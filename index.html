@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b3d2e">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Campo KML</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="vendor/leaflet.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div id="map"></div>
+
+<header class="bar">
+  <button id="btnMenu" class="ibtn" type="button" aria-label="Capas y herramientas"></button>
+  <div class="brand">Campo <b>KML</b></div>
+  <button id="btnImport" class="tbtn" type="button">Importar</button>
+</header>
+
+<div id="measureBar" class="mbar" hidden>
+  <span id="mText">Toca el mapa para añadir puntos</span>
+  <button id="mUndo" class="tbtn" type="button">Deshacer</button>
+  <button id="mEnd" class="tbtn" type="button">Terminar</button>
+</div>
+
+<div class="fabs">
+  <button id="fabLocate" class="fab" type="button" aria-label="Mi ubicación"></button>
+  <button id="fabPhoto" class="fab" type="button" aria-label="Foto georreferenciada"></button>
+  <button id="fabNote" class="fab main" type="button" aria-label="Nueva anotación en mi posición"></button>
+</div>
+
+<aside id="drawer" class="drawer" hidden></aside>
+<div id="scrim" class="scrim" hidden></div>
+
+<section id="sheet" class="sheet" hidden aria-live="polite">
+  <button id="sheetX" class="sheet-x" type="button" aria-label="Cerrar"></button>
+  <div id="sheetBody"></div>
+</section>
+
+<div id="toast" class="toast" hidden></div>
+
+<input type="file" id="inKml" accept=".kml,.kmz,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz" multiple hidden>
+<input type="file" id="inPhoto" accept="image/*" capture="environment" hidden>
+<input type="file" id="inVideo" accept="video/*" capture="environment" hidden>
+<input type="file" id="inGallery" accept="image/*,video/*,audio/*" multiple hidden>
+
+<script src="vendor/leaflet.js"></script>
+<script src="vendor/jszip.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

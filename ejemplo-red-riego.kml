@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Ejemplo red de riego</name>
+<Style id="tub"><LineStyle><color>ff00d4ff</color><width>4</width></LineStyle></Style>
+<StyleMap id="tubMap"><Pair><key>normal</key><styleUrl>#tub</styleUrl></Pair><Pair><key>highlight</key><styleUrl>#tub</styleUrl></Pair></StyleMap>
+<Folder><name>Tuberías</name>
+<Placemark><name>Ramal principal R-1</name><description>PEAD DN 315 PN10</description><styleUrl>#tubMap</styleUrl>
+<ExtendedData><Data name="Material"><value>PEAD</value></Data><Data name="DN"><value>315</value></Data></ExtendedData>
+<LineString><coordinates>-2.9195,37.6125,0 -2.9172,37.6138,0 -2.9141,37.6146,0 -2.9108,37.6151,0 -2.9079,37.6163,0 -2.9052,37.6181,0</coordinates></LineString></Placemark>
+<Placemark><name>Ramal secundario R-1.2</name><LineString><coordinates>-2.9108,37.6151 -2.9104,37.6128 -2.9097,37.6104 -2.9083,37.6089</coordinates></LineString></Placemark>
+</Folder>
+<Folder><name>Elementos</name>
+<Placemark><name>Balsa de regulación</name><Polygon><outerBoundaryIs><LinearRing><coordinates>-2.9221,37.6112 -2.9200,37.6115 -2.9198,37.6101 -2.9219,37.6098 -2.9221,37.6112</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>
+<Placemark><name>Hidrante H-12</name><Point><coordinates>-2.9083,37.6089,0</coordinates></Point></Placemark>
+</Folder></Document></kml>
