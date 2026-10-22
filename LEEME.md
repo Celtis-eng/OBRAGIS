@@ -1,4 +1,4 @@
-# Campo KML
+# OBRA-GIS
 
 App de campo para Android (también funciona en iPhone y en el ordenador) que:
 
@@ -13,7 +13,7 @@ App de campo para Android (también funciona en iPhone y en el ordenador) que:
 - **Guardar zona sin conexión**: descarga la ortofoto PNOA de la zona visible para trabajar sin cobertura.
 - **Fotos con GPS**: importa fotos JPEG y las coloca solas en el mapa con su fecha, altitud y orientación (si la cámara guardó la ubicación).
 - **Gestor de capas**: mostrar/ocultar, orden, opacidad, color, renombrar, encuadrar y borrar. Servicios WMS/WMTS: Catastro, SIGPAC, MTN y límites del IGN, o cualquier WMS escribiendo su dirección.
-- Recibir KML/KMZ **compartidos desde WhatsApp, Gmail o Drive** (botón Compartir → Campo KML), una vez instalada.
+- Recibir KML/KMZ **compartidos desde WhatsApp, Gmail o Drive** (botón Compartir → OBRA-GIS), una vez instalada.
 
 Todo se guarda en el propio móvil. No hay servidor ni cuentas.
 
@@ -52,7 +52,7 @@ La cámara, el GPS y el micrófono solo funcionan si la app se abre desde una di
 **Instalar en Android**
 1. Abre la dirección en Chrome.
 2. Menú ⋮ → *Instalar aplicación* (o *Añadir a pantalla de inicio*).
-3. Ya tienes el icono de Campo KML, y la app se abre a pantalla completa como cualquier otra.
+3. Ya tienes el icono de OBRA-GIS, y la app se abre a pantalla completa como cualquier otra.
 4. La primera vez acepta los permisos de ubicación, cámara y micrófono.
 
 Para actualizar la app, sube los ficheros nuevos al mismo sitio. Los móviles cogen la nueva versión al abrirla dos veces. Si cambias `app.js`, sube también el número de `SHELL = 'shell-v1'` en `sw.js`.
@@ -81,6 +81,6 @@ El repositorio compila la app Android solo, con GitHub Actions, cada vez que sub
 
 **Instalar en el móvil:** abre el enlace del APK en Chrome, descárgalo y ábrelo. Android pedirá permiso para "instalar aplicaciones desconocidas" desde Chrome. Concédelo. Play Protect puede avisar de que la app no está en Google Play. Pulsa "Instalar de todas formas".
 
-**Fotos con GPS en la app nativa:** la forma más fiable es seleccionarlas en la Galería y usar Compartir → Campo KML. Así la app puede pedir a Android la foto original con las coordenadas.
+**Fotos con GPS en la app nativa:** la forma más fiable es seleccionarlas en la Galería y usar Compartir → OBRA-GIS. Así la app puede pedir a Android la foto original con las coordenadas.
 
 **Google híbrido en la app nativa:** si restringes la clave de Google por sitio web, añade `https://localhost/*` a la lista.

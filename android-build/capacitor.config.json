@@ -1,6 +1,6 @@
 {
   "appId": "es.obragis.campokml",
-  "appName": "Campo KML",
+  "appName": "OBRA-GIS",
   "webDir": "www",
   "android": { "allowMixedContent": false }
 }

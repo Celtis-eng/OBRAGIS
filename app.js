@@ -1,5 +1,5 @@
 'use strict';
-/* Campo KML — visor de KML/KMZ sobre ortofoto con gestor de capas, anotaciones
+/* OBRA-GIS — visor de KML/KMZ sobre ortofoto con gestor de capas, anotaciones
    georreferenciadas (fotos, vídeos, notas de voz y texto), importación de fotos con GPS
    y navegación con Google Maps. Funciona como web instalable y como app nativa (Capacitor). */
 
@@ -1183,7 +1183,7 @@ async function exportKMZ() {
   }
   const st = (id, c) => `<Style id="${id}"><IconStyle><color>${c}</color><Icon><href>http://maps.google.com/mapfiles/kml/paddle/wht-blank.png</href></Icon></IconStyle></Style>`;
   const body = [...folders].map(([name, pms]) => `<Folder><name>${xml(name)}</name>\n${pms}</Folder>`).join('\n');
-  const kmlDoc = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Campo KML ${new Date().toLocaleDateString('es-ES')}</name>
+  const kmlDoc = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>OBRA-GIS ${new Date().toLocaleDateString('es-ES')}</name>
 ${st('photo', 'ffc27119')}${st('video', 'ffb5369c')}${st('audio', 'ff3e8a2b')}${st('note', 'ff0c59e8')}
 ${body}</Document></kml>`;
   zip.file('doc.kml', kmlDoc);
@@ -1279,7 +1279,7 @@ async function renderDrawer() {
     typeOf(e.rec) === 'kml' ? `<span class="sw" style="background:${e.rec.color}"></span>` : `<span class="sw ic">${ICON.wms}</span>`,
     { move: ordered.length > 1, body: layerOptions(e) })).join('');
 
-  d.innerHTML = `<div class="dhead"><h2>Campo KML</h2><button class="mini ic" id="dClose" aria-label="Cerrar">${ICON.close}</button></div>
+  d.innerHTML = `<div class="dhead"><h2>OBRA-GIS</h2><button class="mini ic" id="dClose" aria-label="Cerrar">${ICON.close}</button></div>
     <h3>Capas</h3>
     <div class="lgroup">${pointRows}</div>
     <div class="lgroup">${otherRows || '<p class="empty">Aún no hay capas KML ni servicios.</p>'}</div>

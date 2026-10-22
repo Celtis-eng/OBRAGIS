@@ -1,6 +1,6 @@
 {
-  "name": "Campo KML",
-  "short_name": "Campo KML",
+  "name": "OBRA-GIS",
+  "short_name": "OBRA-GIS",
   "description": "Visor de KML/KMZ sobre ortofoto con anotaciones, fotos, vídeos y notas de voz georreferenciadas.",
   "lang": "es",
   "start_url": "./",
