@@ -276,13 +276,92 @@ async function setBase(id) {
   if (!$('#drawer').hidden) renderDrawer();
 }
 
-/* ---------------- Catálogo de servicios de capas ---------------- */
-const CATALOG = [
-  { name: 'Parcelas de Catastro', kind: 'wms', url: 'https://ovc.catastro.meh.es/Cartografia/WMS/ServidorWMS.aspx', layers: 'Catastro', attribution: '© D. G. del Catastro' },
-  { name: 'SIGPAC · recintos', kind: 'wms', url: 'https://wms.mapa.gob.es/sigpac/wms', layers: 'AU.Sigpac:recinto', attribution: 'SIGPAC © MAPA' },
-  { name: 'Mapa topográfico MTN (IGN)', kind: 'wmts', url: ign('mapa-raster', 'MTN', 'image/jpeg'), maxNative: 18, opacity: 0.7, attribution: ATTR_IGN },
-  { name: 'Límites administrativos (IGN)', kind: 'wms', url: 'https://www.ign.es/wms-inspire/unidades-administrativas', layers: 'AU.AdministrativeBoundary', attribution: ATTR_IGN },
+/* ---------------- Catálogo de servicios de capas (afecciones de obra) ----------------
+   DERA: Datos Espaciales de Referencia de Andalucía (IECA). REDIAM: Junta de Andalucía.
+   MITECO: Sistema Nacional de Cartografía de Zonas Inundables y DPH. */
+const DERA = (tema, capa, name, extra = {}) => ({ name, kind: 'wms', url: `https://www.ideandalucia.es/services/${tema}/wms`, layers: capa, info: 'json', cover: 'Andalucía', attribution: 'DERA © IECA, Junta de Andalucía', ...extra });
+const MITECO = (svc, name, extra = {}) => ({ name, kind: 'wms', url: `https://gis.miteco.gob.es/geoserver/agua/${svc}/wms`, layers: svc, info: 'json', cover: 'España', opacity: 0.6, attribution: '© MITECO', ...extra });
+const VVPP_URL = 'https://www.juntadeandalucia.es/medioambiente/mapwms/REDIAM_Inventario_VVPP';
+const CATALOG_GROUPS = [
+  { id: 'energia', name: 'Redes eléctricas, gas y energía', items: [
+    DERA('DERA_g10_infra_energetica', 'g10_14_LineaElectrica', 'Líneas eléctricas'),
+    DERA('DERA_g10_infra_energetica', 'g10_13_SubestacionElectrica', 'Subestaciones eléctricas'),
+    DERA('DERA_g10_infra_energetica', 'g10_18_Gasoducto', 'Gasoductos'),
+    DERA('DERA_g10_infra_energetica', 'g10_19_Oleoducto', 'Oleoductos'),
+    DERA('DERA_g10_infra_energetica', 'g10_15_PlantaGas', 'Plantas de gas'),
+    DERA('DERA_g10_infra_energetica', 'g10_03_PlantaSolar', 'Plantas solares'),
+    DERA('DERA_g10_infra_energetica', 'g10_02_ParqueEolico', 'Parques eólicos'),
+    DERA('DERA_g09_transport_com', 'g09_26_Antena', 'Antenas de telecomunicación'),
+  ] },
+  { id: 'agua', name: 'Agua: dominio público hidráulico e inundabilidad', items: [
+    MITECO('DPH_Estimado', 'DPH cartográfico (cauces)'),
+    MITECO('DPH_Deslindado', 'DPH deslindado'),
+    MITECO('ZI_Laminas_ZFP', 'Zona de flujo preferente'),
+    MITECO('Zi_laminas_q10', 'Zona inundable T=10 años'),
+    MITECO('Zi_laminas_q100', 'Zona inundable T=100 años'),
+    MITECO('Zi_laminas_q500', 'Zona inundable T=500 años'),
+    DERA('DERA_g3_hidrografia', 'g03_01_Rio', 'Ríos y arroyos'),
+    DERA('DERA_g3_hidrografia', 'g03_06_Embalse', 'Embalses'),
+  ] },
+  { id: 'hidraulica', name: 'Infraestructura hidráulica y saneamiento', items: [
+    DERA('DERA_g3_hidrografia', 'g03_08_Conduccion', 'Conducciones de agua'),
+    DERA('DERA_g3_hidrografia', 'g03_13_CanalArtificial', 'Canales'),
+    DERA('DERA_g3_hidrografia', 'g03_11_Canalizacion', 'Canalizaciones'),
+    DERA('DERA_g3_hidrografia', 'g03_15_Colector', 'Colectores'),
+    DERA('DERA_g3_hidrografia', 'g03_07_Captacion', 'Captaciones'),
+    DERA('DERA_g3_hidrografia', 'g03_09_Deposito', 'Depósitos'),
+    DERA('DERA_g3_hidrografia', 'g03_10_Balsa', 'Balsas'),
+    DERA('DERA_g10_infra_energetica', 'g10_27_Edar', 'Depuradoras (EDAR)'),
+    DERA('DERA_g10_infra_energetica', 'g10_29_Etap', 'Potabilizadoras (ETAP)'),
+  ] },
+  { id: 'transporte', name: 'Carreteras y ferrocarril', items: [
+    DERA('DERA_g9_transport_com', 'g09_14_RedCarreteras', 'Red de carreteras'),
+    DERA('DERA_g9_transport_com', 'g09_17_PuntoKilometrico', 'Puntos kilométricos'),
+    DERA('DERA_g9_transport_com', 'g09_21_Ferrocarril', 'Ferrocarril'),
+    DERA('DERA_g9_transport_com', 'g09_19_Camino', 'Caminos'),
+    DERA('DERA_g9_transport_com', 'g09_24_ViaVerde', 'Vías verdes'),
+  ] },
+  { id: 'vvpp', name: 'Vías pecuarias', items: [
+    { name: 'Vías pecuarias (inventario REDIAM)', kind: 'wms', url: VVPP_URL, layers: 'Inventario_VVPP', info: 'html', cover: 'Andalucía', attribution: 'REDIAM, Junta de Andalucía' },
+    { name: 'Tramos deslindados de vías pecuarias', kind: 'wms', url: VVPP_URL, layers: 'linea_base_deslindada', info: 'html', cover: 'Andalucía', attribution: 'REDIAM, Junta de Andalucía' },
+    { name: 'Lugares asociados a vías pecuarias', kind: 'wms', url: VVPP_URL, layers: 'Lugares_VVPP', info: 'html', cover: 'Andalucía', attribution: 'REDIAM, Junta de Andalucía' },
+    DERA('DERA_g9_transport_com', 'g09_22_ViasPecuarias', 'Vías pecuarias (DERA)'),
+  ] },
+  { id: 'natural', name: 'Espacios naturales y montes', items: [
+    DERA('DERA_g11_patrimonio', 'g11_07_Enp_RegimenProteccion', 'Espacios naturales protegidos', { opacity: 0.6 }),
+    DERA('DERA_g11_patrimonio', 'g11_09_RedNatura_ZEC', 'Red Natura 2000 · ZEC', { opacity: 0.6 }),
+    DERA('DERA_g11_patrimonio', 'g11_09_RedNatura_ZEPA', 'Red Natura 2000 · ZEPA', { opacity: 0.6 }),
+    DERA('DERA_g11_patrimonio', 'g11_09_RedNatura_LIC', 'Red Natura 2000 · LIC', { opacity: 0.6 }),
+    DERA('DERA_g11_patrimonio', 'g11_15_Montes', 'Montes públicos', { opacity: 0.6 }),
+    DERA('DERA_g11_patrimonio', 'g11_14_HumedalesRamsar', 'Humedales Ramsar', { opacity: 0.6 }),
+    DERA('DERA_g11_patrimonio', 'g11_10_ReservaBiosfera', 'Reservas de la Biosfera', { opacity: 0.5 }),
+    DERA('DERA_g11_patrimonio', 'g11_04_InventarioAndaluzGeorrecursos', 'Georrecursos'),
+  ] },
+  { id: 'patrimonio', name: 'Patrimonio cultural', items: [
+    DERA('DERA_g11_patrimonio', 'g11_18_BienesProtegidos_pol', 'Bienes protegidos (áreas)', { opacity: 0.6 }),
+    DERA('DERA_g11_patrimonio', 'g11_17_BienesProtegidos_pun', 'Bienes protegidos (puntos)'),
+    DERA('DERA_g11_patrimonio', 'g11_19_EntornosProteccionBIC', 'Entornos de protección de BIC', { opacity: 0.5 }),
+  ] },
+  { id: 'parcelario', name: 'Parcelario, límites y servidumbres', items: [
+    { name: 'Parcelas de Catastro', kind: 'wms', url: 'https://ovc.catastro.meh.es/Cartografia/WMS/ServidorWMS.aspx', layers: 'Catastro', info: 'html', cover: 'España', attribution: '© D. G. del Catastro' },
+    { name: 'SIGPAC · recintos', kind: 'wms', url: 'https://wms.mapa.gob.es/sigpac/wms', layers: 'AU.Sigpac:recinto', info: 'html', cover: 'España', attribution: 'SIGPAC © MAPA' },
+    DERA('DERA_g13_limites_administrativos', 'g13_01_TerminoMunicipal', 'Términos municipales', { opacity: 0.8 }),
+    DERA('DERA_g13_limites_administrativos', 'g13_42_LineaCostaDMPT', 'Deslinde dominio público marítimo-terrestre'),
+    DERA('DERA_g12_servicios', 'g12_31_ZonaMilitar', 'Zonas militares', { opacity: 0.6 }),
+    DERA('DERA_g8_tejido_economico', 'g08_07_ActividadExtractiva', 'Actividades extractivas (canteras)'),
+  ] },
+  { id: 'referencia', name: 'Cartografía de referencia', items: [
+    { name: 'Mapa topográfico MTN (IGN)', kind: 'wmts', url: ign('mapa-raster', 'MTN', 'image/jpeg'), maxNative: 18, opacity: 0.7, cover: 'España', attribution: ATTR_IGN },
+    DERA('DERA_g1_relieve', 'g01_03_CurvaNivel', 'Curvas de nivel'),
+    { name: 'Límites administrativos (IGN)', kind: 'wms', url: 'https://www.ign.es/wms-inspire/unidades-administrativas', layers: 'AU.AdministrativeBoundary', cover: 'España', attribution: ATTR_IGN },
+  ] },
 ];
+const CATALOG = CATALOG_GROUPS.flatMap(g => g.items.map(i => ({ ...i, group: g.id })));
+// Selección básica para revisar las afecciones de una obra
+const AFECCIONES_KIT = ['Líneas eléctricas', 'Subestaciones eléctricas', 'Gasoductos', 'Oleoductos', 'Red de carreteras', 'Ferrocarril',
+  'Vías pecuarias (inventario REDIAM)', 'DPH cartográfico (cauces)', 'Zona de flujo preferente', 'Zona inundable T=100 años',
+  'Conducciones de agua', 'Canales', 'Espacios naturales protegidos', 'Red Natura 2000 · ZEC', 'Red Natura 2000 · ZEPA',
+  'Montes públicos', 'Bienes protegidos (áreas)', 'Bienes protegidos (puntos)', 'Parcelas de Catastro'];
 
 /* ---------------- Lectura de KML ---------------- */
 const byTag = (el, tag) => Array.from(el.getElementsByTagNameNS('*', tag));
@@ -413,6 +492,11 @@ function buildRaster(entry) {
   entry.tile = r.kind === 'wmts'
     ? L.tileLayer(r.url, { ...common, maxNativeZoom: r.maxNative || 19 })
     : L.tileLayer.wms(r.url, { ...common, layers: r.layers, format: 'image/png', transparent: true, version: r.version || '1.1.1' });
+  let errors = 0, warned = false;
+  entry.tile.on('tileerror', () => {
+    if (++errors >= 6 && !warned && navigator.onLine !== false) { warned = true; toast(`El servicio «${r.name}» no responde ahora mismo. Prueba más tarde o quita la capa.`, 6000); }
+  });
+  entry.tile.on('tileload', () => { errors = 0; });
 }
 function mapLayerOf(entry) { return entry.group || entry.tile || pointGroup(entry.rec.id); }
 
@@ -606,29 +690,62 @@ function importMenu() {
   b.querySelector('[data-a=photos]').onclick = () => { closeSheet(); $('#inPhotosImport').click(); };
   b.querySelector('[data-a=service]').onclick = serviceMenu;
 }
+let catalogQuery = '', catalogOpen = 'energia';
 function serviceMenu() {
-  const b = openSheet(`<h2>Añadir capa de servicio</h2><p class="sub">Servicios públicos WMS / WMTS</p>
-    <div class="acts">${CATALOG.map((c, i) => `<button class="btn full" data-cat="${i}">${ICON.wms}${esc(c.name)}</button>`).join('')}</div>
+  const q = catalogQuery.trim().toLowerCase();
+  const groups = CATALOG_GROUPS.map(g => {
+    const items = g.items.filter(i => !q || i.name.toLowerCase().includes(q) || g.name.toLowerCase().includes(q));
+    if (!items.length) return '';
+    const open = q || catalogOpen === g.id;
+    const rows = items.map(i => {
+      const k = CATALOG.findIndex(c => c.url === i.url && c.layers === i.layers);
+      const added = !!serviceExists(i);
+      return `<button class="crow ${added ? 'added' : ''}" data-cat="${k}" type="button"><span>${esc(i.name)}</span><small>${esc(i.cover || '')}${added ? ' · añadida' : ''}</small></button>`;
+    }).join('');
+    return `<div class="cgroup ${open ? 'open' : ''}">
+      <button class="chead" data-grp="${g.id}" type="button">${esc(g.name)}<small>${items.length}</small></button>
+      ${open ? `<div class="citems">${rows}<button class="mini" data-grpall="${g.id}" type="button">Añadir todas las de este grupo</button></div>` : ''}
+    </div>`;
+  }).join('');
+  const b = openSheet(`<h2>Capas de servicios públicos</h2>
+    <p class="sub">Servicios afectados y condicionantes a revisar antes de la obra</p>
+    <div class="acts"><button class="btn go full" data-a="kit">${ICON.layers}Añadir kit de afecciones de obra</button></div>
+    <div class="field"><input type="text" id="catQ" placeholder="Buscar capa (p. ej. gas, carretera, inundable)" value="${esc(catalogQuery)}"></div>
+    <div class="catalog">${groups || '<p class="empty">Ninguna capa coincide con la búsqueda.</p>'}</div>
     <h3 class="sh">Otro servicio WMS</h3>
-    <div class="field"><input type="text" id="wName" placeholder="Nombre (p. ej. Red Natura 2000)"></div>
+    <div class="field"><input type="text" id="wName" placeholder="Nombre (p. ej. Planeamiento urbanístico)"></div>
     <div class="field"><input type="text" id="wUrl" placeholder="URL del servicio (https://…)" inputmode="url"></div>
     <div class="field"><input type="text" id="wLayers" placeholder="Nombre de la capa o capas, separadas por comas"></div>
     <div class="acts"><button class="btn pri full" data-a="add">Añadir servicio</button></div>
-    <p class="hint">La URL y el nombre de la capa aparecen en la ficha del servicio (GetCapabilities). Usa la dirección https.</p>`);
-  b.querySelectorAll('[data-cat]').forEach(bt => bt.onclick = () => addService(CATALOG[+bt.dataset.cat]));
+    <p class="hint">Las redes de distribución (baja y media tensión, gas canalizado, telecomunicaciones, abastecimiento y saneamiento municipal) no son públicas: hay que pedírselas a cada compañía antes de excavar.</p>`);
+  const qi = $('#catQ');
+  qi.oninput = () => { catalogQuery = qi.value; const pos = qi.selectionStart; serviceMenu(); const n = $('#catQ'); n.focus(); n.setSelectionRange(pos, pos); };
+  b.querySelector('[data-a=kit]').onclick = () => addServices(CATALOG.filter(c => AFECCIONES_KIT.includes(c.name)), 'kit de afecciones').then(serviceMenu);
+  b.querySelectorAll('[data-grp]').forEach(bt => bt.onclick = () => { catalogOpen = catalogOpen === bt.dataset.grp ? '' : bt.dataset.grp; serviceMenu(); });
+  b.querySelectorAll('[data-grpall]').forEach(bt => bt.onclick = () => { const g = CATALOG_GROUPS.find(x => x.id === bt.dataset.grpall); addServices(g.items, g.name).then(serviceMenu); });
+  b.querySelectorAll('[data-cat]').forEach(bt => bt.onclick = async () => { await addService(CATALOG[+bt.dataset.cat]); serviceMenu(); });
   b.querySelector('[data-a=add]').onclick = () => {
     const url = $('#wUrl').value.trim().split('?')[0], lay = $('#wLayers').value.trim();
     if (!/^https:\/\//i.test(url) || !lay) { toast('Escribe la URL (https://…) y el nombre de la capa.'); return; }
-    addService({ name: $('#wName').value.trim() || lay, kind: 'wms', url, layers: lay });
+    addService({ name: $('#wName').value.trim() || lay, kind: 'wms', url, layers: lay, info: 'html' }).then(() => closeSheet());
   };
 }
-async function addService(def) {
-  const dup = [...layers.values()].find(e => e.rec.url === def.url && (e.rec.layers || '') === (def.layers || ''));
-  if (dup) { toast(`«${dup.rec.name}» ya está en tus capas.`); return; }
-  const rec = { id: uid(), type: 'wms', kind: def.kind, name: def.name, url: def.url, layers: def.layers || '', maxNative: def.maxNative, attribution: def.attribution || '', visible: true, opacity: def.opacity ?? 1, order: nextOrder(), created: Date.now() };
+const serviceExists = def => [...layers.values()].find(e => e.rec.url === def.url && (e.rec.layers || '') === (def.layers || ''));
+async function addService(def, quiet = false) {
+  const dup = serviceExists(def);
+  if (dup) { if (!quiet) toast(`«${dup.rec.name}» ya está en tus capas.`); return false; }
+  const rec = { id: uid(), type: 'wms', kind: def.kind, name: def.name, url: def.url, layers: def.layers || '', maxNative: def.maxNative, info: def.info || '', cover: def.cover || '',
+    attribution: def.attribution || '', visible: true, opacity: def.opacity ?? 1, order: nextOrder(), created: Date.now() };
   await DB.put('layers', rec);
   registerLayer(rec);
-  closeSheet(); toast(`Capa «${rec.name}» añadida. Puedes cambiar su orden y transparencia en Capas.`, 5000);
+  if (!quiet) toast(`Capa «${rec.name}» añadida. Mantén pulsado un punto del mapa para ver sus datos.`, 5000);
+  return true;
+}
+async function addServices(defs, label) {
+  let n = 0;
+  for (const d of defs) if (await addService(d, true)) n++;
+  toast(n ? `${n} capas añadidas${label ? ' (' + label + ')' : ''}. Mantén pulsado un punto para consultar las afecciones.` : 'Esas capas ya estaban añadidas.', 6000);
+  if (!$('#drawer').hidden) renderDrawer();
 }
 
 /* ---------------- Pulsación larga en el mapa ---------------- */
@@ -656,6 +773,7 @@ let longFired = 0;
 
 function pointMenu(ll) {
   if (measure) return addMeasurePt(ll);
+  const queryable = orderedLayers().filter(e => e.rec.visible && e.tile && e.rec.kind === 'wms' && e.rec.info);
   const b = openSheet(`<h2>Punto seleccionado</h2><p class="sub">Pulsación larga${distFromMe(ll.lat, ll.lng)}</p>
     ${coordsBlock(ll.lat, ll.lng)}
     <div class="acts">
@@ -665,13 +783,76 @@ function pointMenu(ll) {
       <button class="btn" data-a="copy">${ICON.copy}Copiar coordenadas</button>
       <button class="btn" data-a="measure">${ICON.ruler}Medir desde aquí</button>
       <a class="btn full" href="${viewUrl(ll.lat, ll.lng)}" target="_blank" rel="noopener">Ver en Google Maps</a>
-    </div>`);
+    </div>
+    ${queryable.length ? `<div class="afec"><h3 class="sh">Afecciones en este punto</h3><div id="afecList"><p class="hint">Consultando ${queryable.length} capas…</p></div></div>` : ''}`);
   const cross = L.marker(ll, { icon: L.divIcon({ className: '', html: '<div class="cross"></div>', iconSize: [28, 28], iconAnchor: [14, 14] }), interactive: false }).addTo(map);
   onSheetClose(() => map.removeLayer(cross));
   b.querySelector('[data-a=note]').onclick = () => openEditor({ lat: ll.lat, lng: ll.lng, src: 'mapa' });
   b.querySelector('[data-a=photo]').onclick = () => { const at = { lat: ll.lat, lng: ll.lng, src: 'mapa' }; capture('inPhoto', files => { openEditor(at); addMedia(files); }); };
   b.querySelector('[data-a=copy]').onclick = () => copyText(`${fmtLL(ll.lat, ll.lng)}\n${fmtUTM(ll.lat, ll.lng)}`);
   b.querySelector('[data-a=measure]').onclick = () => { closeSheet(); startMeasure(ll); };
+  if (queryable.length) queryAfecciones(ll, queryable);
+}
+
+/* ---------------- Consulta de datos de las capas WMS (GetFeatureInfo) ---------------- */
+function featureInfoUrl(rec, ll, fmt) {
+  const z = map.getZoom(), size = 101, res = 40075016.686 / (256 * 2 ** z) * 1.5; // tolerancia de unos 75 px de pantalla
+  const p = L.CRS.EPSG3857.project(L.latLng(ll)), half = size / 2 * res;
+  const bbox = [p.x - half, p.y - half, p.x + half, p.y + half].map(v => v.toFixed(2)).join(',');
+  const lay = encodeURIComponent(rec.layers);
+  return `${rec.url}?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetFeatureInfo&LAYERS=${lay}&QUERY_LAYERS=${lay}&STYLES=&SRS=EPSG:3857&BBOX=${bbox}`
+    + `&WIDTH=${size}&HEIGHT=${size}&X=${Math.floor(size / 2)}&Y=${Math.floor(size / 2)}&FEATURE_COUNT=5&FORMAT=image/png&INFO_FORMAT=${encodeURIComponent(fmt)}`;
+}
+async function httpGetText(url) {
+  const H = Plug('CapacitorHttp');
+  if (NATIVE && H) { const r = await H.get({ url, responseType: 'text', connectTimeout: 12000, readTimeout: 12000 }); if (r.status >= 400) throw new Error('HTTP ' + r.status); return typeof r.data === 'string' ? r.data : JSON.stringify(r.data); }
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 12000);
+  try { const r = await fetch(url, { signal: ctl.signal }); if (!r.ok) throw new Error('HTTP ' + r.status); return await r.text(); }
+  finally { clearTimeout(t); }
+}
+const HIDE_KEYS = /^(fid|gid|objectid|shape|geom|the_geom|bbox|id_?$)/i;
+function parseInfo(text, fmt) {
+  if (fmt === 'json') {
+    const j = JSON.parse(text);
+    return (j.features || []).map(f => Object.entries(f.properties || {}).filter(([k, v]) => v !== null && v !== '' && !HIDE_KEYS.test(k) && typeof v !== 'object'));
+  }
+  const d = new DOMParser().parseFromString(text, 'text/html');
+  d.querySelectorAll('script,style').forEach(n => n.remove());
+  const rows = [...d.querySelectorAll('tr')].map(tr => [...tr.children].map(td => td.textContent.trim())).filter(r => r.length >= 2 && r.some(Boolean));
+  if (rows.length) {
+    // tablas con cabecera en la primera fila → pares campo/valor
+    if (rows[0].length > 2 && rows.length >= 2) return rows.slice(1).map(r => rows[0].map((h, i) => [h, r[i] || '']).filter(([k, v]) => v && !HIDE_KEYS.test(k)));
+    return [rows.map(r => [r[0], r.slice(1).join(' ')]).filter(([k, v]) => v)];
+  }
+  const txt = (d.body.textContent || '').replace(/\s+\n/g, '\n').replace(/\n{2,}/g, '\n').trim();
+  if (!txt || /no (features|results|se ha encontrado)|search returned no results/i.test(txt)) return [];
+  return [[['', txt.slice(0, 600)]]];
+}
+async function queryAfecciones(ll, list) {
+  const out = list.map(e => ({ e, html: '' }));
+  const render = () => {
+    const box = $('#afecList'); if (!box) return;
+    const hits = out.filter(o => o.html && o.html !== 'none' && !o.fail);
+    const fails = out.filter(o => o.fail);
+    const pending = out.filter(o => !o.html).length;
+    let h = hits.map(o => o.html).join('');
+    if (pending) h += `<p class="hint">Consultando ${pending} capas…</p>`;
+    else if (!hits.length) h += '<p class="hint">Ninguna de las capas consultadas tiene elementos en este punto. Si buscas algo fino, como una línea, acerca el mapa y vuelve a pulsar.</p>';
+    if (fails.length) h += `<p class="hint">Sin respuesta: ${fails.map(o => `<a href="${esc(o.link)}" target="_blank" rel="noopener">${esc(o.e.rec.name)}</a>`).join(', ')}. Pulsa una para ver sus datos en el navegador.</p>`;
+    box.innerHTML = h;
+  };
+  await Promise.all(out.map(async o => {
+    const r = o.e.rec, fmt = r.info === 'json' ? 'application/json' : 'text/html';
+    const link = featureInfoUrl(r, ll, 'text/html');
+    try {
+      const feats = parseInfo(await httpGetText(featureInfoUrl(r, ll, fmt)), r.info);
+      o.html = feats.length ? `<div class="afec-item"><b>${esc(r.name)}</b>${feats.slice(0, 3).map(f => `<table class="attrs">${f.slice(0, 12).map(([k, v]) => `<tr>${k ? `<td>${esc(k)}</td>` : ''}<td${k ? '' : ' colspan="2"'}>${esc(String(v))}</td></tr>`).join('')}</table>`).join('')}</div>` : 'none';
+    } catch (err) {
+      o.html = 'fail'; o.fail = true; o.link = link;
+    }
+    render();
+  }));
+  render();
 }
 
 /* ---------------- GPS ---------------- */
@@ -1070,13 +1251,15 @@ function layerOptions(e) {
   if (t === 'kml') h += `<label class="rng">Color<input type="color" value="${r.color}" data-col="${id}"></label>`;
   h += `<div class="field row"><input type="text" value="${esc(r.name)}" data-name="${id}" aria-label="Nombre de la capa"><button class="mini" data-rename="${id}">Renombrar</button></div>`;
   h += `<div class="row">${t !== 'wms' ? `<button class="mini" data-zoom="${id}">Encuadrar</button>` : ''}<button class="mini del" data-dell="${id}">Eliminar capa</button></div>`;
-  if (t === 'wms') h += `<p class="hint">${esc(r.url)}${r.layers ? ' · ' + esc(r.layers) : ''}</p>`;
+  if (t === 'wms' && r.kind !== 'wmts') h += `<div class="legend"><img src="${esc(legendUrl(r))}" alt="Leyenda de ${esc(r.name)}" onerror="this.parentNode.remove()"></div>`;
+  if (t === 'wms') h += `<p class="hint">${esc(r.url)}${r.layers ? ' · ' + esc(r.layers) : ''}${r.cover ? ' · cobertura: ' + esc(r.cover) : ''}</p>`;
   return h;
 }
+const legendUrl = r => `${r.url}?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetLegendGraphic&FORMAT=image/png&LAYER=${encodeURIComponent(r.layers.split(',')[0])}`;
 function layerSub(e) {
   const t = typeOf(e.rec);
   if (t === 'kml') return `KML · ${e.feats.length} elementos`;
-  if (t === 'wms') return 'Servicio de imagen';
+  if (t === 'wms') return 'Servicio' + (e.rec.cover ? ' · ' + e.rec.cover : '');
   const n = [...notes.values()].filter(x => x.layerId === e.rec.id).length;
   return `Fotos con GPS · ${n}`;
 }
@@ -1238,7 +1421,12 @@ function nativeInbox() { // app nativa: «Abrir con» y «Compartir»
     const recs = (await DB.all('layers')).sort((a, b) => a.created - b.created);
     recs.forEach((r, i) => { if (r.order == null) r.order = i + 1; if (!r.type) r.type = 'kml'; });
     for (const rec of recs) { try { registerLayer(rec); } catch (e) { console.error(e); } }
-    if (settings.catastro && !recs.some(r => r.url === CATALOG[0].url)) { settings.catastro = false; saveSettings(); addService(CATALOG[0]); } // versión anterior
+    const cat = CATALOG.find(c => c.name === 'Parcelas de Catastro');
+    if (settings.catastro && !recs.some(r => r.url === cat.url)) { settings.catastro = false; saveSettings(); addService(cat, true); } // versión anterior
+    for (const r of recs) { // completa datos de capas añadidas con versiones anteriores
+      const c = r.type === 'wms' && !r.info && CATALOG.find(x => x.url === r.url && x.layers === r.layers);
+      if (c) { r.info = c.info || ''; r.cover = c.cover || ''; DB.put('layers', r); }
+    }
     if (settings.notesVisible !== false) pointGroup('notes').addTo(map);
     for (const n of await DB.all('notes')) { notes.set(n.id, n); drawNote(n); }
   } catch (e) { toast('No se pudieron leer los datos guardados: ' + e.message, 7000); }

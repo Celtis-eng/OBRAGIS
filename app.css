@@ -142,3 +142,19 @@ textarea{resize:vertical;min-height:70px}
 .viewer{position:absolute;inset:0;z-index:2500;background:rgba(0,0,0,.92);display:grid;place-items:center;padding:calc(var(--safe-t) + 10px) calc(var(--safe-r) + 10px) calc(var(--safe-b) + 10px) calc(var(--safe-l) + 10px);cursor:zoom-out}
 .viewer img{max-width:100%;max-height:100%;object-fit:contain}
 .view .media img{cursor:zoom-in}
+/* catálogo de servicios */
+.catalog{display:flex;flex-direction:column;gap:8px;margin:8px 0}
+.cgroup{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.chead{width:100%;display:flex;justify-content:space-between;align-items:center;gap:8px;text-align:left;background:var(--bg2);border:0;color:var(--fg);font:600 .95rem inherit;font-family:inherit;padding:12px;cursor:pointer}
+.chead small{color:var(--muted);font-weight:500}
+.citems{display:flex;flex-direction:column;padding:4px 8px 10px;gap:2px}
+.citems .mini{align-self:flex-start;margin-top:6px}
+.crow{display:flex;justify-content:space-between;align-items:baseline;gap:10px;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);color:var(--fg);font:inherit;padding:10px 4px;cursor:pointer}
+.crow small{color:var(--muted);white-space:nowrap}
+.crow.added span{color:var(--accent);font-weight:600}
+.legend{background:#fff;border-radius:8px;padding:6px;align-self:flex-start;max-width:100%;overflow:auto}
+.legend img{display:block;max-width:100%}
+.afec{margin:6px 0 4px}
+.afec-item{border-left:3px solid var(--go);padding:2px 0 2px 10px;margin:8px 0}
+.afec-item b{display:block;margin-bottom:2px}
+.afec-item .attrs{margin:4px 0}
