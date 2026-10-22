@@ -21,8 +21,15 @@
     "params": {
       "files": [{
         "name": "files",
-        "accept": [".kml", ".kmz", "application/vnd.google-earth.kml+xml", "application/vnd.google-earth.kmz", "application/xml", "text/xml", "application/octet-stream", "application/zip"]
+        "accept": [".kml", ".kmz", "application/vnd.google-earth.kml+xml", "application/vnd.google-earth.kmz", "application/xml", "text/xml", "text/plain", "application/octet-stream", "application/zip", "*/*"]
       }]
     }
-  }
+  },
+  "file_handlers": [{
+    "action": "./",
+    "accept": {
+      "application/vnd.google-earth.kml+xml": [".kml"],
+      "application/vnd.google-earth.kmz": [".kmz"]
+    }
+  }]
 }

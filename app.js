@@ -867,6 +867,12 @@ async function receiveShared() { // ficheros compartidos desde otras apps (Whats
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW', e));
   }
+  if ('launchQueue' in window) { // KML abiertos con doble clic (app instalada en el ordenador)
+    window.launchQueue.setConsumer(async params => {
+      if (!params.files || !params.files.length) return;
+      importFiles(await Promise.all(params.files.map(h => h.getFile())));
+    });
+  }
   if (new URLSearchParams(location.search).has('shared')) { history.replaceState(null, '', './'); receiveShared(); }
   if (!kml.size && !notes.size) toast('Pulsa Importar para abrir un KML o KMZ. Mantén pulsado en el mapa para ver las opciones de un punto.', 8000);
 })();
