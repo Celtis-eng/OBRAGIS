@@ -112,3 +112,33 @@ textarea{resize:vertical;min-height:70px}
 .leaflet-control-attribution{font-size:10px}
 .leaflet-bottom.leaflet-left{margin-bottom:var(--safe-b)}
 @media (prefers-reduced-motion:reduce){.fab.wait svg{animation:none}}
+
+/* gestor de capas */
+.dhead{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.lgroup{border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:10px}
+.lyr{border-bottom:1px solid var(--line)}
+.lyr:last-child{border-bottom:0}
+.lyr .lrow{border:0;padding:6px 8px}
+.lyr.open{background:var(--bg2)}
+.lrow .nm{flex:1;min-width:0;text-align:left;background:none;border:0;color:var(--fg);font:inherit;padding:6px 2px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lrow input[type=checkbox]{width:20px;height:20px;accent-color:var(--accent);flex:none}
+.mini.ic{width:34px;padding:0;display:grid;place-items:center}
+.mini.ic svg{width:18px;height:18px}
+.sw.ic{width:20px;height:20px;background:none;color:var(--muted);display:grid;place-items:center}
+.sw.ic svg{width:18px;height:18px}
+.pin-sw{border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid #fff;box-shadow:0 0 0 1px var(--line)}
+.pin-sw.note{background:#e8590c}.pin-sw.photo{background:#1971c2}
+.lopts{padding:4px 12px 12px;display:flex;flex-direction:column;gap:10px}
+.lopts .row,.field.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.field.row input{flex:1;min-width:0}
+.rng{display:flex;align-items:center;gap:10px;font-size:.85rem;color:var(--muted)}
+.rng input[type=range]{flex:1;accent-color:var(--accent)}
+.rng input[type=color]{width:44px;height:30px;border:1px solid var(--line);border-radius:6px;background:none;padding:0}
+.lopts .hint{overflow-wrap:anywhere}
+.sh{margin:18px 0 6px;font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.pin .cone{position:absolute;left:-3px;top:20px;width:40px;height:40px;fill:rgba(25,113,194,.5);stroke:#fff;stroke-width:1;transform-origin:20px 20px}
+.pin{z-index:0}
+.leaflet-pane#hl,.leaflet-hl-pane{pointer-events:none}
+.viewer{position:absolute;inset:0;z-index:2500;background:rgba(0,0,0,.92);display:grid;place-items:center;padding:calc(var(--safe-t) + 10px) calc(var(--safe-r) + 10px) calc(var(--safe-b) + 10px) calc(var(--safe-l) + 10px);cursor:zoom-out}
+.viewer img{max-width:100%;max-height:100%;object-fit:contain}
+.view .media img{cursor:zoom-in}

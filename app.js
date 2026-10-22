@@ -1,13 +1,17 @@
 'use strict';
-/* Campo KML — visor de KML/KMZ sobre ortofoto con anotaciones georreferenciadas
-   (fotos, vídeos, notas de voz y texto) y navegación con Google Maps. */
+/* Campo KML — visor de KML/KMZ sobre ortofoto con gestor de capas, anotaciones
+   georreferenciadas (fotos, vídeos, notas de voz y texto), importación de fotos con GPS
+   y navegación con Google Maps. Funciona como web instalable y como app nativa (Capacitor). */
 
 const $ = (s, r = document) => r.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const NATIVE = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+const Plug = name => (window.Capacitor && window.Capacitor.Plugins ? window.Capacitor.Plugins[name] : null);
 
 const ICON = {
   menu: '<svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>',
+  layers: '<svg viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>',
   locate: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>',
   photo: '<svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
   video: '<svg viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3z"/></svg>',
@@ -19,6 +23,10 @@ const ICON = {
   ruler: '<svg viewBox="0 0 24 24"><path d="M3 17L17 3l4 4L7 21zM7 13l2 2M10 10l2 2M13 7l2 2"/></svg>',
   copy: '<svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4H4v12h4"/></svg>',
   gallery: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 16l5-5 4 4 3-3 6 6"/></svg>',
+  up: '<svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg>',
+  down: '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>',
+  kml: '<svg viewBox="0 0 24 24"><path d="M3 18l6-8 4 5 3-3 5 6"/></svg>',
+  wms: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>',
 };
 
 /* ---------------- Almacenamiento local (IndexedDB) ---------------- */
@@ -53,7 +61,7 @@ const DB = (() => {
   };
 })();
 
-const settings = { base: 'pnoa', catastro: false, googleKey: '', travel: 'driving', stamp: true, view: null };
+const settings = { base: 'pnoa', catastro: false, googleKey: '', travel: 'driving', stamp: true, view: null, notesVisible: true };
 const saveSettings = () => DB.put('kv', { ...settings }, 'settings').catch(() => {});
 
 /* ---------------- Utilidades geográficas ---------------- */
@@ -86,6 +94,68 @@ function distFromMe(lat, lng) {
   return ` · a ${fmtLen(L.latLng(lastPos.lat, lastPos.lng).distanceTo([lat, lng]))} de ti`;
 }
 
+/* ---------------- Lectura de EXIF (coordenadas, fecha y orientación de fotos) ---------------- */
+async function readExif(file) {
+  const buf = await file.slice(0, 256 * 1024).arrayBuffer();
+  const v = new DataView(buf);
+  if (v.byteLength < 4 || v.getUint16(0) !== 0xFFD8) return null; // no es JPEG
+  let off = 2;
+  while (off + 4 <= v.byteLength) {
+    const marker = v.getUint16(off);
+    if ((marker & 0xFF00) !== 0xFF00) break;
+    const len = v.getUint16(off + 2);
+    if (marker === 0xFFE1 && off + 10 <= v.byteLength && v.getUint32(off + 4) === 0x45786966) return parseTiff(v, off + 10);
+    if (marker === 0xFFDA) break; // empieza la imagen
+    off += 2 + len;
+  }
+  return null;
+}
+function parseTiff(v, t) {
+  const le = v.getUint16(t) === 0x4949;
+  const u16 = o => v.getUint16(o, le), u32 = o => v.getUint32(o, le);
+  const SIZE = { 1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 7: 1, 9: 4, 10: 8 };
+  const ifd = o => {
+    const tags = {}; const n = u16(o);
+    for (let i = 0; i < n; i++) { const e = o + 2 + i * 12; tags[u16(e)] = { type: u16(e + 2), count: u32(e + 4), at: e + 8 }; }
+    return tags;
+  };
+  const val = tag => {
+    if (!tag) return null;
+    const { type, count, at } = tag, size = (SIZE[type] || 1) * count;
+    const p = size > 4 ? t + u32(at) : at;
+    if (p + size > v.byteLength) return null;
+    if (type === 2) { let s = ''; for (let i = 0; i < count; i++) { const c = v.getUint8(p + i); if (!c) break; s += String.fromCharCode(c); } return s; }
+    const out = [];
+    for (let i = 0; i < count; i++) {
+      if (type === 5) { const b = u32(p + i * 8 + 4); out.push(b ? u32(p + i * 8) / b : 0); }
+      else if (type === 10) { const b = v.getInt32(p + i * 8 + 4, le); out.push(b ? v.getInt32(p + i * 8, le) / b : 0); }
+      else if (type === 3) out.push(u16(p + i * 2));
+      else if (type === 4) out.push(u32(p + i * 4));
+      else out.push(v.getUint8(p + i));
+    }
+    return out;
+  };
+  const ifd0 = ifd(t + u32(t + 4));
+  const res = {};
+  if (ifd0[0x8769]) { const ex = ifd(t + val(ifd0[0x8769])[0]); const d = val(ex[0x9003]) || val(ifd0[0x0132]); if (d) res.date = exifDate(d); }
+  if (ifd0[0x8825]) {
+    const g = ifd(t + val(ifd0[0x8825])[0]);
+    const lat = val(g[2]), lng = val(g[4]), latRef = val(g[1]), lngRef = val(g[3]);
+    if (lat && lng && lat.length === 3 && lng.length === 3) {
+      let la = lat[0] + lat[1] / 60 + lat[2] / 3600, lo = lng[0] + lng[1] / 60 + lng[2] / 3600;
+      if (latRef === 'S') la = -la; if (lngRef === 'W') lo = -lo;
+      if (isFinite(la) && isFinite(lo) && !(la === 0 && lo === 0) && Math.abs(la) <= 90 && Math.abs(lo) <= 180) { res.lat = la; res.lng = lo; }
+    }
+    const alt = val(g[6]); if (alt) res.alt = (val(g[5]) || [0])[0] === 1 ? -alt[0] : alt[0];
+    const dir = val(g[0x11]); if (dir && isFinite(dir[0])) res.dir = dir[0];
+  }
+  return res;
+}
+function exifDate(s) { // "AAAA:MM:DD HH:MM:SS" en hora local
+  const m = /^(\d{4}):(\d{2}):(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/.exec(s || '');
+  return m ? new Date(+m[1], m[2] - 1, +m[3], +m[4], +m[5], +m[6]).getTime() : null;
+}
+
 /* ---------------- Interfaz: aviso, hoja inferior, panel ---------------- */
 let toastT;
 function toast(msg, ms = 3500) {
@@ -115,19 +185,55 @@ function copyText(text) {
   if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, () => toast(text, 6000));
   else toast(text, 6000);
 }
+const blobToB64 = blob => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = rej; r.readAsDataURL(blob); });
+const b64ToBlob = (b64, type) => { const s = atob(b64), a = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) a[i] = s.charCodeAt(i); return new Blob([a], { type }); };
+
+// Guardar o enviar un fichero generado (KMZ). En la app nativa abre el menú Compartir de Android.
+async function saveBlob(blob, name) {
+  const FS = Plug('Filesystem'), SH = Plug('Share');
+  if (NATIVE && FS && SH) {
+    const w = await FS.writeFile({ path: name, data: await blobToB64(blob), directory: 'CACHE' });
+    await SH.share({ title: name, files: [w.uri], dialogTitle: 'Guardar o enviar ' + name });
+    return;
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 5000);
+}
 
 /* ---------------- Mapa y capas base ---------------- */
 const map = L.map('map', { zoomControl: false, renderer: L.canvas({ tolerance: 12 }), maxZoom: 21 }).setView([37.18, -3.6], 9);
 L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(map);
+map.createPane('rasters').style.zIndex = 350;   // servicios WMS/WMTS, por encima del mapa base
+map.createPane('hl').style.zIndex = 590;        // resaltes y mediciones, por debajo de los marcadores
+map.getPane('hl').style.pointerEvents = 'none';
+const hlRenderer = L.canvas({ pane: 'hl' });
 
 const ign = (svc, layer, fmt) => `https://www.ign.es/wmts/${svc}?service=WMTS&request=GetTile&version=1.0.0&layer=${layer}&style=default&tilematrixset=GoogleMapsCompatible&tilematrix={z}&tilerow={y}&tilecol={x}&format=${fmt}`;
 const URL_PNOA = ign('pnoa-ma', 'OI.OrthoimageCoverage', 'image/jpeg');
 const URL_LABELS = ign('ign-base', 'IGNBaseOrto', 'image/png');
 const ATTR_IGN = 'PNOA y Base IGN CC-BY 4.0 <a href="https://www.scne.es" target="_blank" rel="noopener">scne.es</a>';
-const pnoaTiles = () => L.tileLayer(URL_PNOA, { maxNativeZoom: 19, maxZoom: 21, attribution: ATTR_IGN });
+// En la app nativa no hay service worker: las teselas guardadas para uso sin conexión se leen aquí.
+const CachedTileLayer = L.TileLayer.extend({
+  createTile(coords, done) {
+    const img = document.createElement('img');
+    img.alt = ''; img.setAttribute('role', 'presentation');
+    L.DomEvent.on(img, 'load', L.Util.bind(this._tileOnLoad, this, done, img));
+    L.DomEvent.on(img, 'error', L.Util.bind(this._tileOnError, this, done, img));
+    const url = this.getTileUrl(coords);
+    if (!NATIVE || !('caches' in window)) { img.src = url; return img; }
+    caches.open('tiles-v1').then(c => c.match(url)).then(r => (r ? r.blob() : null)).then(b => {
+      if (!b) { img.src = url; return; }
+      const u = URL.createObjectURL(b); img.addEventListener('load', () => URL.revokeObjectURL(u), { once: true }); img.src = u;
+    }).catch(() => { img.src = url; });
+    return img;
+  },
+});
+const tiles = (url, o) => new CachedTileLayer(url, o);
+const pnoaTiles = () => tiles(URL_PNOA, { maxNativeZoom: 19, maxZoom: 21, attribution: ATTR_IGN });
 
 const BASES = {
-  pnoa: { name: 'Ortofoto PNOA híbrida (IGN)', make: () => L.layerGroup([pnoaTiles(), L.tileLayer(URL_LABELS, { maxNativeZoom: 18, maxZoom: 21 })]) },
+  pnoa: { name: 'Ortofoto PNOA híbrida (IGN)', make: () => L.layerGroup([pnoaTiles(), tiles(URL_LABELS, { maxNativeZoom: 18, maxZoom: 21 })]) },
   google: { name: 'Google híbrido (con clave)', make: makeGoogle },
   pnoaSolo: { name: 'Ortofoto PNOA sin rótulos', make: pnoaTiles },
   osm: { name: 'Callejero OpenStreetMap', make: () => L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 21, maxNativeZoom: 19, attribution: '© OpenStreetMap' }) },
@@ -170,10 +276,13 @@ async function setBase(id) {
   if (!$('#drawer').hidden) renderDrawer();
 }
 
-const catastro = L.tileLayer.wms('https://ovc.catastro.meh.es/Cartografia/WMS/ServidorWMS.aspx', {
-  layers: 'Catastro', format: 'image/png', transparent: true, version: '1.1.1', zIndex: 5, maxZoom: 21, attribution: '© D. G. del Catastro',
-});
-function setCatastro(on) { settings.catastro = on; saveSettings(); on ? catastro.addTo(map) : map.removeLayer(catastro); }
+/* ---------------- Catálogo de servicios de capas ---------------- */
+const CATALOG = [
+  { name: 'Parcelas de Catastro', kind: 'wms', url: 'https://ovc.catastro.meh.es/Cartografia/WMS/ServidorWMS.aspx', layers: 'Catastro', attribution: '© D. G. del Catastro' },
+  { name: 'SIGPAC · recintos', kind: 'wms', url: 'https://wms.mapa.gob.es/sigpac/wms', layers: 'AU.Sigpac:recinto', attribution: 'SIGPAC © MAPA' },
+  { name: 'Mapa topográfico MTN (IGN)', kind: 'wmts', url: ign('mapa-raster', 'MTN', 'image/jpeg'), maxNative: 18, opacity: 0.7, attribution: ATTR_IGN },
+  { name: 'Límites administrativos (IGN)', kind: 'wms', url: 'https://www.ign.es/wms-inspire/unidades-administrativas', layers: 'AU.AdministrativeBoundary', attribution: ATTR_IGN },
+];
 
 /* ---------------- Lectura de KML ---------------- */
 const byTag = (el, tag) => Array.from(el.getElementsByTagNameNS('*', tag));
@@ -256,22 +365,39 @@ function parseKML(text) {
   return { docName, feats: out };
 }
 
-/* ---------------- Capas KML en el mapa ---------------- */
+/* ---------------- Gestor de capas ----------------
+   Tipos: kml (vectorial), wms/wmts (imagen de un servicio), photos (fotos importadas con GPS)
+   y la capa fija "Mis anotaciones". Las vectoriales se dibujan siempre sobre las de imagen. */
 const PALETTE = ['#ffd43b', '#ff6b6b', '#4dabf7', '#69db7c', '#f783ac', '#ffa94d', '#b197fc', '#3bc9db'];
-const kml = new Map(); // id → { rec, feats, group }
+const layers = new Map();       // id → { rec, feats?, group?, tile? }
+const pointGroups = new Map();  // id de capa de puntos → L.layerGroup
 const highlight = L.layerGroup().addTo(map);
+const typeOf = rec => rec.type || 'kml';
+const isPointLayer = rec => typeOf(rec) === 'photos';
+const nextOrder = () => Math.max(0, ...[...layers.values()].map(e => e.rec.order || 0)) + 1;
 
-function renderKml(rec) {
+function pointGroup(id) {
+  let g = pointGroups.get(id);
+  if (!g) { g = L.layerGroup(); pointGroups.set(id, g); }
+  return g;
+}
+function layerVisible(id) {
+  if (id === 'notes') return settings.notesVisible !== false;
+  const e = layers.get(id); return !!(e && e.rec.visible);
+}
+
+function buildKml(entry) {
+  const { rec } = entry;
   const { feats } = parseKML(rec.text);
+  const op = rec.opacity ?? 1;
   const group = L.featureGroup();
   feats.forEach(f => {
-    const st = f.style;
-    const col = st.line || rec.color;
+    const st = f.style, col = st.line || rec.color;
     f.parts.forEach(p => {
       let lyr;
-      if (p.t === 'ln') lyr = L.polyline(p.c, { color: col, weight: Math.max(3, st.width || 3), opacity: st.lineOp > 0.2 ? st.lineOp : 1 });
-      else if (p.t === 'pg') lyr = L.polygon(p.c, { color: col, weight: Math.max(2, st.width || 2), fillColor: st.fill || col, fillOpacity: st.noFill ? 0 : Math.min(st.fillOp ?? 0.2, 0.45) });
-      else lyr = L.circleMarker(p.c[0], { radius: 7, color: '#fff', weight: 2, fillColor: st.icon || rec.color, fillOpacity: 1 });
+      if (p.t === 'ln') lyr = L.polyline(p.c, { color: col, weight: Math.max(3, st.width || 3), opacity: (st.lineOp > 0.2 ? st.lineOp : 1) * op });
+      else if (p.t === 'pg') lyr = L.polygon(p.c, { color: col, weight: Math.max(2, st.width || 2), opacity: op, fillColor: st.fill || col, fillOpacity: st.noFill ? 0 : Math.min(st.fillOp ?? 0.2, 0.45) * op });
+      else lyr = L.circleMarker(p.c[0], { radius: 7, color: '#fff', weight: 2, opacity: op, fillColor: st.icon || rec.color, fillOpacity: op });
       lyr.on('click', e => {
         L.DomEvent.stop(e);
         if (measure) return addMeasurePt(e.latlng);
@@ -280,14 +406,90 @@ function renderKml(rec) {
       group.addLayer(lyr);
     });
   });
-  const entry = { rec, feats, group };
-  kml.set(rec.id, entry);
-  if (rec.visible) group.addTo(map);
+  entry.feats = feats; entry.group = group;
+}
+function buildRaster(entry) {
+  const r = entry.rec, common = { pane: 'rasters', opacity: r.opacity ?? 1, maxZoom: 21, attribution: r.attribution || '' };
+  entry.tile = r.kind === 'wmts'
+    ? L.tileLayer(r.url, { ...common, maxNativeZoom: r.maxNative || 19 })
+    : L.tileLayer.wms(r.url, { ...common, layers: r.layers, format: 'image/png', transparent: true, version: r.version || '1.1.1' });
+}
+function mapLayerOf(entry) { return entry.group || entry.tile || pointGroup(entry.rec.id); }
+
+function registerLayer(rec) {
+  const entry = { rec };
+  const t = typeOf(rec);
+  if (t === 'kml') buildKml(entry);
+  else if (t === 'wms') buildRaster(entry);
+  layers.set(rec.id, entry);
+  if (rec.visible) mapLayerOf(entry).addTo(map);
+  applyOrder();
   return entry;
+}
+function rebuildLayer(id) {
+  const e = layers.get(id); if (!e) return;
+  if (e.group || e.tile) map.removeLayer(mapLayerOf(e));
+  if (typeOf(e.rec) === 'kml') buildKml(e); else if (typeOf(e.rec) === 'wms') buildRaster(e);
+  if (e.rec.visible) mapLayerOf(e).addTo(map);
+  applyOrder();
+}
+function orderedLayers() { return [...layers.values()].filter(e => !isPointLayer(e.rec)).sort((a, b) => (b.rec.order || 0) - (a.rec.order || 0)); }
+function applyOrder() {
+  const asc = orderedLayers().reverse();
+  let z = 1;
+  asc.forEach(e => {
+    if (e.tile) e.tile.setZIndex(z++);
+    if (e.group && map.hasLayer(e.group)) e.group.eachLayer(l => l.bringToFront && l.bringToFront());
+  });
+}
+async function setLayerVisible(id, on) {
+  if (id === 'notes') { settings.notesVisible = on; saveSettings(); on ? pointGroup('notes').addTo(map) : map.removeLayer(pointGroup('notes')); return; }
+  const e = layers.get(id); if (!e) return;
+  e.rec.visible = on;
+  on ? mapLayerOf(e).addTo(map) : map.removeLayer(mapLayerOf(e));
+  applyOrder();
+  await DB.put('layers', e.rec);
+}
+async function moveLayer(id, dir) {
+  const list = orderedLayers(); const i = list.findIndex(e => e.rec.id === id); const j = i + dir;
+  if (i < 0 || j < 0 || j >= list.length) return;
+  const a = list[i].rec, b = list[j].rec;
+  [a.order, b.order] = [b.order || 0, a.order || 0];
+  if (a.order === b.order) a.order += dir < 0 ? 1 : -1;
+  await DB.put('layers', a); await DB.put('layers', b);
+  applyOrder(); renderDrawer();
+}
+function layerBounds(id) {
+  if (id === 'notes' || isPointLayer((layers.get(id) || {}).rec || {})) {
+    const pts = [...notes.values()].filter(n => (n.layerId || 'notes') === id).map(n => [n.lat, n.lng]);
+    return pts.length ? L.latLngBounds(pts) : null;
+  }
+  const e = layers.get(id);
+  return e && e.group ? e.group.getBounds() : null;
+}
+function zoomToLayer(id) {
+  const b = layerBounds(id);
+  if (b && b.isValid()) map.fitBounds(b.pad(0.15), { maxZoom: 18 });
+  else toast('Esta capa es un servicio de imagen: no tiene una extensión que encuadrar.');
+}
+async function deleteLayer(id) {
+  const e = layers.get(id); if (!e) return;
+  const pts = [...notes.values()].filter(n => n.layerId === id);
+  const extra = pts.length ? ` y sus ${pts.length} fotos` : '';
+  if (!confirm(`¿Quitar la capa «${e.rec.name}»${extra} de la app?`)) return;
+  map.removeLayer(mapLayerOf(e));
+  for (const n of pts) { await DB.del('notes', n.id); notes.delete(n.id); noteMarkers.delete(n.id); }
+  pointGroups.delete(id);
+  layers.delete(id); await DB.del('layers', id);
+  renderDrawer(); toast('Capa eliminada');
+}
+async function updateLayer(id, changes) {
+  const e = layers.get(id); if (!e) return;
+  Object.assign(e.rec, changes);
+  await DB.put('layers', e.rec);
 }
 
 function featureSheet(f, ll, rec) {
-
   const kind = f.type === 'ln' ? 'Traza · ' + fmtLen(f.length) : f.type === 'pg' ? 'Polígono · perímetro ' + fmtLen(f.length) : 'Punto';
   let acts = '';
   if (f.type === 'ln') {
@@ -311,12 +513,12 @@ function featureSheet(f, ll, rec) {
     ${coords}${f.desc ? `<div class="desc">${esc(f.desc)}</div>` : ''}${attrs}<div class="acts">${acts}</div>`);
   highlight.clearLayers();
   f.parts.forEach(p => {
-    if (p.t === 'pt') L.circleMarker(p.c[0], { radius: 12, color: '#fff', weight: 3, fill: false, interactive: false }).addTo(highlight);
-    else L.polyline(p.t === 'pg' ? [...p.c, p.c[0]] : p.c, { color: '#fff', weight: 8, opacity: 0.55, interactive: false }).addTo(highlight);
+    if (p.t === 'pt') L.circleMarker(p.c[0], { renderer: hlRenderer, radius: 12, color: '#fff', weight: 3, fill: false, interactive: false }).addTo(highlight);
+    else L.polyline(p.t === 'pg' ? [...p.c, p.c[0]] : p.c, { renderer: hlRenderer, color: '#fff', weight: 8, opacity: 0.55, interactive: false }).addTo(highlight);
   });
   if (f.type === 'ln') {
-    L.circleMarker(f.start, { radius: 8, color: '#0b6e4f', weight: 4, fillColor: '#fff', fillOpacity: 1, interactive: false }).bindTooltip('Inicio', { permanent: true, direction: 'top', offset: [0, -8] }).addTo(highlight);
-    L.circleMarker(f.end, { radius: 8, color: '#fff', weight: 3, fillColor: '#e8590c', fillOpacity: 1, interactive: false }).bindTooltip('Final', { permanent: true, direction: 'top', offset: [0, -8] }).addTo(highlight);
+    L.circleMarker(f.start, { renderer: hlRenderer, radius: 8, color: '#0b6e4f', weight: 4, fillColor: '#fff', fillOpacity: 1, interactive: false }).bindTooltip('Inicio', { permanent: true, direction: 'top', offset: [0, -8] }).addTo(highlight);
+    L.circleMarker(f.end, { renderer: hlRenderer, radius: 8, color: '#fff', weight: 3, fillColor: '#e8590c', fillOpacity: 1, interactive: false }).bindTooltip('Final', { permanent: true, direction: 'top', offset: [0, -8] }).addTo(highlight);
   }
   onSheetClose(() => highlight.clearLayers());
   b.querySelector('[data-a=note]').onclick = () => openEditor({ lat: noteAt.lat, lng: noteAt.lng, src: 'mapa', title: f.name });
@@ -325,6 +527,7 @@ function featureSheet(f, ll, rec) {
   b.querySelector('[data-a=measure]').onclick = () => { closeSheet(); startMeasure(ll); };
 }
 
+/* ---------------- Importación de ficheros ---------------- */
 async function readKmlFile(file) {
   if (/\.kmz$/i.test(file.name) || file.type === 'application/vnd.google-earth.kmz') {
     const zip = await JSZip.loadAsync(file);
@@ -341,14 +544,91 @@ async function importFiles(files) {
       const text = await readKmlFile(file);
       const { docName, feats } = parseKML(text);
       if (!feats.length) throw new Error(file.name + ': no contiene puntos, líneas ni polígonos.');
-      const rec = { id: uid(), name: file.name.replace(/\.km[lz]$/i, '') || docName || 'Capa', text, color: PALETTE[kml.size % PALETTE.length], visible: true, created: Date.now() };
+      const nk = [...layers.values()].filter(e => typeOf(e.rec) === 'kml').length;
+      const rec = { id: uid(), type: 'kml', name: file.name.replace(/\.km[lz]$/i, '') || docName || 'Capa', text, color: PALETTE[nk % PALETTE.length], visible: true, opacity: 1, order: nextOrder(), created: Date.now() };
       await DB.put('layers', rec);
-      last = renderKml(rec);
+      last = registerLayer(rec);
       toast(`${rec.name}: ${feats.length} elementos cargados`);
     } catch (e) { toast(e.message || 'No se pudo leer ' + file.name, 6000); }
   }
   if (last) map.fitBounds(last.group.getBounds().pad(0.1), { maxZoom: 18 });
   if (!$('#drawer').hidden) renderDrawer();
+}
+
+// Fotos con coordenadas en el EXIF → nueva capa de fotos
+async function importPhotos(files) {
+  const imgs = files.filter(f => f.type.startsWith('image/') || /\.jpe?g$/i.test(f.name));
+  if (!imgs.length) return;
+  toast(`Leyendo ${imgs.length} foto${imgs.length > 1 ? 's' : ''}…`, 10000);
+  const rec = { id: uid(), type: 'photos', name: 'Fotos ' + new Date().toLocaleDateString('es-ES'), visible: true, order: 0, created: Date.now() };
+  const added = [], missing = [];
+  for (const f of imgs) {
+    let ex = null;
+    try { ex = await readExif(f); } catch (e) { ex = null; }
+    if (!ex || ex.lat == null) { missing.push(f.name); continue; }
+    const blob = await processImage(f, null, false);
+    added.push({
+      id: uid(), layerId: rec.id, lat: ex.lat, lng: ex.lng, acc: null, alt: ex.alt ?? null, dir: ex.dir ?? null, src: 'exif',
+      title: f.name.replace(/\.[^.]+$/, ''), text: '', created: ex.date || f.lastModified || Date.now(),
+      media: [{ id: uid(), kind: 'photo', blob, mime: blob.type || 'image/jpeg', t: Date.now() }],
+    });
+  }
+  if (added.length) {
+    try {
+      await DB.put('layers', rec);
+      registerLayer(rec);
+      for (const n of added) { await DB.put('notes', n); notes.set(n.id, n); drawNote(n); }
+      if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+      zoomToLayer(rec.id);
+    } catch (e) { toast('No se pudieron guardar las fotos: ' + (e.message || 'almacenamiento lleno'), 7000); return; }
+  }
+  if (!missing.length) toast(`${added.length} fotos situadas en el mapa (capa «${rec.name}»).`, 5000);
+  else if (!added.length) toast(`Ninguna foto trae coordenadas. ${NATIVE ? '' : 'En Android, elígelas desde «Archivos» en lugar de la galería, porque la galería puede quitarles la ubicación. '}Comprueba también que la cámara tenía activada la ubicación.`, 10000);
+  else toast(`${added.length} fotos situadas. ${missing.length} sin coordenadas: ${missing.slice(0, 3).join(', ')}${missing.length > 3 ? '…' : ''}`, 8000);
+  if (!$('#drawer').hidden) renderDrawer();
+}
+function handleIncoming(files) {
+  const k = files.filter(f => /\.km[lz]$/i.test(f.name) || /google-earth/.test(f.type));
+  const p = files.filter(f => !k.includes(f) && (f.type.startsWith('image/') || /\.jpe?g$/i.test(f.name)));
+  if (k.length) importFiles(k);
+  if (p.length) importPhotos(p);
+  if (!k.length && !p.length) toast('Solo se pueden abrir ficheros KML, KMZ o fotos JPEG.');
+}
+function importMenu() {
+  const b = openSheet(`<h2>Importar</h2><p class="sub">Elige qué quieres añadir al mapa</p>
+    <div class="acts">
+      <button class="btn full" data-a="kml">${ICON.kml}KML o KMZ</button>
+      <button class="btn full" data-a="photos">${ICON.gallery}Fotos con coordenadas GPS</button>
+      <button class="btn full" data-a="service">${ICON.wms}Capa de un servicio (WMS)</button>
+    </div>
+    <p class="hint">Las fotos se sitúan solas si la cámara guardó la ubicación. ${NATIVE ? '' : 'En Android, si llegan sin posición, elígelas desde «Archivos» y no desde la galería.'}</p>`);
+  b.querySelector('[data-a=kml]').onclick = () => { closeSheet(); $('#inKml').click(); };
+  b.querySelector('[data-a=photos]').onclick = () => { closeSheet(); $('#inPhotosImport').click(); };
+  b.querySelector('[data-a=service]').onclick = serviceMenu;
+}
+function serviceMenu() {
+  const b = openSheet(`<h2>Añadir capa de servicio</h2><p class="sub">Servicios públicos WMS / WMTS</p>
+    <div class="acts">${CATALOG.map((c, i) => `<button class="btn full" data-cat="${i}">${ICON.wms}${esc(c.name)}</button>`).join('')}</div>
+    <h3 class="sh">Otro servicio WMS</h3>
+    <div class="field"><input type="text" id="wName" placeholder="Nombre (p. ej. Red Natura 2000)"></div>
+    <div class="field"><input type="text" id="wUrl" placeholder="URL del servicio (https://…)" inputmode="url"></div>
+    <div class="field"><input type="text" id="wLayers" placeholder="Nombre de la capa o capas, separadas por comas"></div>
+    <div class="acts"><button class="btn pri full" data-a="add">Añadir servicio</button></div>
+    <p class="hint">La URL y el nombre de la capa aparecen en la ficha del servicio (GetCapabilities). Usa la dirección https.</p>`);
+  b.querySelectorAll('[data-cat]').forEach(bt => bt.onclick = () => addService(CATALOG[+bt.dataset.cat]));
+  b.querySelector('[data-a=add]').onclick = () => {
+    const url = $('#wUrl').value.trim().split('?')[0], lay = $('#wLayers').value.trim();
+    if (!/^https:\/\//i.test(url) || !lay) { toast('Escribe la URL (https://…) y el nombre de la capa.'); return; }
+    addService({ name: $('#wName').value.trim() || lay, kind: 'wms', url, layers: lay });
+  };
+}
+async function addService(def) {
+  const dup = [...layers.values()].find(e => e.rec.url === def.url && (e.rec.layers || '') === (def.layers || ''));
+  if (dup) { toast(`«${dup.rec.name}» ya está en tus capas.`); return; }
+  const rec = { id: uid(), type: 'wms', kind: def.kind, name: def.name, url: def.url, layers: def.layers || '', maxNative: def.maxNative, attribution: def.attribution || '', visible: true, opacity: def.opacity ?? 1, order: nextOrder(), created: Date.now() };
+  await DB.put('layers', rec);
+  registerLayer(rec);
+  closeSheet(); toast(`Capa «${rec.name}» añadida. Puedes cambiar su orden y transparencia en Capas.`, 5000);
 }
 
 /* ---------------- Pulsación larga en el mapa ---------------- */
@@ -376,7 +656,6 @@ let longFired = 0;
 
 function pointMenu(ll) {
   if (measure) return addMeasurePt(ll);
-  const cross = L.marker(ll, { icon: L.divIcon({ className: '', html: '<div class="cross"></div>', iconSize: [28, 28], iconAnchor: [14, 14] }), interactive: false }).addTo(map);
   const b = openSheet(`<h2>Punto seleccionado</h2><p class="sub">Pulsación larga${distFromMe(ll.lat, ll.lng)}</p>
     ${coordsBlock(ll.lat, ll.lng)}
     <div class="acts">
@@ -387,9 +666,10 @@ function pointMenu(ll) {
       <button class="btn" data-a="measure">${ICON.ruler}Medir desde aquí</button>
       <a class="btn full" href="${viewUrl(ll.lat, ll.lng)}" target="_blank" rel="noopener">Ver en Google Maps</a>
     </div>`);
+  const cross = L.marker(ll, { icon: L.divIcon({ className: '', html: '<div class="cross"></div>', iconSize: [28, 28], iconAnchor: [14, 14] }), interactive: false }).addTo(map);
   onSheetClose(() => map.removeLayer(cross));
   b.querySelector('[data-a=note]').onclick = () => openEditor({ lat: ll.lat, lng: ll.lng, src: 'mapa' });
-  b.querySelector('[data-a=photo]').onclick = () => { const at = { lat: ll.lat, lng: ll.lng, src: 'mapa' }; capture('inPhoto', files => { openEditor(at, true); addMedia(files); }); };
+  b.querySelector('[data-a=photo]').onclick = () => { const at = { lat: ll.lat, lng: ll.lng, src: 'mapa' }; capture('inPhoto', files => { openEditor(at); addMedia(files); }); };
   b.querySelector('[data-a=copy]').onclick = () => copyText(`${fmtLL(ll.lat, ll.lng)}\n${fmtUTM(ll.lat, ll.lng)}`);
   b.querySelector('[data-a=measure]').onclick = () => { closeSheet(); startMeasure(ll); };
 }
@@ -397,14 +677,14 @@ function pointMenu(ll) {
 /* ---------------- GPS ---------------- */
 let lastPos = null, watchId = null, wantCenter = false, meMarker = null, meCircle = null;
 function geoErr(e) {
-  return e.code === 1 ? 'Sin permiso de ubicación. Actívalo en los ajustes del navegador para esta app.'
-    : e.code === 3 ? 'El GPS tarda en responder. Prueba al aire libre.' : 'No se pudo obtener la posición.';
+  return e && e.code === 1 ? 'Sin permiso de ubicación. Actívalo en los ajustes para esta app.'
+    : e && e.code === 3 ? 'El GPS tarda en responder. Prueba al aire libre.' : 'No se pudo obtener la posición.';
 }
 function onPos(p) {
   lastPos = { lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy, t: Date.now() };
   const ll = [lastPos.lat, lastPos.lng];
   if (!meMarker) {
-    meCircle = L.circle(ll, { radius: lastPos.acc, color: '#1c7ed6', weight: 1, fillOpacity: 0.12, interactive: false }).addTo(map);
+    meCircle = L.circle(ll, { renderer: hlRenderer, radius: lastPos.acc, color: '#1c7ed6', weight: 1, fillOpacity: 0.12, interactive: false }).addTo(map);
     meMarker = L.marker(ll, { icon: L.divIcon({ className: '', html: '<div class="me"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }), interactive: false, zIndexOffset: 1000 }).addTo(map);
   } else { meMarker.setLatLng(ll); meCircle.setLatLng(ll).setRadius(lastPos.acc); }
   const f = $('#fabLocate'); f.classList.remove('wait'); f.classList.add('on');
@@ -439,15 +719,15 @@ function capture(inputId, cb) { captureCb = cb; const i = $('#' + inputId); i.va
   if (files.length && cb) cb(files);
 }));
 
-async function processImage(file, at) {
+async function processImage(file, at, stamp = settings.stamp) {
   try {
     const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
     const s = Math.min(1, 2560 / Math.max(bmp.width, bmp.height));
-    if (s === 1 && file.size < 2.5e6 && !settings.stamp) return file;
+    if (s === 1 && file.size < 2.5e6 && !(stamp && at)) return file;
     const c = document.createElement('canvas');
     c.width = Math.round(bmp.width * s); c.height = Math.round(bmp.height * s);
     const g = c.getContext('2d'); g.drawImage(bmp, 0, 0, c.width, c.height);
-    if (settings.stamp && at) {
+    if (stamp && at) {
       const fs = Math.max(14, Math.round(c.width / 55)), pad = Math.round(fs * 0.6);
       const lines = [fmtDate(Date.now()), fmtLL(at.lat, at.lng) + (at.acc ? ` ±${Math.round(at.acc)} m` : ''), fmtUTM(at.lat, at.lng)];
       const h = lines.length * fs * 1.3 + pad * 2;
@@ -459,24 +739,34 @@ async function processImage(file, at) {
   } catch (e) { return file; }
 }
 
-/* ---------------- Anotaciones ---------------- */
+/* ---------------- Anotaciones y fotos ---------------- */
 const notes = new Map();       // id → nota
 const noteMarkers = new Map(); // id → marcador
-const notesLayer = L.layerGroup().addTo(map);
 const noteType = n => (n.media && n.media[0] ? n.media[0].kind : 'note');
-const pinIcon = type => L.divIcon({ className: '', html: `<div class="pin ${type}"><span></span>${ICON[type] || ICON.note}</div>`, iconSize: [34, 42], iconAnchor: [17, 40] });
+const pinIcon = (type, dir) => L.divIcon({
+  className: '',
+  html: `<div class="pin ${type}">${dir != null ? `<svg class="cone" viewBox="-20 -20 40 40" style="transform:rotate(${Math.round(dir)}deg)"><path d="M0 0L-10-19A21 21 0 0 1 10-19Z"/></svg>` : ''}<span></span>${ICON[type] || ICON.note}</div>`,
+  iconSize: [34, 42], iconAnchor: [17, 40],
+});
 
 function drawNote(n) {
+  const gid = n.layerId || 'notes';
+  const g = pointGroup(gid);
+  if (layerVisible(gid) && !map.hasLayer(g)) g.addTo(map);
   let m = noteMarkers.get(n.id);
   if (!m) {
-    m = L.marker([n.lat, n.lng], { icon: pinIcon(noteType(n)) }).addTo(notesLayer);
+    m = L.marker([n.lat, n.lng], { icon: pinIcon(noteType(n), n.dir) }).addTo(g);
     m.on('click', e => { L.DomEvent.stop(e); if (measure) return addMeasurePt(e.latlng); viewNote(n.id); });
     noteMarkers.set(n.id, m);
-  } else { m.setLatLng([n.lat, n.lng]).setIcon(pinIcon(noteType(n))); }
+  } else { m.setLatLng([n.lat, n.lng]).setIcon(pinIcon(noteType(n), n.dir)); }
+}
+function removeNoteMarker(id) {
+  const m = noteMarkers.get(id); if (!m) return;
+  pointGroups.forEach(g => g.removeLayer(m)); noteMarkers.delete(id);
 }
 
 let draft = null, draftMarker = null, recorder = null, recTimer = null;
-function openEditor(at, keepCapture = false) {
+function openEditor(at) {
   const existing = at.note;
   draft = existing ? { ...existing, media: [...(existing.media || [])] }
     : { id: uid(), lat: at.lat, lng: at.lng, acc: at.acc || null, src: at.src || 'gps', title: at.title || '', text: '', media: [], created: Date.now() };
@@ -491,17 +781,18 @@ function mediaHtml(list, editable) {
   return list.map((m, i) => {
     const u = objectUrl(m.blob);
     const rm = editable ? `<button class="rm" data-rm="${i}" aria-label="Quitar">${ICON.close}</button>` : '';
-    if (m.kind === 'photo') return `<div class="m">${editable ? `<img src="${u}" alt="">` : `<a href="${u}" target="_blank" rel="noopener"><img src="${u}" alt="Foto"></a>`}${rm}</div>`;
+    if (m.kind === 'photo') return `<div class="m"><img src="${u}" alt="Foto" ${editable ? '' : 'data-full'}>${rm}</div>`;
     if (m.kind === 'video') return `<div class="m"><video src="${u}" ${editable ? 'muted' : 'controls'} playsinline preload="metadata"></video>${rm}</div>`;
     return `<div class="m aud"><audio src="${u}" controls preload="metadata"></audio>${rm}</div>`;
   }).join('');
 }
+const srcLabel = s => ({ gps: 'posición GPS', exif: 'coordenadas de la foto', mapa: 'punto del mapa' }[s] || 'punto del mapa');
 function renderEditor() {
   const d = draft; if (!d) return;
   const isNew = !notes.has(d.id);
   const keepDraft = draft;
   const b = openSheet(`<h2>${isNew ? 'Nueva anotación' : 'Editar anotación'}</h2>
-    <div class="loc"><span>${fmtLL(d.lat, d.lng)}${d.acc ? ' · ±' + Math.round(d.acc) + ' m' : ''} · ${d.src === 'gps' ? 'posición GPS' : 'punto del mapa'}</span>
+    <div class="loc"><span>${fmtLL(d.lat, d.lng)}${d.acc ? ' · ±' + Math.round(d.acc) + ' m' : ''} · ${srcLabel(d.src)}</span>
       <button class="mini" data-a="gps">Usar mi posición</button></div>
     <p class="hint">Puedes arrastrar el marcador amarillo para corregir la posición.</p>
     <div class="field"><input type="text" id="nTitle" placeholder="Título (p. ej. Fuga en hidrante H-12)" value="${esc(d.title)}"></div>
@@ -561,7 +852,7 @@ async function addMedia(files) {
 }
 async function toggleRecord() {
   if (recorder) { recorder.stop(); return; }
-  if (!navigator.mediaDevices || !window.MediaRecorder) { toast('Este navegador no permite grabar audio.'); return; }
+  if (!navigator.mediaDevices || !window.MediaRecorder) { toast('Este dispositivo no permite grabar audio aquí.'); return; }
   syncDraft();
   let stream;
   try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
@@ -606,15 +897,16 @@ async function saveDraft() {
 async function deleteNote(id) {
   if (!confirm('¿Eliminar esta anotación y sus archivos? No se puede deshacer.')) return;
   await DB.del('notes', id);
-  notes.delete(id);
-  const m = noteMarkers.get(id); if (m) { notesLayer.removeLayer(m); noteMarkers.delete(id); }
+  notes.delete(id); removeNoteMarker(id);
   closeSheet(); toast('Anotación eliminada');
   if (!$('#drawer').hidden) renderDrawer();
 }
+function layerName(id) { if (!id || id === 'notes') return 'Mis anotaciones'; const e = layers.get(id); return e ? e.rec.name : ''; }
 function viewNote(id) {
   const n = notes.get(id); if (!n) return;
+  const extra = [n.acc ? 'GPS ±' + Math.round(n.acc) + ' m' : '', n.alt != null ? 'altitud ' + Math.round(n.alt) + ' m' : '', n.dir != null ? 'orientación ' + Math.round(n.dir) + '°' : ''].filter(Boolean).join(' · ');
   const b = openSheet(`<h2>${esc(n.title)}</h2>
-    <p class="sub">${fmtDate(n.created)}${n.acc ? ' · GPS ±' + Math.round(n.acc) + ' m' : ''}${distFromMe(n.lat, n.lng)}</p>
+    <p class="sub">${fmtDate(n.created)} · ${esc(layerName(n.layerId))}${extra ? ' · ' + extra : ''}${distFromMe(n.lat, n.lng)}</p>
     ${coordsBlock(n.lat, n.lng)}
     ${n.text ? `<div class="desc">${esc(n.text)}</div>` : ''}
     <div class="media">${mediaHtml(n.media || [], false)}</div>
@@ -625,33 +917,50 @@ function viewNote(id) {
       <button class="btn" data-a="copy">${ICON.copy}Copiar coordenadas</button>
       <button class="btn del" data-a="delete">Eliminar</button>
     </div>`, 'view');
+  b.querySelectorAll('img[data-full]').forEach(img => img.onclick = () => showPhoto(img.src));
   b.querySelector('[data-a=edit]').onclick = () => openEditor({ note: n });
   b.querySelector('[data-a=copy]').onclick = () => copyText(`${fmtLL(n.lat, n.lng)}\n${fmtUTM(n.lat, n.lng)}`);
   b.querySelector('[data-a=delete]').onclick = () => deleteNote(n.id);
   b.querySelector('[data-a=share]').onclick = () => shareNote(n);
 }
+function showPhoto(src) {
+  const v = $('#viewer'); v.innerHTML = `<img src="${src}" alt="Foto">`; v.hidden = false;
+  v.onclick = () => { v.hidden = true; v.innerHTML = ''; };
+}
 async function shareNote(n) {
   const text = `${n.title}\n${n.text ? n.text + '\n' : ''}${fmtLL(n.lat, n.lng)}\n${viewUrl(n.lat, n.lng)}`;
-  const files = (n.media || []).map((m, i) => new File([m.blob], `${n.id}_${i + 1}.${extFor(m)}`, { type: m.mime }));
+  const media = n.media || [];
+  const FS = Plug('Filesystem'), SH = Plug('Share');
   try {
+    if (NATIVE && SH) {
+      const files = [];
+      if (FS) for (let i = 0; i < media.length; i++) {
+        const w = await FS.writeFile({ path: `${n.id}_${i + 1}.${extFor(media[i])}`, data: await blobToB64(media[i].blob), directory: 'CACHE' });
+        files.push(w.uri);
+      }
+      await SH.share(files.length ? { title: n.title, text, files } : { title: n.title, text });
+      return;
+    }
+    const files = media.map((m, i) => new File([m.blob], `${n.id}_${i + 1}.${extFor(m)}`, { type: m.mime }));
     if (files.length && navigator.canShare && navigator.canShare({ files })) await navigator.share({ title: n.title, text, files });
     else if (navigator.share) await navigator.share({ title: n.title, text });
     else copyText(text);
-  } catch (e) { if (e.name !== 'AbortError') copyText(text); }
+  } catch (e) { if (e && e.name !== 'AbortError' && !/cancel/i.test(e.message || '')) copyText(text); }
 }
 const extFor = m => ({ photo: 'jpg', video: (m.mime || '').includes('mp4') ? 'mp4' : 'webm', audio: (m.mime || '').includes('mp4') ? 'm4a' : (m.mime || '').includes('ogg') ? 'ogg' : 'webm' }[m.kind]);
 
 /* ---------------- Medición ---------------- */
 let measure = null;
+const mDot = ll => L.circleMarker(ll, { renderer: hlRenderer, radius: 6, color: '#1f1a00', weight: 2, fillColor: '#ffd43b', fillOpacity: 1, interactive: false });
 function startMeasure(ll) {
   if (measure) endMeasure();
-  measure = { pts: [], line: L.polyline([], { color: '#ffd43b', weight: 4, dashArray: '8 6', interactive: false }).addTo(map), marks: L.layerGroup().addTo(map) };
+  measure = { pts: [], line: L.polyline([], { renderer: hlRenderer, color: '#ffd43b', weight: 4, dashArray: '8 6', interactive: false }).addTo(map), marks: L.layerGroup().addTo(map) };
   $('#measureBar').hidden = false;
   if (ll) addMeasurePt(ll); else updateMeasure();
 }
 function addMeasurePt(ll) {
   measure.pts.push(L.latLng(ll));
-  L.circleMarker(ll, { radius: 6, color: '#1f1a00', weight: 2, fillColor: '#ffd43b', fillOpacity: 1, interactive: false }).addTo(measure.marks);
+  mDot(ll).addTo(measure.marks);
   measure.line.setLatLngs(measure.pts); updateMeasure();
 }
 function updateMeasure() {
@@ -664,19 +973,19 @@ map.on('click', e => { if (measure) addMeasurePt(e.latlng); });
 $('#mUndo').onclick = () => {
   if (!measure || !measure.pts.length) return;
   measure.pts.pop(); measure.marks.clearLayers();
-  measure.pts.forEach(p => L.circleMarker(p, { radius: 6, color: '#1f1a00', weight: 2, fillColor: '#ffd43b', fillOpacity: 1, interactive: false }).addTo(measure.marks));
+  measure.pts.forEach(p => mDot(p).addTo(measure.marks));
   measure.line.setLatLngs(measure.pts); updateMeasure();
 };
 $('#mEnd').onclick = endMeasure;
 
-/* ---------------- Exportar anotaciones a KMZ ---------------- */
+/* ---------------- Exportar anotaciones y fotos a KMZ ---------------- */
 const cdata = s => '<![CDATA[' + String(s).replace(/]]>/g, ']]]]><![CDATA[>') + ']]>';
 const xml = s => String(s ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 async function exportKMZ() {
   const list = [...notes.values()].sort((a, b) => a.created - b.created);
-  if (!list.length) { toast('Todavía no hay anotaciones que exportar.'); return; }
-  toast('Preparando KMZ…');
-  const zip = new JSZip(); let pms = '';
+  if (!list.length) { toast('Todavía no hay anotaciones ni fotos que exportar.'); return; }
+  toast('Preparando KMZ…', 8000);
+  const zip = new JSZip(); const folders = new Map();
   for (const n of list) {
     let html = `<p><b>${esc(fmtDate(n.created))}</b><br>${esc(fmtLL(n.lat, n.lng))}<br>${esc(fmtUTM(n.lat, n.lng))}</p>`;
     if (n.text) html += `<p>${esc(n.text).replace(/\n/g, '<br>')}</p>`;
@@ -685,21 +994,22 @@ async function exportKMZ() {
       zip.file(name, m.blob);
       html += m.kind === 'photo' ? `<p><img src="${name}" width="480"></p>` : `<p><a href="${name}">${m.kind === 'video' ? 'Vídeo' : 'Nota de voz'} ${i + 1}</a></p>`;
     });
-    pms += `<Placemark><name>${xml(n.title)}</name><description>${cdata(html)}</description>
+    const pm = `<Placemark><name>${xml(n.title)}</name><description>${cdata(html)}</description>
 <TimeStamp><when>${new Date(n.created).toISOString()}</when></TimeStamp><styleUrl>#${noteType(n)}</styleUrl>
 <Point><coordinates>${n.lng.toFixed(7)},${n.lat.toFixed(7)},0</coordinates></Point></Placemark>\n`;
+    const fname = layerName(n.layerId);
+    folders.set(fname, (folders.get(fname) || '') + pm);
   }
   const st = (id, c) => `<Style id="${id}"><IconStyle><color>${c}</color><Icon><href>http://maps.google.com/mapfiles/kml/paddle/wht-blank.png</href></Icon></IconStyle></Style>`;
-  const kmlDoc = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Anotaciones Campo KML ${new Date().toLocaleDateString('es-ES')}</name>
+  const body = [...folders].map(([name, pms]) => `<Folder><name>${xml(name)}</name>\n${pms}</Folder>`).join('\n');
+  const kmlDoc = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Campo KML ${new Date().toLocaleDateString('es-ES')}</name>
 ${st('photo', 'ffc27119')}${st('video', 'ffb5369c')}${st('audio', 'ff3e8a2b')}${st('note', 'ff0c59e8')}
-<Folder><name>Anotaciones</name>\n${pms}</Folder></Document></kml>`;
+${body}</Document></kml>`;
   zip.file('doc.kml', kmlDoc);
   const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.google-earth.kmz' });
   const name = `anotaciones_${new Date().toISOString().slice(0, 10)}.kmz`;
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
-  document.body.appendChild(a); a.click();
-  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 5000);
-  toast(`Exportadas ${list.length} anotaciones en ${name}`);
+  try { await saveBlob(blob, name); toast(`Exportadas ${list.length} anotaciones en ${name}`); }
+  catch (e) { if (!/cancel/i.test(e.message || '')) toast('No se pudo exportar: ' + (e.message || e), 6000); }
 }
 
 /* ---------------- Guardar zona para trabajar sin cobertura ---------------- */
@@ -710,7 +1020,7 @@ function tileRange(b, z) {
   return { x0: x(b.getWest()), x1: x(b.getEast()), y0: y(b.getNorth()), y1: y(b.getSouth()) };
 }
 async function cacheArea() {
-  if (!('caches' in window)) { toast('Este navegador no permite guardar mapas sin conexión.'); return; }
+  if (!('caches' in window)) { toast('Este dispositivo no permite guardar mapas sin conexión.'); return; }
   const b = map.getBounds(), z0 = Math.max(12, map.getZoom()), urls = [];
   for (let z = z0; z <= Math.min(z0 + 3, 19); z++) {
     const r = tileRange(b, z);
@@ -738,66 +1048,114 @@ async function cacheArea() {
   toast(ok ? `Zona guardada: ${ok} de ${urls.length} imágenes disponibles sin conexión.` : 'No se pudo guardar la zona. Comprueba la conexión.', 7000);
 }
 
-/* ---------------- Panel lateral ---------------- */
+/* ---------------- Panel lateral con el gestor de capas ---------------- */
+let openLayerId = null;
 function openDrawer() { renderDrawer(); $('#drawer').hidden = false; $('#scrim').hidden = false; }
 function closeDrawer() { $('#drawer').hidden = true; $('#scrim').hidden = true; }
+
+function layerRow(id, name, sub, swatch, opts) {
+  const vis = layerVisible(id), open = openLayerId === id;
+  return `<div class="lyr ${open ? 'open' : ''}">
+    <div class="lrow"><input type="checkbox" data-vis="${id}" ${vis ? 'checked' : ''} aria-label="Mostrar ${esc(name)}">
+      ${swatch}<button class="nm" data-open="${id}" type="button">${esc(name)}<small>${esc(sub)}</small></button>
+      ${opts.move ? `<button class="mini ic" data-up="${id}" aria-label="Subir">${ICON.up}</button><button class="mini ic" data-down="${id}" aria-label="Bajar">${ICON.down}</button>` : ''}
+    </div>
+    ${open ? `<div class="lopts">${opts.body}</div>` : ''}
+  </div>`;
+}
+function layerOptions(e) {
+  const r = e.rec, t = typeOf(r), id = r.id;
+  let h = '';
+  if (t !== 'photos') h += `<label class="rng">Opacidad<input type="range" min="10" max="100" step="5" value="${Math.round((r.opacity ?? 1) * 100)}" data-op="${id}"></label>`;
+  if (t === 'kml') h += `<label class="rng">Color<input type="color" value="${r.color}" data-col="${id}"></label>`;
+  h += `<div class="field row"><input type="text" value="${esc(r.name)}" data-name="${id}" aria-label="Nombre de la capa"><button class="mini" data-rename="${id}">Renombrar</button></div>`;
+  h += `<div class="row">${t !== 'wms' ? `<button class="mini" data-zoom="${id}">Encuadrar</button>` : ''}<button class="mini del" data-dell="${id}">Eliminar capa</button></div>`;
+  if (t === 'wms') h += `<p class="hint">${esc(r.url)}${r.layers ? ' · ' + esc(r.layers) : ''}</p>`;
+  return h;
+}
+function layerSub(e) {
+  const t = typeOf(e.rec);
+  if (t === 'kml') return `KML · ${e.feats.length} elementos`;
+  if (t === 'wms') return 'Servicio de imagen';
+  const n = [...notes.values()].filter(x => x.layerId === e.rec.id).length;
+  return `Fotos con GPS · ${n}`;
+}
 async function renderDrawer() {
   const d = $('#drawer');
-  const layers = [...kml.values()].sort((a, b) => b.rec.created - a.rec.created);
-  const nl = [...notes.values()].sort((a, b) => b.created - a.created);
+  const scroll = d.scrollTop;
+  const ordered = orderedLayers();
+  const photoLayers = [...layers.values()].filter(e => isPointLayer(e.rec)).sort((a, b) => b.rec.created - a.rec.created);
+  const own = [...notes.values()].filter(n => !n.layerId).sort((a, b) => b.created - a.created);
   let storage = '';
   try { const e = await navigator.storage.estimate(); storage = `${(e.usage / 1048576).toFixed(1).replace('.', ',')} MB usados en el dispositivo`; } catch (e) {}
-  d.innerHTML = `<h2>Campo KML</h2>
+
+  const pointRows = layerRow('notes', 'Mis anotaciones', `${own.length} anotaciones`, `<span class="sw pin-sw note"></span>`,
+    { move: false, body: `<div class="row"><button class="mini" data-zoom="notes">Encuadrar</button></div>` })
+    + photoLayers.map(e => layerRow(e.rec.id, e.rec.name, layerSub(e), `<span class="sw pin-sw photo"></span>`, { move: false, body: layerOptions(e) })).join('');
+  const otherRows = ordered.map(e => layerRow(e.rec.id, e.rec.name, layerSub(e),
+    typeOf(e.rec) === 'kml' ? `<span class="sw" style="background:${e.rec.color}"></span>` : `<span class="sw ic">${ICON.wms}</span>`,
+    { move: ordered.length > 1, body: layerOptions(e) })).join('');
+
+  d.innerHTML = `<div class="dhead"><h2>Campo KML</h2><button class="mini ic" id="dClose" aria-label="Cerrar">${ICON.close}</button></div>
+    <h3>Capas</h3>
+    <div class="lgroup">${pointRows}</div>
+    <div class="lgroup">${otherRows || '<p class="empty">Aún no hay capas KML ni servicios.</p>'}</div>
+    ${ordered.length > 1 ? '<p class="hint">Las de arriba se dibujan encima. Las capas KML quedan siempre sobre las de imagen.</p>' : ''}
+    <div class="acts"><button class="btn pri full" data-t="add">${ICON.plus}Añadir capa</button></div>
     <h3>Mapa base</h3>
     ${Object.entries(BASES).map(([id, b]) => `<label class="opt"><input type="radio" name="base" value="${id}" ${settings.base === id ? 'checked' : ''}>${esc(b.name)}</label>`).join('')}
-    <label class="opt"><input type="checkbox" id="chkCat" ${settings.catastro ? 'checked' : ''}>Parcelas de Catastro</label>
-    <h3>Capas KML (${layers.length})</h3>
-    ${layers.length ? layers.map(({ rec, feats }) => `<div class="lrow"><input type="checkbox" data-vis="${rec.id}" ${rec.visible ? 'checked' : ''} aria-label="Mostrar ${esc(rec.name)}">
-      <span class="sw" style="background:${rec.color}"></span><span class="nm">${esc(rec.name)}<small>${feats.length} elementos</small></span>
-      <button class="mini" data-zoom="${rec.id}">Ver</button><button class="mini del" data-dell="${rec.id}" aria-label="Quitar capa">${ICON.close}</button></div>`).join('')
-      : '<p class="empty">Importa un KML o KMZ con el botón Importar.</p>'}
-    <h3>Anotaciones (${nl.length})</h3>
-    ${nl.length ? nl.map(n => `<div class="nrow" data-note="${n.id}"><span class="pin ${noteType(n)}" style="transform:scale(.7)"><span></span>${ICON[noteType(n)]}</span>
+    <h3>Mis anotaciones (${own.length})</h3>
+    ${own.length ? own.slice(0, 50).map(n => `<div class="nrow" data-note="${n.id}"><span class="pin ${noteType(n)}" style="transform:scale(.7)"><span></span>${ICON[noteType(n)]}</span>
       <span class="t"><b>${esc(n.title)}</b><small>${fmtDate(n.created)} · ${(n.media || []).length} archivos</small></span></div>`).join('')
       : '<p class="empty">Mantén pulsado en el mapa o usa el botón naranja para crear la primera.</p>'}
     <h3>Herramientas</h3>
     <div class="acts">
-      <button class="btn" data-t="import">Importar KML</button>
       <button class="btn" data-t="export">Exportar KMZ</button>
       <button class="btn" data-t="measure">${ICON.ruler}Medir</button>
-      <button class="btn" data-t="cache">Guardar zona sin conexión</button>
+      <button class="btn full" data-t="cache">Guardar zona visible sin conexión</button>
     </div>
     <h3>Ajustes</h3>
     <div class="field"><label for="selTravel">Indicaciones de Google Maps</label>
       <select id="selTravel"><option value="driving">En coche</option><option value="walking">A pie</option></select></div>
-    <label class="opt"><input type="checkbox" id="chkStamp" ${settings.stamp ? 'checked' : ''}>Sellar fecha y coordenadas en las fotos</label>
+    <label class="opt"><input type="checkbox" id="chkStamp" ${settings.stamp ? 'checked' : ''}>Sellar fecha y coordenadas en las fotos que hago</label>
     <div class="field"><label for="gKey">Clave de Google (API Map Tiles)</label>
       <input type="password" id="gKey" autocomplete="off" placeholder="AIza…" value="${esc(settings.googleKey)}">
       <button class="mini" id="gKeySave" type="button">Guardar clave</button>
       <p class="hint">Solo hace falta para el fondo Google híbrido. La ortofoto PNOA del IGN funciona sin clave.</p></div>
-    <p class="hint">${storage}</p>`;
+    <p class="hint">${storage}${NATIVE ? ' · App Android' : ''}</p>`;
+  d.scrollTop = scroll;
+
+  $('#dClose').onclick = closeDrawer;
   d.querySelectorAll('input[name=base]').forEach(r => r.onchange = () => setBase(r.value));
-  $('#chkCat').onchange = e => setCatastro(e.target.checked);
-  d.querySelectorAll('[data-vis]').forEach(c => c.onchange = async () => {
-    const e = kml.get(c.dataset.vis); e.rec.visible = c.checked;
-    c.checked ? e.group.addTo(map) : map.removeLayer(e.group);
-    await DB.put('layers', e.rec);
-  });
+  d.querySelectorAll('[data-vis]').forEach(c => c.onchange = () => setLayerVisible(c.dataset.vis, c.checked));
+  d.querySelectorAll('[data-open]').forEach(bt => bt.onclick = () => { openLayerId = openLayerId === bt.dataset.open ? null : bt.dataset.open; renderDrawer(); });
+  d.querySelectorAll('[data-up]').forEach(bt => bt.onclick = () => moveLayer(bt.dataset.up, -1));
+  d.querySelectorAll('[data-down]').forEach(bt => bt.onclick = () => moveLayer(bt.dataset.down, 1));
   d.querySelectorAll('[data-zoom]').forEach(bt => bt.onclick = () => {
-    const e = kml.get(bt.dataset.zoom);
-    if (!e.rec.visible) { e.rec.visible = true; e.group.addTo(map); DB.put('layers', e.rec); }
-    closeDrawer(); map.fitBounds(e.group.getBounds().pad(0.1), { maxZoom: 18 });
+    const id = bt.dataset.zoom;
+    if (!layerVisible(id)) setLayerVisible(id, true);
+    closeDrawer(); zoomToLayer(id);
   });
-  d.querySelectorAll('[data-dell]').forEach(bt => bt.onclick = async () => {
-    const e = kml.get(bt.dataset.dell);
-    if (!confirm(`¿Quitar la capa «${e.rec.name}» de la app?`)) return;
-    map.removeLayer(e.group); kml.delete(e.rec.id); await DB.del('layers', e.rec.id); renderDrawer();
+  d.querySelectorAll('[data-dell]').forEach(bt => bt.onclick = () => deleteLayer(bt.dataset.dell));
+  d.querySelectorAll('[data-op]').forEach(r => {
+    r.oninput = () => {
+      const e = layers.get(r.dataset.op), v = +r.value / 100;
+      e.rec.opacity = v;
+      if (e.tile) e.tile.setOpacity(v);
+    };
+    r.onchange = async () => { const id = r.dataset.op; await updateLayer(id, { opacity: +r.value / 100 }); if (typeOf(layers.get(id).rec) === 'kml') rebuildLayer(id); };
+  });
+  d.querySelectorAll('[data-col]').forEach(c => c.onchange = async () => { await updateLayer(c.dataset.col, { color: c.value }); rebuildLayer(c.dataset.col); renderDrawer(); });
+  d.querySelectorAll('[data-rename]').forEach(bt => bt.onclick = async () => {
+    const id = bt.dataset.rename, v = d.querySelector(`[data-name="${id}"]`).value.trim();
+    if (!v) return; await updateLayer(id, { name: v }); renderDrawer(); toast('Capa renombrada');
   });
   d.querySelectorAll('[data-note]').forEach(r => r.onclick = () => {
     const n = notes.get(r.dataset.note); closeDrawer();
+    if (!layerVisible('notes')) setLayerVisible('notes', true);
     map.setView([n.lat, n.lng], Math.max(map.getZoom(), 17)); viewNote(n.id);
   });
-  d.querySelector('[data-t=import]').onclick = () => { closeDrawer(); $('#inKml').click(); };
+  d.querySelector('[data-t=add]').onclick = () => { closeDrawer(); importMenu(); };
   d.querySelector('[data-t=export]').onclick = exportKMZ;
   d.querySelector('[data-t=measure]').onclick = () => { closeDrawer(); startMeasure(); };
   d.querySelector('[data-t=cache]').onclick = () => { closeDrawer(); cacheArea(); };
@@ -807,7 +1165,7 @@ async function renderDrawer() {
 }
 
 /* ---------------- Botones principales ---------------- */
-$('#btnMenu').innerHTML = ICON.menu;
+$('#btnMenu').innerHTML = ICON.layers;
 $('#fabLocate').innerHTML = ICON.locate;
 $('#fabPhoto').innerHTML = ICON.photo;
 $('#fabNote').innerHTML = ICON.plus;
@@ -815,8 +1173,9 @@ $('#sheetX').innerHTML = ICON.close;
 $('#btnMenu').onclick = openDrawer;
 $('#scrim').onclick = closeDrawer;
 $('#sheetX').onclick = closeSheet;
-$('#btnImport').onclick = () => $('#inKml').click();
+$('#btnImport').onclick = importMenu;
 $('#inKml').addEventListener('change', e => { const f = Array.from(e.target.files || []); e.target.value = ''; if (f.length) importFiles(f); });
+$('#inPhotosImport').addEventListener('change', e => { const f = Array.from(e.target.files || []); e.target.value = ''; if (f.length) importPhotos(f); });
 $('#fabLocate').onclick = locate;
 
 // Foto rápida: abre la cámara al instante y georreferencia con el GPS en paralelo
@@ -836,43 +1195,61 @@ $('#fabNote').onclick = async () => {
   catch (e) { toast(geoErr(e) + ' Mantén pulsado en el mapa para anotar en un punto concreto.', 7000); }
 };
 
-map.on('moveend', () => { const c = map.getCenter(); settings.view = [c.lat, c.lng, map.getZoom()]; clearTimeout(map._svT); map._svT = setTimeout(saveSettings, 800); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (!$('#drawer').hidden) closeDrawer(); else if (measure) endMeasure(); else closeSheet(); } });
+// Arrastrar ficheros sobre el mapa (ordenador)
+const mapEl = map.getContainer();
+mapEl.addEventListener('dragover', e => { e.preventDefault(); });
+mapEl.addEventListener('drop', e => { e.preventDefault(); const f = Array.from(e.dataTransfer.files || []); if (f.length) handleIncoming(f); });
 
-/* ---------------- Arranque ---------------- */
-async function receiveShared() { // ficheros compartidos desde otras apps (WhatsApp, Drive…)
+map.on('moveend', () => { const c = map.getCenter(); settings.view = [c.lat, c.lng, map.getZoom()]; clearTimeout(map._svT); map._svT = setTimeout(saveSettings, 800); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (!$('#viewer').hidden) { $('#viewer').hidden = true; } else if (!$('#drawer').hidden) closeDrawer(); else if (measure) endMeasure(); else closeSheet(); } });
+
+/* ---------------- Ficheros recibidos de otras apps ---------------- */
+async function receiveShared() { // web instalada: menú Compartir de Android
   if (!('caches' in window)) return;
   const c = await caches.open('inbox'); const keys = await c.keys(); if (!keys.length) return;
   const files = [];
   for (const k of keys) {
     const r = await c.match(k);
-    files.push(new File([await r.blob()], decodeURIComponent(r.headers.get('x-name') || 'compartido.kml')));
+    const blob = await r.blob();
+    files.push(new File([blob], decodeURIComponent(r.headers.get('x-name') || 'compartido'), { type: blob.type }));
     await c.delete(k);
   }
-  const kmlFiles = files.filter(f => /\.km[lz]$/i.test(f.name));
-  if (kmlFiles.length) importFiles(kmlFiles); else toast('Los archivos compartidos no son KML ni KMZ.');
+  handleIncoming(files);
+}
+function nativeInbox() { // app nativa: «Abrir con» y «Compartir»
+  const IB = Plug('Inbox'); if (!IB) return;
+  const take = async () => {
+    try {
+      const r = await IB.take();
+      const files = (r.files || []).map(f => new File([b64ToBlob(f.b64, f.mime || '')], f.name || 'archivo', { type: f.mime || '' }));
+      if (files.length) handleIncoming(files);
+    } catch (e) { toast('No se pudo abrir el archivo recibido: ' + (e.message || e), 6000); }
+  };
+  IB.addListener('files', take);
+  take();
 }
 
+/* ---------------- Arranque ---------------- */
 (async function init() {
   try { Object.assign(settings, (await DB.get('kv', 'settings')) || {}); } catch (e) {}
   if (settings.view) map.setView([settings.view[0], settings.view[1]], settings.view[2]);
   await setBase(settings.base in BASES ? settings.base : 'pnoa');
-  if (settings.catastro) catastro.addTo(map);
   try {
-    for (const rec of (await DB.all('layers')).sort((a, b) => a.created - b.created)) {
-      try { renderKml(rec); } catch (e) { console.error(e); }
-    }
+    const recs = (await DB.all('layers')).sort((a, b) => a.created - b.created);
+    recs.forEach((r, i) => { if (r.order == null) r.order = i + 1; if (!r.type) r.type = 'kml'; });
+    for (const rec of recs) { try { registerLayer(rec); } catch (e) { console.error(e); } }
+    if (settings.catastro && !recs.some(r => r.url === CATALOG[0].url)) { settings.catastro = false; saveSettings(); addService(CATALOG[0]); } // versión anterior
+    if (settings.notesVisible !== false) pointGroup('notes').addTo(map);
     for (const n of await DB.all('notes')) { notes.set(n.id, n); drawNote(n); }
   } catch (e) { toast('No se pudieron leer los datos guardados: ' + e.message, 7000); }
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
-    navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW', e));
-  }
+  if (NATIVE) nativeInbox();
+  else if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW', e));
   if ('launchQueue' in window) { // KML abiertos con doble clic (app instalada en el ordenador)
     window.launchQueue.setConsumer(async params => {
       if (!params.files || !params.files.length) return;
-      importFiles(await Promise.all(params.files.map(h => h.getFile())));
+      handleIncoming(await Promise.all(params.files.map(h => h.getFile())));
     });
   }
   if (new URLSearchParams(location.search).has('shared')) { history.replaceState(null, '', './'); receiveShared(); }
-  if (!kml.size && !notes.size) toast('Pulsa Importar para abrir un KML o KMZ. Mantén pulsado en el mapa para ver las opciones de un punto.', 8000);
+  if (!layers.size && !notes.size) toast('Pulsa Importar para abrir un KML, un KMZ o fotos con GPS. Mantén pulsado en el mapa para ver las opciones de un punto.', 8000);
 })();

@@ -11,7 +11,8 @@ App de campo para Android (también funciona en iPhone y en el ordenador) que:
 - **Medición** de distancias sobre el mapa.
 - **Exportar** todas las anotaciones a un **KMZ** con las fotos, vídeos y audios dentro (se abre en Google Earth o QGIS).
 - **Guardar zona sin conexión**: descarga la ortofoto PNOA de la zona visible para trabajar sin cobertura.
-- Capa opcional de **parcelas del Catastro**.
+- **Fotos con GPS**: importa fotos JPEG y las coloca solas en el mapa con su fecha, altitud y orientación (si la cámara guardó la ubicación).
+- **Gestor de capas**: mostrar/ocultar, orden, opacidad, color, renombrar, encuadrar y borrar. Servicios WMS/WMTS: Catastro, SIGPAC, MTN y límites del IGN, o cualquier WMS escribiendo su dirección.
 - Recibir KML/KMZ **compartidos desde WhatsApp, Gmail o Drive** (botón Compartir → Campo KML), una vez instalada.
 
 Todo se guarda en el propio móvil. No hay servidor ni cuentas.
@@ -67,3 +68,19 @@ Los datos viven en el navegador del móvil. Si desinstalas la app o borras los d
 - `manifest.webmanifest`, `icons/`: instalación como app.
 - `vendor/`: Leaflet 1.9.4 (mapa) y JSZip 3.10.1 (KMZ).
 - `ejemplo-red-riego.kml`: KML de prueba.
+
+## App nativa Android (APK)
+
+El repositorio compila la app Android solo, con GitHub Actions, cada vez que subes cambios a `main`.
+
+- La carpeta `android-build/` contiene el empaquetado nativo (Capacitor): permisos de GPS, cámara y micrófono, el receptor de ficheros (`native/InboxPlugin.java`) para **"Abrir con"** y **"Compartir"**, y el icono.
+- `.github/workflows/android.yml` es la receta de compilación. Tarda unos 5 minutos. Puedes seguirla en la pestaña **Actions**.
+- El APK se publica en **Releases** con el nombre `CampoKML.apk`. Enlace directo:
+  `https://github.com/<usuario>/<repositorio>/releases/download/apk/CampoKML.apk`
+- `android-build/debug.keystore` es la firma de la app. Es una firma de pruebas, pero siempre la misma, así que las nuevas versiones se instalan encima sin desinstalar. Si algún día la publicas en Google Play, habrá que crear una firma propia y guardarla como secreto del repositorio.
+
+**Instalar en el móvil:** abre el enlace del APK en Chrome, descárgalo y ábrelo. Android pedirá permiso para "instalar aplicaciones desconocidas" desde Chrome. Concédelo. Play Protect puede avisar de que la app no está en Google Play. Pulsa "Instalar de todas formas".
+
+**Fotos con GPS en la app nativa:** la forma más fiable es seleccionarlas en la Galería y usar Compartir → Campo KML. Así la app puede pedir a Android la foto original con las coordenadas.
+
+**Google híbrido en la app nativa:** si restringes la clave de Google por sitio web, añade `https://localhost/*` a la lista.

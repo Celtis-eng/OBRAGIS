@@ -1,0 +1,6 @@
+{
+  "appId": "es.obragis.campokml",
+  "appName": "Campo KML",
+  "webDir": "www",
+  "android": { "allowMixedContent": false }
+}

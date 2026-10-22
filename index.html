@@ -16,7 +16,7 @@
 <div id="map"></div>
 
 <header class="bar">
-  <button id="btnMenu" class="ibtn" type="button" aria-label="Capas y herramientas"></button>
+  <button id="btnMenu" class="ibtn" type="button" aria-label="Capas, mapa base y herramientas"></button>
   <div class="brand">Campo <b>KML</b></div>
   <button id="btnImport" class="tbtn" type="button">Importar</button>
 </header>
@@ -42,10 +42,12 @@
 </section>
 
 <div id="toast" class="toast" hidden></div>
+<div id="viewer" class="viewer" hidden></div>
 
 <input type="file" id="inKml" accept=".kml,.kmz,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz" multiple hidden>
 <input type="file" id="inPhoto" accept="image/*" capture="environment" hidden>
 <input type="file" id="inVideo" accept="video/*" capture="environment" hidden>
+<input type="file" id="inPhotosImport" accept="image/jpeg,image/*" multiple hidden>
 <input type="file" id="inGallery" accept="image/*,video/*,audio/*" multiple hidden>
 
 <script src="vendor/leaflet.js"></script>
