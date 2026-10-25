@@ -178,3 +178,19 @@ textarea{resize:vertical;min-height:70px}
 .profile .pl{fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round}
 .profile .pe{fill:var(--go);stroke:var(--bg);stroke-width:1.5}
 .leaflet-tooltip.pk-tip{font:600 11px ui-monospace,Menlo,Consolas,monospace;padding:2px 6px}
+/* actuaciones */
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--bg2);color:var(--fg);border-radius:999px;padding:8px 12px;font:500 .88rem inherit;font-family:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.chip::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--c)}
+.chip.on{border-color:var(--c);box-shadow:inset 0 0 0 2px var(--c);font-weight:700}
+.seg{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{border:0;border-right:1px solid var(--line);background:var(--bg2);color:var(--fg);padding:10px 4px;font:500 .85rem inherit;font-family:inherit;cursor:pointer}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--accent);color:#fff;font-weight:700}
+.pkbtns{display:flex;flex-direction:column;gap:6px}
+.pkbtns .mini{min-height:38px}
+.field.row label.grow{flex:1;font-size:.85rem;color:var(--muted)}
+.dot{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:8px;vertical-align:baseline;flex:none}
+.nrow .dot{margin-right:0}
+.act-label{pointer-events:none}
+.act-label span{position:absolute;transform:translate(-50%,-50%);white-space:nowrap;font:600 11px system-ui,sans-serif;color:#fff;background:rgba(16,32,24,.78);border-left:4px solid;padding:2px 6px;border-radius:3px}

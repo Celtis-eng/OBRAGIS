@@ -20,6 +20,7 @@ const ICON = {
   plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
   nav: '<svg viewBox="0 0 24 24"><path d="M3 11l18-8-8 18-2-8z"/></svg>',
   close: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  road: '<svg viewBox="0 0 24 24"><path d="M8 3L4 21M16 3l4 18M12 4v3M12 10v3M12 16v3"/></svg>',
   slope: '<svg viewBox="0 0 24 24"><path d="M3 19L21 7M3 19h18M15 19v-8"/></svg>',
   ruler: '<svg viewBox="0 0 24 24"><path d="M3 17L17 3l4 4L7 21zM7 13l2 2M10 10l2 2M13 7l2 2"/></svg>',
   copy: '<svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4H4v12h4"/></svg>',
@@ -34,12 +35,13 @@ const ICON = {
 const DB = (() => {
   let dbp;
   const open = () => dbp || (dbp = new Promise((res, rej) => {
-    const r = indexedDB.open('campo-kml', 1);
+    const r = indexedDB.open('campo-kml', 2);
     r.onupgradeneeded = () => {
-      const d = r.result;
-      d.createObjectStore('layers', { keyPath: 'id' });
-      d.createObjectStore('notes', { keyPath: 'id' });
-      d.createObjectStore('kv');
+      const d = r.result, has = n => d.objectStoreNames.contains(n);
+      if (!has('layers')) d.createObjectStore('layers', { keyPath: 'id' });
+      if (!has('notes')) d.createObjectStore('notes', { keyPath: 'id' });
+      if (!has('kv')) d.createObjectStore('kv');
+      if (!has('acts')) d.createObjectStore('acts', { keyPath: 'id' }); // actuaciones lineales sobre trazas
     };
     r.onsuccess = () => res(r.result);
     r.onerror = () => rej(r.error);
@@ -463,6 +465,7 @@ function pointGroup(id) {
 }
 function layerVisible(id) {
   if (id === 'notes') return settings.notesVisible !== false;
+  if (id === 'acts') return settings.actsVisible !== false;
   const e = layers.get(id); return !!(e && e.rec.visible);
 }
 
@@ -539,7 +542,7 @@ function drawPK() {
     }
   }
 }
-let pkT; map.on('moveend', () => { clearTimeout(pkT); pkT = setTimeout(drawPK, 60); });
+let pkT; map.on('moveend', () => { clearTimeout(pkT); pkT = setTimeout(() => { drawPK(); drawActs(); }, 60); });
 
 function buildKml(entry) {
   const { rec } = entry;
@@ -555,7 +558,7 @@ function buildKml(entry) {
       else lyr = L.circleMarker(p.c[0], { radius: 7, color: '#fff', weight: 2, opacity: op, fillColor: st.icon || rec.color, fillOpacity: op });
       lyr.on('click', e => {
         L.DomEvent.stop(e);
-        if (slopePick) return slopePickPoint(e.latlng);
+        if (slopePick || actPick) return slopePickPoint(e.latlng);
         if (measure) return addMeasurePt(e.latlng);
         featureSheet(f, e.latlng, rec);
       });
@@ -590,7 +593,7 @@ function registerLayer(rec) {
 }
 function rebuildLayer(id) {
   const e = layers.get(id); if (!e) return;
-  setTimeout(drawPK, 0);
+  setTimeout(() => { drawPK(); drawActs(); }, 0);
   if (e.group || e.tile) map.removeLayer(mapLayerOf(e));
   if (typeOf(e.rec) === 'kml') buildKml(e); else if (typeOf(e.rec) === 'wms') buildRaster(e);
   if (e.rec.visible) mapLayerOf(e).addTo(map);
@@ -606,7 +609,8 @@ function applyOrder() {
   });
 }
 async function setLayerVisible(id, on) {
-  setTimeout(drawPK, 0);
+  setTimeout(() => { drawPK(); drawActs(); }, 0);
+  if (id === 'acts') { settings.actsVisible = on; saveSettings(); drawActs(); return; }
   if (id === 'notes') { settings.notesVisible = on; saveSettings(); on ? pointGroup('notes').addTo(map) : map.removeLayer(pointGroup('notes')); return; }
   const e = layers.get(id); if (!e) return;
   e.rec.visible = on;
@@ -644,7 +648,7 @@ async function deleteLayer(id) {
   map.removeLayer(mapLayerOf(e));
   for (const n of pts) { await DB.del('notes', n.id); notes.delete(n.id); noteMarkers.delete(n.id); }
   pointGroups.delete(id);
-  layers.delete(id); await DB.del('layers', id); drawPK();
+  layers.delete(id); await DB.del('layers', id); drawPK(); drawActs();
   renderDrawer(); toast('Capa eliminada');
 }
 async function updateLayer(id, changes) {
@@ -666,7 +670,7 @@ function featureSheet(f, ll, rec) {
   }
   const noteAt = f.type === 'pt' ? { lat: f.start[0], lng: f.start[1] } : ll;
   acts += `<button class="btn" data-a="note">${ICON.note}Anotar aquí</button><button class="btn" data-a="fit">Encuadrar</button>`;
-  if (f.type === 'ln') acts += `<button class="btn pri full" data-a="slope">${ICON.slope}Pendiente y perfil</button>`;
+  if (f.type === 'ln') acts += `<button class="btn go full" data-a="newact">${ICON.road}Nueva actuación en esta traza</button><button class="btn pri full" data-a="slope">${ICON.slope}Pendiente y perfil</button>`;
   acts += `<button class="btn" data-a="copy">${ICON.copy}Copiar coordenadas</button><button class="btn" data-a="measure">${ICON.ruler}Medir desde aquí</button>`;
 
   let coords = '';
@@ -693,6 +697,8 @@ function featureSheet(f, ll, rec) {
   b.querySelector('[data-a=measure]').onclick = () => { closeSheet(); startMeasure(ll); };
   const sl = b.querySelector('[data-a=slope]');
   if (sl) sl.onclick = () => slopeSheet(f, rec, 0, f.length);
+  const na = b.querySelector('[data-a=newact]');
+  if (na) na.onclick = () => { const d = pkAt(f, ll).d; openActEditor({ rec, f, d0: d, d1: d }); };
 }
 
 /* ---------------- Importación de ficheros ---------------- */
@@ -857,7 +863,7 @@ let longFired = 0;
 })();
 
 function pointMenu(ll) {
-  if (slopePick) return slopePickPoint(ll);
+  if (slopePick || actPick) return slopePickPoint(ll);
   if (measure) return addMeasurePt(ll);
   const queryable = orderedLayers().filter(e => e.rec.visible && e.tile && e.rec.kind === 'wms' && e.rec.info);
   const b = openSheet(`<h2>Punto seleccionado</h2><p class="sub">Pulsación larga${distFromMe(ll.lat, ll.lng)}</p>
@@ -868,6 +874,7 @@ function pointMenu(ll) {
       <button class="btn" data-a="photo">${ICON.photo}Foto en este punto</button>
       <button class="btn" data-a="copy">${ICON.copy}Copiar coordenadas</button>
       <button class="btn" data-a="measure">${ICON.ruler}Medir desde aquí</button>
+      <button class="btn full" data-a="actnear">${ICON.road}Actuación en la traza más cercana</button>
       <a class="btn full" href="${viewUrl(ll.lat, ll.lng)}" target="_blank" rel="noopener">Ver en Google Maps</a>
     </div>
     ${queryable.length ? `<div class="afec"><h3 class="sh">Afecciones en este punto</h3><div id="afecList"><p class="hint">Consultando ${queryable.length} capas…</p></div></div>` : ''}`);
@@ -877,6 +884,11 @@ function pointMenu(ll) {
   b.querySelector('[data-a=photo]').onclick = () => { const at = { lat: ll.lat, lng: ll.lng, src: 'mapa' }; capture('inPhoto', files => { openEditor(at); addMedia(files); }); };
   b.querySelector('[data-a=copy]').onclick = () => copyText(`${fmtLL(ll.lat, ll.lng)}\n${fmtUTM(ll.lat, ll.lng)}`);
   b.querySelector('[data-a=measure]').onclick = () => { closeSheet(); startMeasure(ll); };
+  b.querySelector('[data-a=actnear]').onclick = () => {
+    const n = nearestTrace(ll); if (!n) { toast('No hay ninguna traza KML visible. Importa o muestra el KML del camino.'); return; }
+    if (n.off > 100) toast(`La traza más cercana («${n.f.name}») está a ${Math.round(n.off)} m.`, 5000);
+    openActEditor({ rec: n.rec, f: n.f, d0: n.d, d1: n.d });
+  };
   if (queryable.length) queryAfecciones(ll, queryable);
 }
 
@@ -997,6 +1009,7 @@ async function processImage(file, at, stamp = settings.stamp) {
     if (stamp && at) {
       const fs = Math.max(14, Math.round(c.width / 55)), pad = Math.round(fs * 0.6);
       const lines = [fmtDate(Date.now()), fmtLL(at.lat, at.lng) + (at.acc ? ` ±${Math.round(at.acc)} m` : ''), fmtUTM(at.lat, at.lng)];
+      if (at.label) lines.unshift(at.label);
       const h = lines.length * fs * 1.3 + pad * 2;
       g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(0, c.height - h, c.width, h);
       g.fillStyle = '#fff'; g.font = `600 ${fs}px system-ui, sans-serif`; g.textBaseline = 'top';
@@ -1023,7 +1036,7 @@ function drawNote(n) {
   let m = noteMarkers.get(n.id);
   if (!m) {
     m = L.marker([n.lat, n.lng], { icon: pinIcon(noteType(n), n.dir) }).addTo(g);
-    m.on('click', e => { L.DomEvent.stop(e); if (slopePick) return slopePickPoint(e.latlng); if (measure) return addMeasurePt(e.latlng); viewNote(n.id); });
+    m.on('click', e => { L.DomEvent.stop(e); if (slopePick || actPick) return slopePickPoint(e.latlng); if (measure) return addMeasurePt(e.latlng); viewNote(n.id); });
     noteMarkers.set(n.id, m);
   } else { m.setLatLng([n.lat, n.lng]).setIcon(pinIcon(noteType(n), n.dir)); }
 }
@@ -1349,7 +1362,7 @@ function slopeSheet(f, rec, d0, d1, opts = {}) {
   };
   if (opts.autorun) computeSlope(f, rec, d0, d1, source);
 }
-function slopePickPoint(ll) {
+var slopePickPoint = function (ll) {
   const sp = slopePick; if (!sp) return;
   const r = pkAt(sp.f, L.latLng(ll));
   sp.pts.push(r.d);
@@ -1361,8 +1374,8 @@ function slopePickPoint(ll) {
   const [a, c] = sp.pts[0] <= sp.pts[1] ? sp.pts : [sp.pts[1], sp.pts[0]];
   slopePick = null; $('#pickBar').hidden = true;
   slopeSheet(sp.f, sp.rec, a, c, { source: sp.source, autorun: true });
-}
-$('#pickCancel').onclick = () => { slopePick = null; $('#pickBar').hidden = true; slopeHL.clearLayers(); };
+};
+$('#pickCancel').onclick = () => { slopePick = null; $('#pickBar').hidden = true; slopeHL.clearLayers(); if (actPick) { actPick = null; renderActEditor(); } };
 
 const fmtPct = v => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(2).replace('.', ',') + ' %';
 const fmtZ = z => z.toFixed(2).replace('.', ',') + ' m';
@@ -1427,6 +1440,233 @@ function profileSVG(prof) {
   </svg></div>`;
 }
 
+/* ---------------- Actuaciones lineales sobre trazas (escolleras, badenes, cunetas…) ---------------- */
+const ACT_TYPES = [
+  ['Escollera', '#8d6e63'], ['Badén', '#00acc1'], ['Cuneta revestida', '#1e88e5'], ['Cuneta en tierra', '#a1887f'],
+  ['Caño / obra de drenaje', '#3949ab'], ['Muro', '#757575'], ['Firme / pavimento', '#455a64'], ['Barrera / bionda', '#e53935'],
+  ['Arqueta / pozo', '#8e24aa'], ['Paso salvacunetas', '#00897b'], ['Reperfilado / desbroce', '#7cb342'], ['Otro', '#f4511e'],
+];
+const SIDES = { izq: 'Margen izquierdo', der: 'Margen derecho', ambos: 'Ambos márgenes', eje: 'Eje / calzada' };
+const SIDE_ABBR = { izq: 'MI', der: 'MD', ambos: 'AM', eje: 'Eje' };
+const acts = new Map();
+const actColor = t => (ACT_TYPES.find(([n]) => n === t) || ACT_TYPES[ACT_TYPES.length - 1])[1];
+const actTitle = a => `${a.type} ${SIDE_ABBR[a.side] || ''} · PK ${fmtPK(a.d0)}${a.d1 > a.d0 ? '–' + fmtPK(a.d1) : ''}`;
+const actsSorted = () => [...acts.values()].sort((a, b) => (a.traceName || '').localeCompare(b.traceName || '') || a.d0 - b.d0);
+function featOf(a) { const e = layers.get(a.layerId); return e && e.feats ? { rec: e.rec, f: e.feats[a.featIdx] } : null; }
+function segmentCoords(f, d0, d1) {
+  const a = pointAtPK(f, d0); if (d1 <= d0) return [[a.lat, a.lng]];
+  const b = pointAtPK(f, d1);
+  return [[a.lat, a.lng], ...vertexTable(f).filter(p => p.d > d0 && p.d < d1).map(p => [p.lat, p.lng]), [b.lat, b.lng]];
+}
+function nearestTrace(ll) {
+  let best = null;
+  for (const e of layers.values()) {
+    if (typeOf(e.rec) !== 'kml' || !e.rec.visible) continue;
+    e.feats.forEach(f => { if (f.type !== 'ln') return; const r = pkAt(f, ll); if (!best || r.off < best.off) best = { rec: e.rec, f, d: r.d, off: r.off }; });
+  }
+  return best;
+}
+// Desplaza una polilínea unos píxeles a la izquierda (+) o derecha (−) del sentido del PK
+function offsetLatLngs(coords, px) {
+  if (!px || coords.length < 2) return coords.map(c => L.latLng(c));
+  const pts = coords.map(c => map.latLngToLayerPoint(c));
+  return pts.map((p, i) => {
+    const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
+    let dx = b.x - a.x, dy = b.y - a.y; const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
+    return map.layerPointToLatLng([p.x + dy * px, p.y - dx * px]);
+  });
+}
+const actsLayer = L.layerGroup().addTo(map);
+function drawActs() {
+  actsLayer.clearLayers();
+  if (settings.actsVisible === false) return;
+  const z = map.getZoom(), off = z >= 15 ? 9 : 0, bounds = map.getBounds().pad(0.3);
+  for (const a of acts.values()) {
+    if (!a.coords || !a.coords.length || !bounds.intersects(L.latLngBounds(a.coords))) continue;
+    const col = actColor(a.type), sides = a.side === 'ambos' ? [off, -off] : a.side === 'izq' ? [off] : a.side === 'der' ? [-off] : [0];
+    sides.forEach(px => {
+      let lyr;
+      if (a.coords.length > 1 && a.d1 > a.d0) {
+        const ll = offsetLatLngs(a.coords, px);
+        L.polyline(ll, { color: '#102018', weight: 9, opacity: 0.45, interactive: false }).addTo(actsLayer);
+        lyr = L.polyline(ll, { color: col, weight: 6, opacity: 0.95, lineCap: 'butt' });
+      } else {
+        const ctx = featOf(a), c = ctx && ctx.f ? segmentCoords(ctx.f, Math.max(0, a.d0 - 5), a.d0 + 5) : a.coords;
+        const ll = offsetLatLngs(c.length > 1 ? c : a.coords, px);
+        lyr = L.circleMarker(ll[Math.floor(ll.length / 2)] || L.latLng(a.coords[0]), { radius: 7, color: '#fff', weight: 2, fillColor: col, fillOpacity: 1 });
+      }
+      lyr.on('click', e => { L.DomEvent.stop(e); if (slopePick || actPick) return slopePickPoint(e.latlng); if (measure) return addMeasurePt(e.latlng); viewAct(a.id); });
+      lyr.addTo(actsLayer);
+    });
+    if (z >= 17) {
+      const mid = a.coords[Math.floor(a.coords.length / 2)];
+      const lab = offsetLatLngs(a.coords.length > 1 ? a.coords : [mid, mid], (sides[0] || 0) + (sides[0] < 0 ? -22 : 22));
+      L.marker(lab[Math.floor(lab.length / 2)], { interactive: false, keyboard: false, pane: 'pk',
+        icon: L.divIcon({ className: 'act-label', html: `<span style="border-color:${col}">${esc(a.type)} ${SIDE_ABBR[a.side] || ''}</span>`, iconSize: [0, 0] }) }).addTo(actsLayer);
+    }
+  }
+}
+
+let actDraft = null;
+function openActEditor(o) {
+  if (o.act) actDraft = { ...o.act, media: [...(o.act.media || [])] };
+  else actDraft = { id: uid(), layerId: o.rec.id, featIdx: layers.get(o.rec.id).feats.indexOf(o.f), traceName: o.f.name, layerName: o.rec.name,
+    d0: o.d0, d1: o.d1, type: '', side: 'izq', text: '', media: [], created: Date.now(), coords: [] };
+  renderActEditor();
+}
+function syncAct() {
+  if (!actDraft) return;
+  const g = id => $('#' + id);
+  if (g('aText')) actDraft.text = g('aText').value;
+  if (g('aOther') && actDraft.type === '__otro') actDraft.custom = g('aOther').value;
+  if (g('aPk0')) { const v = parsePK(g('aPk0').value); if (isFinite(v)) actDraft.d0 = v; }
+  if (g('aPk1')) { const v = parsePK(g('aPk1').value); if (isFinite(v)) actDraft.d1 = v; }
+}
+function renderActEditor() {
+  const a = actDraft; if (!a) return;
+  const ctx = featOf(a); const f = ctx && ctx.f;
+  const isNew = !acts.has(a.id), keep = actDraft;
+  const len = Math.max(0, a.d1 - a.d0);
+  const b = openSheet(`<h2>${isNew ? 'Nueva actuación' : 'Editar actuación'}</h2>
+    <p class="sub">${esc(a.traceName)} · ${esc(a.layerName || '')}${f ? ' · longitud ' + fmtLen(f.length) : ''}</p>
+    <div class="field"><label>Tipo de actuación</label><div class="chips">${ACT_TYPES.map(([t, c]) => `<button type="button" class="chip ${a.type === t ? 'on' : ''}" data-type="${esc(t)}" style="--c:${c}">${esc(t)}</button>`).join('')}</div></div>
+    ${a.type === 'Otro' ? `<div class="field"><input type="text" id="aOther" placeholder="¿Qué actuación es?" value="${esc(a.custom || '')}"></div>` : ''}
+    <div class="field"><label>Margen (según el sentido del PK)</label><div class="seg">${Object.entries(SIDES).map(([k, v]) => `<button type="button" class="${a.side === k ? 'on' : ''}" data-side="${k}">${esc(v.replace('Margen ', '').replace(' / calzada', ''))}</button>`).join('')}</div></div>
+    <div class="pkrow">
+      <div class="field"><label for="aPk0">Desde PK</label><input type="text" id="aPk0" inputmode="decimal" value="${fmtPK(a.d0)}"></div>
+      <div class="field"><label for="aPk1">Hasta PK</label><input type="text" id="aPk1" inputmode="decimal" value="${fmtPK(a.d1)}"></div>
+    </div>
+    <div class="pkrow">
+      <div class="pkbtns"><button class="mini" data-a="gps0">Inicio: mi posición</button><button class="mini" data-a="map0">Inicio: tocar mapa</button></div>
+      <div class="pkbtns"><button class="mini" data-a="gps1">Fin: mi posición</button><button class="mini" data-a="map1">Fin: tocar mapa</button></div>
+    </div>
+    <div class="field row"><label for="aLen" class="grow">Longitud desde el inicio</label><input type="text" id="aLen" inputmode="decimal" placeholder="m" value="${len ? Math.round(len) : ''}" style="max-width:110px"><button class="mini" data-a="len">Aplicar</button></div>
+    <p class="hint">${len > 0 ? `Tramo de ${fmtLen(len)}.` : 'Ahora es una actuación puntual. Para un tramo, camina hasta el final y pulsa «Fin: mi posición», o escribe el PK final o la longitud.'}</p>
+    <div class="field"><textarea id="aText" rows="2" placeholder="Descripción, medidas u observaciones (p. ej. escollera de 2 m de altura, piedra de 300–500 kg)">${esc(a.text)}</textarea></div>
+    <div class="media">${mediaHtml(a.media, true)}</div>
+    <div class="acts">
+      <button class="btn" data-a="photo">${ICON.photo}Foto</button>
+      <button class="btn" data-a="video">${ICON.video}Vídeo</button>
+      <button class="btn pri full" data-a="save">Guardar actuación</button>
+      ${isNew ? '' : '<button class="btn del full" data-a="delete">Eliminar actuación</button>'}
+    </div>`);
+  actDraft = keep;
+  if (f) showSlopeSegment(f, Math.min(a.d0, a.d1), Math.max(a.d0, a.d1));
+  onSheetClose(() => setTimeout(() => { if (!actPick && ($('#sheet').hidden || !$('#aText'))) { slopeHL.clearLayers(); if (!$('#aText')) actDraft = actPick ? actDraft : null; } }, 0));
+  const setPK = (which, d) => { syncAct(); actDraft[which] = Math.max(0, Math.min(f ? f.length : d, d)); if (which === 'd0' && actDraft.d1 < actDraft.d0) actDraft.d1 = actDraft.d0; renderActEditor(); };
+  b.querySelectorAll('[data-type]').forEach(bt => bt.onclick = () => { syncAct(); actDraft.type = bt.dataset.type; renderActEditor(); });
+  b.querySelectorAll('[data-side]').forEach(bt => bt.onclick = () => { syncAct(); actDraft.side = bt.dataset.side; renderActEditor(); });
+  ['aPk0', 'aPk1'].forEach(id => $('#' + id).onchange = () => { syncAct(); renderActEditor(); });
+  const gps = which => async () => {
+    if (!f) { toast('La traza de esta actuación ya no está cargada.'); return; }
+    toast('Obteniendo posición GPS…', 2000);
+    try { const p = await getPos(); const r = pkAt(f, L.latLng(p.lat, p.lng)); if (r.off > 40) toast(`Estás a ${Math.round(r.off)} m de la traza: se usa el punto más cercano.`, 5000); setPK(which, r.d); }
+    catch (e) { toast(geoErr(e), 6000); }
+  };
+  b.querySelector('[data-a=gps0]').onclick = gps('d0');
+  b.querySelector('[data-a=gps1]').onclick = gps('d1');
+  const pick = which => () => {
+    if (!f) { toast('La traza de esta actuación ya no está cargada.'); return; }
+    syncAct(); actPick = which; closeSheet();
+    $('#pickText').textContent = which === 'd0' ? 'Toca en el mapa el inicio de la actuación' : 'Toca en el mapa el final de la actuación';
+    $('#pickBar').hidden = false;
+  };
+  b.querySelector('[data-a=map0]').onclick = pick('d0');
+  b.querySelector('[data-a=map1]').onclick = pick('d1');
+  b.querySelector('[data-a=len]').onclick = () => { syncAct(); const v = parseFloat(($('#aLen').value || '').replace(',', '.')); if (!(v >= 0)) { toast('Escribe la longitud en metros.'); return; } setPK('d1', actDraft.d0 + v); };
+  const stampAt = () => { const p = f ? pointAtPK(f, actDraft.d0) : { lat: actDraft.coords[0][0], lng: actDraft.coords[0][1] };
+    const base = lastPos && Date.now() - lastPos.t < 60000 ? { lat: lastPos.lat, lng: lastPos.lng, acc: lastPos.acc } : { lat: p.lat, lng: p.lng };
+    return { ...base, label: `${actDraft.type || 'Actuación'} ${SIDE_ABBR[actDraft.side] || ''} · PK ${fmtPK(actDraft.d0)}${actDraft.d1 > actDraft.d0 ? '–' + fmtPK(actDraft.d1) : ''} · ${actDraft.traceName}` }; };
+  const addMediaAct = async files => {
+    syncAct();
+    for (const fl of files) {
+      const kind = fl.type.startsWith('image/') ? 'photo' : fl.type.startsWith('video/') ? 'video' : null; if (!kind) continue;
+      const blob = kind === 'photo' ? await processImage(fl, stampAt()) : fl;
+      actDraft.media.push({ id: uid(), kind, blob, mime: blob.type || fl.type, t: Date.now() });
+    }
+    renderActEditor();
+  };
+  b.querySelector('[data-a=photo]').onclick = () => { syncAct(); capture('inPhoto', addMediaAct); };
+  b.querySelector('[data-a=video]').onclick = () => { syncAct(); capture('inVideo', addMediaAct); };
+  b.querySelectorAll('[data-rm]').forEach(el => el.onclick = () => { syncAct(); actDraft.media.splice(+el.dataset.rm, 1); renderActEditor(); });
+  b.querySelector('[data-a=save]').onclick = saveAct;
+  const del = b.querySelector('[data-a=delete]'); if (del) del.onclick = () => deleteAct(a.id);
+}
+let actPick = null;
+const _slopePickPoint = slopePickPoint;
+slopePickPoint = function (ll) { // también atiende la selección de inicio/fin de actuaciones
+  if (!actPick) return _slopePickPoint(ll);
+  const ctx = featOf(actDraft); const r = pkAt(ctx.f, L.latLng(ll));
+  const which = actPick; actPick = null; $('#pickBar').hidden = true;
+  actDraft[which] = r.d; if (actDraft.d1 < actDraft.d0) [actDraft.d0, actDraft.d1] = [actDraft.d1, actDraft.d0];
+  renderActEditor();
+};
+async function saveAct() {
+  syncAct();
+  const a = actDraft;
+  if (a.type === 'Otro') a.type = (a.custom || '').trim() || 'Otro';
+  if (!a.type) { toast('Elige el tipo de actuación.'); return; }
+  if (a.d1 < a.d0) [a.d0, a.d1] = [a.d1, a.d0];
+  const ctx = featOf(a);
+  if (ctx && ctx.f) { a.d0 = Math.max(0, a.d0); a.d1 = Math.min(ctx.f.length, a.d1); a.coords = segmentCoords(ctx.f, a.d0, a.d1); }
+  a.updated = Date.now();
+  try { await DB.put('acts', a); } catch (e) { toast('No se pudo guardar: ' + (e.message || 'almacenamiento lleno'), 7000); return; }
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  acts.set(a.id, a); actDraft = null; slopeHL.clearLayers();
+  closeSheet(); drawActs(); toast(`Guardada: ${actTitle(a)}`);
+  if (!$('#drawer').hidden) renderDrawer();
+}
+async function deleteAct(id) {
+  if (!confirm('¿Eliminar esta actuación y sus fotos? No se puede deshacer.')) return;
+  await DB.del('acts', id); acts.delete(id); actDraft = null; slopeHL.clearLayers();
+  closeSheet(); drawActs(); toast('Actuación eliminada');
+  if (!$('#drawer').hidden) renderDrawer();
+}
+function viewAct(id) {
+  const a = acts.get(id); if (!a) return;
+  const p0 = a.coords[0], p1 = a.coords[a.coords.length - 1], col = actColor(a.type);
+  const b = openSheet(`<h2><span class="dot" style="background:${col}"></span>${esc(a.type)}</h2>
+    <p class="sub">${esc(SIDES[a.side] || '')} · ${esc(a.traceName)} · ${fmtDate(a.created)}</p>
+    <div class="slope-main"><span style="color:${col}">PK ${fmtPK(a.d0)}${a.d1 > a.d0 ? ' – ' + fmtPK(a.d1) : ''}</span><small>${a.d1 > a.d0 ? 'longitud ' + fmtLen(a.d1 - a.d0) : 'actuación puntual'}</small></div>
+    ${a.text ? `<div class="desc">${esc(a.text)}</div>` : ''}
+    <div class="media">${mediaHtml(a.media || [], false)}</div>
+    <div class="acts">
+      ${goBtn(p0[0], p0[1], 'Ir al inicio', a.d1 > a.d0 ? '' : 'full')}${a.d1 > a.d0 ? goBtn(p1[0], p1[1], 'Ir al final') : ''}
+      <button class="btn" data-a="edit">Editar / añadir fotos</button>
+      <button class="btn" data-a="copy">${ICON.copy}Copiar</button>
+    </div>`, 'view');
+  const ctx = featOf(a); if (ctx && ctx.f) showSlopeSegment(ctx.f, a.d0, Math.max(a.d1, a.d0 + 0.1));
+  onSheetClose(() => setTimeout(() => { if (!$('#aText')) slopeHL.clearLayers(); }, 0));
+  b.querySelectorAll('img[data-full]').forEach(img => img.onclick = () => showPhoto(img.src));
+  b.querySelector('[data-a=edit]').onclick = () => openActEditor({ act: a });
+  b.querySelector('[data-a=copy]').onclick = () => copyText(`${a.type} (${SIDES[a.side]}) · ${a.traceName} · PK ${fmtPK(a.d0)} a ${fmtPK(a.d1)} · ${fmtLen(a.d1 - a.d0)}${a.text ? ' · ' + a.text : ''}`);
+}
+function actList() {
+  const list = actsSorted();
+  const byTrace = new Map(); list.forEach(a => { const k = a.traceName || 'Traza'; byTrace.set(k, [...(byTrace.get(k) || []), a]); });
+  const totals = new Map(); list.forEach(a => totals.set(a.type, (totals.get(a.type) || 0) + (a.d1 - a.d0)));
+  const b = openSheet(`<h2>Actuaciones</h2><p class="sub">${list.length} actuaciones en ${byTrace.size} trazas</p>
+    ${list.length ? `<table class="attrs"><tr><td><b>Tipo</b></td><td><b>Longitud total</b></td></tr>${[...totals].map(([t, l]) => `<tr><td><span class="dot" style="background:${actColor(t)}"></span>${esc(t)}</td><td>${fmtLen(l)}</td></tr>`).join('')}</table>` : '<p class="empty">Todavía no hay actuaciones. Toca una traza y pulsa «Nueva actuación en esta traza».</p>'}
+    ${[...byTrace].map(([t, arr]) => `<h3 class="sh">${esc(t)}</h3>${arr.map(a => `<div class="nrow" data-act="${a.id}"><span class="dot" style="background:${actColor(a.type)}"></span>
+      <span class="t"><b>${esc(a.type)} · ${SIDE_ABBR[a.side] || ''}</b><small>PK ${fmtPK(a.d0)}${a.d1 > a.d0 ? '–' + fmtPK(a.d1) + ' · ' + fmtLen(a.d1 - a.d0) : ' · puntual'} · ${(a.media || []).length} fotos</small></span></div>`).join('')}`).join('')}
+    ${list.length ? `<div class="acts"><button class="btn full" data-a="csv">Exportar a Excel (CSV)</button></div>` : ''}`);
+  b.querySelectorAll('[data-act]').forEach(r => r.onclick = () => { const a = acts.get(r.dataset.act); map.fitBounds(L.latLngBounds(a.coords).pad(0.4), { maxZoom: 18 }); viewAct(a.id); });
+  const c = b.querySelector('[data-a=csv]'); if (c) c.onclick = exportActsCSV;
+}
+async function exportActsCSV() {
+  const list = actsSorted();
+  if (!list.length) { toast('Todavía no hay actuaciones que exportar.'); return; }
+  const n = v => String(v).replace('.', ',');
+  const q = v => `"${String(v ?? '').replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`;
+  const rows = [['Traza', 'Capa', 'Tipo', 'Margen', 'PK inicio', 'PK fin', 'Longitud (m)', 'Descripción', 'Fotos', 'Fecha', 'Lat inicio', 'Lon inicio', 'Lat fin', 'Lon fin']];
+  list.forEach(a => { const p0 = a.coords[0], p1 = a.coords[a.coords.length - 1];
+    rows.push([a.traceName, a.layerName, a.type, SIDES[a.side], fmtPK(a.d0), fmtPK(a.d1), n(Math.round((a.d1 - a.d0) * 10) / 10), a.text, (a.media || []).length, fmtDate(a.created), n(p0[0].toFixed(6)), n(p0[1].toFixed(6)), n(p1[0].toFixed(6)), n(p1[1].toFixed(6))]); });
+  const csv = '\ufeff' + rows.map(r => r.map(q).join(';')).join('\r\n');
+  const name = `actuaciones_${new Date().toISOString().slice(0, 10)}.csv`;
+  try { await saveBlob(new Blob([csv], { type: 'text/csv' }), name); toast(`Exportadas ${list.length} actuaciones en ${name}`); }
+  catch (e) { if (!/cancel/i.test(e.message || '')) toast('No se pudo exportar: ' + (e.message || e), 6000); }
+}
+
 /* ---------------- Medición ---------------- */
 let measure = null;
 const mDot = ll => L.circleMarker(ll, { renderer: hlRenderer, radius: 6, color: '#1f1a00', weight: 2, fillColor: '#ffd43b', fillOpacity: 1, interactive: false });
@@ -1447,7 +1687,7 @@ function updateMeasure() {
   $('#mText').textContent = p.length < 2 ? 'Toca el mapa para añadir puntos' : `Distancia: ${fmtLen(d)} · ${p.length} puntos`;
 }
 function endMeasure() { if (!measure) return; map.removeLayer(measure.line); map.removeLayer(measure.marks); measure = null; $('#measureBar').hidden = true; }
-map.on('click', e => { if (slopePick) return slopePickPoint(e.latlng); if (measure) addMeasurePt(e.latlng); });
+map.on('click', e => { if (slopePick || actPick) return slopePickPoint(e.latlng); if (measure) addMeasurePt(e.latlng); });
 $('#mUndo').onclick = () => {
   if (!measure || !measure.pts.length) return;
   measure.pts.pop(); measure.marks.clearLayers();
@@ -1461,7 +1701,7 @@ const cdata = s => '<![CDATA[' + String(s).replace(/]]>/g, ']]]]><![CDATA[>') + 
 const xml = s => String(s ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 async function exportKMZ() {
   const list = [...notes.values()].sort((a, b) => a.created - b.created);
-  if (!list.length) { toast('Todavía no hay anotaciones ni fotos que exportar.'); return; }
+  if (!list.length && !acts.size) { toast('Todavía no hay anotaciones, fotos ni actuaciones que exportar.'); return; }
   toast('Preparando KMZ…', 8000);
   const zip = new JSZip(); const folders = new Map();
   for (const n of list) {
@@ -1478,15 +1718,34 @@ async function exportKMZ() {
     const fname = layerName(n.layerId);
     folders.set(fname, (folders.get(fname) || '') + pm);
   }
+  let actPms = '', actStyles = '';
+  ACT_TYPES.forEach(([t, c], i) => { actStyles += `<Style id="act${i}"><LineStyle><color>ff${c.slice(5, 7)}${c.slice(3, 5)}${c.slice(1, 3)}</color><width>5</width></LineStyle><IconStyle><color>ff${c.slice(5, 7)}${c.slice(3, 5)}${c.slice(1, 3)}</color></IconStyle></Style>`; });
+  for (const a of actsSorted()) {
+    let html = `<p><b>${esc(a.type)}</b> · ${esc(SIDES[a.side] || '')}<br>PK ${fmtPK(a.d0)} a ${fmtPK(a.d1)} · ${fmtLen(a.d1 - a.d0)}<br>${esc(a.traceName)}</p>`;
+    if (a.text) html += `<p>${esc(a.text).replace(/\n/g, '<br>')}</p>`;
+    (a.media || []).forEach((m, i) => {
+      const name = `files/${a.id}_${i + 1}.${extFor(m)}`;
+      zip.file(name, m.blob);
+      html += m.kind === 'photo' ? `<p><img src="${name}" width="480"></p>` : `<p><a href="${name}">${m.kind === 'video' ? 'Vídeo' : 'Nota de voz'} ${i + 1}</a></p>`;
+    });
+    const ti = Math.max(0, ACT_TYPES.findIndex(([t]) => t === a.type));
+    const geom = a.coords.length > 1 && a.d1 > a.d0
+      ? `<LineString><tessellate>1</tessellate><coordinates>${a.coords.map(c => `${c[1].toFixed(7)},${c[0].toFixed(7)},0`).join(' ')}</coordinates></LineString>`
+      : `<Point><coordinates>${a.coords[0][1].toFixed(7)},${a.coords[0][0].toFixed(7)},0</coordinates></Point>`;
+    actPms += `<Placemark><name>${xml(actTitle(a))}</name><description>${cdata(html)}</description><styleUrl>#act${ti}</styleUrl>
+<ExtendedData><Data name="Tipo"><value>${xml(a.type)}</value></Data><Data name="Margen"><value>${xml(SIDES[a.side] || '')}</value></Data><Data name="PK_inicio"><value>${fmtPK(a.d0)}</value></Data><Data name="PK_fin"><value>${fmtPK(a.d1)}</value></Data><Data name="Longitud_m"><value>${Math.round(a.d1 - a.d0)}</value></Data></ExtendedData>
+${geom}</Placemark>\n`;
+  }
+  if (actPms) folders.set('Actuaciones', actPms);
   const st = (id, c) => `<Style id="${id}"><IconStyle><color>${c}</color><Icon><href>http://maps.google.com/mapfiles/kml/paddle/wht-blank.png</href></Icon></IconStyle></Style>`;
   const body = [...folders].map(([name, pms]) => `<Folder><name>${xml(name)}</name>\n${pms}</Folder>`).join('\n');
   const kmlDoc = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>OBRA-GIS ${new Date().toLocaleDateString('es-ES')}</name>
-${st('photo', 'ffc27119')}${st('video', 'ffb5369c')}${st('audio', 'ff3e8a2b')}${st('note', 'ff0c59e8')}
+${st('photo', 'ffc27119')}${st('video', 'ffb5369c')}${st('audio', 'ff3e8a2b')}${st('note', 'ff0c59e8')}${actStyles}
 ${body}</Document></kml>`;
   zip.file('doc.kml', kmlDoc);
   const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.google-earth.kmz' });
   const name = `anotaciones_${new Date().toISOString().slice(0, 10)}.kmz`;
-  try { await saveBlob(blob, name); toast(`Exportadas ${list.length} anotaciones en ${name}`); }
+  try { await saveBlob(blob, name); toast(`Exportadas ${list.length} anotaciones y ${acts.size} actuaciones en ${name}`); }
   catch (e) { if (!/cancel/i.test(e.message || '')) toast('No se pudo exportar: ' + (e.message || e), 6000); }
 }
 
@@ -1569,7 +1828,9 @@ async function renderDrawer() {
   let storage = '';
   try { const e = await navigator.storage.estimate(); storage = `${(e.usage / 1048576).toFixed(1).replace('.', ',')} MB usados en el dispositivo`; } catch (e) {}
 
-  const pointRows = layerRow('notes', 'Mis anotaciones', `${own.length} anotaciones`, `<span class="sw pin-sw note"></span>`,
+  const actRow = layerRow('acts', 'Actuaciones en trazas', `${acts.size} actuaciones`, `<span class="sw" style="background:linear-gradient(90deg,#8d6e63,#1e88e5,#00acc1)"></span>`,
+    { move: false, body: `<div class="row"><button class="mini" data-actlist>Ver listado</button></div>` });
+  const pointRows = actRow + layerRow('notes', 'Mis anotaciones', `${own.length} anotaciones`, `<span class="sw pin-sw note"></span>`,
     { move: false, body: `<div class="row"><button class="mini" data-zoom="notes">Encuadrar</button></div>` })
     + photoLayers.map(e => layerRow(e.rec.id, e.rec.name, layerSub(e), `<span class="sw pin-sw photo"></span>`, { move: false, body: layerOptions(e) })).join('');
   const otherRows = ordered.map(e => layerRow(e.rec.id, e.rec.name, layerSub(e),
@@ -1590,6 +1851,8 @@ async function renderDrawer() {
       : '<p class="empty">Mantén pulsado en el mapa o usa el botón naranja para crear la primera.</p>'}
     <h3>Herramientas</h3>
     <div class="acts">
+      <button class="btn full" data-t="actlist">${ICON.road}Listado de actuaciones (${acts.size})</button>
+      <button class="btn" data-t="csv">Actuaciones a Excel (CSV)</button>
       <button class="btn" data-t="export">Exportar KMZ</button>
       <button class="btn" data-t="measure">${ICON.ruler}Medir</button>
       <button class="btn full" data-t="cache">Guardar zona visible sin conexión</button>
@@ -1638,6 +1901,9 @@ async function renderDrawer() {
   });
   d.querySelector('[data-t=add]').onclick = () => { closeDrawer(); importMenu(); };
   d.querySelector('[data-t=export]').onclick = exportKMZ;
+  d.querySelector('[data-t=csv]').onclick = exportActsCSV;
+  d.querySelector('[data-t=actlist]').onclick = () => { closeDrawer(); actList(); };
+  const al = d.querySelector('[data-actlist]'); if (al) al.onclick = () => { closeDrawer(); actList(); };
   d.querySelector('[data-t=measure]').onclick = () => { closeDrawer(); startMeasure(); };
   d.querySelector('[data-t=cache]').onclick = () => { closeDrawer(); cacheArea(); };
   const sel = $('#selTravel'); sel.value = settings.travel; sel.onchange = () => { settings.travel = sel.value; saveSettings(); };
@@ -1671,7 +1937,24 @@ $('#fabPhoto').onclick = () => {
   });
 };
 // Nueva anotación en mi posición
-$('#fabNote').onclick = async () => {
+$('#fabNote').onclick = () => {
+  const b = openSheet(`<h2>Nuevo</h2><p class="sub">En tu posición GPS</p><div class="acts">
+    <button class="btn go full" data-a="act">${ICON.road}Actuación en el camino desde aquí</button>
+    <button class="btn full" data-a="note">${ICON.note}Anotación en este punto</button></div>
+    <p class="hint">Una actuación ocupa un tramo de la traza (de un PK a otro), por ejemplo una escollera o una cuneta. Una anotación es un punto suelto.</p>`);
+  b.querySelector('[data-a=note]').onclick = () => { closeSheet(); newNoteHere(); };
+  b.querySelector('[data-a=act]').onclick = () => { closeSheet(); newActHere(); };
+};
+async function newActHere() {
+  toast('Obteniendo posición GPS…', 2500);
+  let p; try { p = await getPos(); } catch (e) { toast(geoErr(e) + ' Toca la traza en el mapa y usa «Nueva actuación en esta traza».', 7000); return; }
+  const n = nearestTrace(L.latLng(p.lat, p.lng));
+  if (!n) { toast('No hay ninguna traza KML visible. Importa o muestra el KML del camino.', 6000); return; }
+  if (n.off > 50) toast(`Estás a ${Math.round(n.off)} m de «${n.f.name}». Comprueba que es la traza correcta.`, 6000);
+  map.panTo([p.lat, p.lng]);
+  openActEditor({ rec: n.rec, f: n.f, d0: n.d, d1: n.d, gps: true });
+}
+async function newNoteHere() {
   toast('Obteniendo posición GPS…', 2500);
   try { const p = await getPos(); openEditor({ lat: p.lat, lng: p.lng, acc: p.acc, src: 'gps' }); map.panTo([p.lat, p.lng]); }
   catch (e) { toast(geoErr(e) + ' Mantén pulsado en el mapa para anotar en un punto concreto.', 7000); }
@@ -1728,6 +2011,8 @@ function nativeInbox() { // app nativa: «Abrir con» y «Compartir»
     }
     if (settings.notesVisible !== false) pointGroup('notes').addTo(map);
     for (const n of await DB.all('notes')) { notes.set(n.id, n); drawNote(n); }
+    for (const a of await DB.all('acts')) acts.set(a.id, a);
+    drawActs();
   } catch (e) { toast('No se pudieron leer los datos guardados: ' + e.message, 7000); }
   if (NATIVE) nativeInbox();
   else if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW', e));
