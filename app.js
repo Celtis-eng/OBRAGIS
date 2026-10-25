@@ -20,6 +20,7 @@ const ICON = {
   plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
   nav: '<svg viewBox="0 0 24 24"><path d="M3 11l18-8-8 18-2-8z"/></svg>',
   close: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  slope: '<svg viewBox="0 0 24 24"><path d="M3 19L21 7M3 19h18M15 19v-8"/></svg>',
   ruler: '<svg viewBox="0 0 24 24"><path d="M3 17L17 3l4 4L7 21zM7 13l2 2M10 10l2 2M13 7l2 2"/></svg>',
   copy: '<svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4H4v12h4"/></svg>',
   gallery: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 16l5-5 4 4 3-3 6 6"/></svg>',
@@ -70,9 +71,9 @@ const fmtLL = (lat, lng) => `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
 const fmtDate = t => new Date(t).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 const thousands = n => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 
-function toUTM(lat, lon) { // WGS84 ≈ ETRS89 (diferencia submétrica)
+function toUTM(lat, lon, forceZone) { // WGS84 ≈ ETRS89 (diferencia submétrica)
   const a = 6378137, f = 1 / 298.257223563, k0 = 0.9996;
-  const zone = Math.floor((lon + 180) / 6) + 1;
+  const zone = forceZone || Math.floor((lon + 180) / 6) + 1;
   const e2 = f * (2 - f), ep2 = e2 / (1 - e2);
   const p = lat * Math.PI / 180, l = lon * Math.PI / 180, l0 = ((zone - 1) * 6 - 180 + 3) * Math.PI / 180;
   const N = a / Math.sqrt(1 - e2 * Math.sin(p) ** 2), T = Math.tan(p) ** 2, C = ep2 * Math.cos(p) ** 2, A = Math.cos(p) * (l - l0);
@@ -368,7 +369,7 @@ const byTag = (el, tag) => Array.from(el.getElementsByTagNameNS('*', tag));
 const childText = (el, tag) => { const n = Array.from(el.children).find(c => c.localName === tag); return n ? n.textContent.trim() : ''; };
 const firstText = (el, tag) => { const n = byTag(el, tag)[0]; return n ? n.textContent.trim() : ''; };
 const parseCoords = t => (t || '').trim().split(/\s+/).map(s => s.split(',').map(Number))
-  .filter(a => a.length >= 2 && isFinite(a[0]) && isFinite(a[1])).map(a => [a[1], a[0]]); // → [lat, lng]
+  .filter(a => a.length >= 2 && isFinite(a[0]) && isFinite(a[1])).map(a => (a.length > 2 && isFinite(a[2]) ? [a[1], a[0], a[2]] : [a[1], a[0]])); // → [lat, lng, z?]
 
 function kmlColor(abgr) {
   const s = (abgr || '').trim().replace('#', '');
@@ -554,6 +555,7 @@ function buildKml(entry) {
       else lyr = L.circleMarker(p.c[0], { radius: 7, color: '#fff', weight: 2, opacity: op, fillColor: st.icon || rec.color, fillOpacity: op });
       lyr.on('click', e => {
         L.DomEvent.stop(e);
+        if (slopePick) return slopePickPoint(e.latlng);
         if (measure) return addMeasurePt(e.latlng);
         featureSheet(f, e.latlng, rec);
       });
@@ -664,6 +666,7 @@ function featureSheet(f, ll, rec) {
   }
   const noteAt = f.type === 'pt' ? { lat: f.start[0], lng: f.start[1] } : ll;
   acts += `<button class="btn" data-a="note">${ICON.note}Anotar aquí</button><button class="btn" data-a="fit">Encuadrar</button>`;
+  if (f.type === 'ln') acts += `<button class="btn pri full" data-a="slope">${ICON.slope}Pendiente y perfil</button>`;
   acts += `<button class="btn" data-a="copy">${ICON.copy}Copiar coordenadas</button><button class="btn" data-a="measure">${ICON.ruler}Medir desde aquí</button>`;
 
   let coords = '';
@@ -688,6 +691,8 @@ function featureSheet(f, ll, rec) {
   b.querySelector('[data-a=fit]').onclick = () => map.fitBounds(L.featureGroup(highlight.getLayers()).getBounds().pad(0.2), { maxZoom: 18 });
   b.querySelector('[data-a=copy]').onclick = () => copyText(f.type === 'ln' ? `Inicio: ${fmtLL(...f.start)}\nFinal: ${fmtLL(...f.end)}` : fmtLL(f.start[0], f.start[1]));
   b.querySelector('[data-a=measure]').onclick = () => { closeSheet(); startMeasure(ll); };
+  const sl = b.querySelector('[data-a=slope]');
+  if (sl) sl.onclick = () => slopeSheet(f, rec, 0, f.length);
 }
 
 /* ---------------- Importación de ficheros ---------------- */
@@ -852,6 +857,7 @@ let longFired = 0;
 })();
 
 function pointMenu(ll) {
+  if (slopePick) return slopePickPoint(ll);
   if (measure) return addMeasurePt(ll);
   const queryable = orderedLayers().filter(e => e.rec.visible && e.tile && e.rec.kind === 'wms' && e.rec.info);
   const b = openSheet(`<h2>Punto seleccionado</h2><p class="sub">Pulsación larga${distFromMe(ll.lat, ll.lng)}</p>
@@ -1017,7 +1023,7 @@ function drawNote(n) {
   let m = noteMarkers.get(n.id);
   if (!m) {
     m = L.marker([n.lat, n.lng], { icon: pinIcon(noteType(n), n.dir) }).addTo(g);
-    m.on('click', e => { L.DomEvent.stop(e); if (measure) return addMeasurePt(e.latlng); viewNote(n.id); });
+    m.on('click', e => { L.DomEvent.stop(e); if (slopePick) return slopePickPoint(e.latlng); if (measure) return addMeasurePt(e.latlng); viewNote(n.id); });
     noteMarkers.set(n.id, m);
   } else { m.setLatLng([n.lat, n.lng]).setIcon(pinIcon(noteType(n), n.dir)); }
 }
@@ -1210,6 +1216,217 @@ async function shareNote(n) {
 }
 const extFor = m => ({ photo: 'jpg', video: (m.mime || '').includes('mp4') ? 'mp4' : 'webm', audio: (m.mime || '').includes('mp4') ? 'm4a' : (m.mime || '').includes('ogg') ? 'ogg' : 'webm' }[m.kind]);
 
+/* ---------------- Pendiente media y perfil longitudinal ---------------- */
+const DEM_IGN = 'https://api-coverages.idee.es/collections/EL.ElevationGridCoverage_25830_5_PB/coverage';
+function vertexTable(f) { // vértices de la traza con su PK acumulado (misma regla que las marcas de PK)
+  if (f._v) return f._v;
+  const v = []; let acc = 0;
+  lineParts(f).forEach(p => p.c.forEach((c, i) => {
+    if (i > 0) acc += L.latLng(p.c[i - 1]).distanceTo(c);
+    v.push({ lat: c[0], lng: c[1], z: c.length > 2 ? c[2] : null, d: acc });
+  }));
+  return (f._v = v);
+}
+function kmlHasZ(f) { const v = vertexTable(f); return v.every(p => p.z != null) && v.some(p => p.z !== 0) && new Set(v.map(p => p.z)).size > 1; }
+function pointAtPK(f, d) {
+  const v = vertexTable(f);
+  if (d <= 0) return { ...v[0] };
+  for (let i = 1; i < v.length; i++) {
+    if (v[i].d >= d) {
+      const a = v[i - 1], b = v[i], t = b.d > a.d ? (d - a.d) / (b.d - a.d) : 0;
+      return { lat: a.lat + (b.lat - a.lat) * t, lng: a.lng + (b.lng - a.lng) * t, z: a.z != null && b.z != null ? a.z + (b.z - a.z) * t : null, d };
+    }
+  }
+  return { ...v[v.length - 1] };
+}
+function parsePK(txt) {
+  const t = String(txt || '').trim().replace(/\s/g, '').replace(',', '.');
+  if (!t) return NaN;
+  const m = /^(\d+)\+(\d+(?:\.\d+)?)$/.exec(t);
+  return m ? +m[1] * 1000 + +m[2] : +t;
+}
+// Cotas del MDT05 del IGN (OGC API Coverages, CoverageJSON). Agrupa los puntos en ventanas de ~500 m.
+function covGrid(j) {
+  const ax = j.domain.axes, rk = Object.keys(j.ranges)[0], rg = j.ranges[rk];
+  const axis = a => a.values ? { v0: a.values[0], dv: a.values.length > 1 ? a.values[1] - a.values[0] : 1, n: a.values.length } : { v0: a.start, dv: a.num > 1 ? (a.stop - a.start) / (a.num - 1) : 1, n: a.num };
+  const x = axis(ax.x || ax.lon || ax.E), y = axis(ax.y || ax.lat || ax.N);
+  const names = rg.axisNames || ['y', 'x'];
+  const yFirst = /^(y|lat|N)$/i.test(names[0]);
+  return { x, y, yFirst, vals: rg.values, geo: Math.abs(x.v0) <= 180 && Math.abs(y.v0) <= 90 };
+}
+function sampleGrid(g, p) {
+  let X, Y;
+  if (g.geo) { X = p.lng; Y = p.lat; } else { const u = toUTM(p.lat, p.lng, 30); X = u.x; Y = u.y; }
+  const fi = (X - g.x.v0) / g.x.dv, fj = (Y - g.y.v0) / g.y.dv;
+  const i0 = Math.floor(fi), j0 = Math.floor(fj), ti = fi - i0, tj = fj - j0;
+  const at = (i, j) => {
+    if (i < 0 || j < 0 || i >= g.x.n || j >= g.y.n) return null;
+    const v = g.vals[g.yFirst ? j * g.x.n + i : i * g.y.n + j];
+    return v == null || !isFinite(v) || v < -500 || v > 9000 ? null : v;
+  };
+  const q = [at(i0, j0), at(i0 + 1, j0), at(i0, j0 + 1), at(i0 + 1, j0 + 1)];
+  if (q.some(v => v == null)) { const ok = q.filter(v => v != null); return ok.length ? ok.reduce((a, b) => a + b) / ok.length : null; }
+  return q[0] * (1 - ti) * (1 - tj) + q[1] * ti * (1 - tj) + q[2] * (1 - ti) * tj + q[3] * ti * tj;
+}
+async function demIGN(pts) {
+  const out = new Array(pts.length).fill(null), SPAN = 0.0045;
+  let i = 0;
+  while (i < pts.length) {
+    let j = i, b = [pts[i].lng, pts[i].lat, pts[i].lng, pts[i].lat];
+    while (j + 1 < pts.length) {
+      const p = pts[j + 1], nb = [Math.min(b[0], p.lng), Math.min(b[1], p.lat), Math.max(b[2], p.lng), Math.max(b[3], p.lat)];
+      if (nb[2] - nb[0] > SPAN || nb[3] - nb[1] > SPAN) break;
+      b = nb; j++;
+    }
+    const m = 0.0002, bbox = [b[0] - m, b[1] - m, b[2] + m, b[3] + m].map(v => v.toFixed(6)).join(',');
+    const g = covGrid(JSON.parse(await httpGetText(`${DEM_IGN}?f=json&bbox=${bbox}`)));
+    for (let k = i; k <= j; k++) out[k] = sampleGrid(g, pts[k]);
+    i = j + 1;
+  }
+  if (out.filter(v => v != null).length < pts.length * 0.8) throw new Error('El MDT del IGN no devolvió cotas para este tramo');
+  return out;
+}
+async function demGlobal(pts) { // Copernicus GLO-90 a través de Open-Meteo (reserva)
+  const out = [];
+  for (let i = 0; i < pts.length; i += 100) {
+    const ch = pts.slice(i, i + 100);
+    const j = JSON.parse(await httpGetText(`https://api.open-meteo.com/v1/elevation?latitude=${ch.map(p => p.lat.toFixed(6)).join(',')}&longitude=${ch.map(p => p.lng.toFixed(6)).join(',')}`));
+    out.push(...j.elevation);
+  }
+  return out;
+}
+async function profileElevations(f, pts, source) {
+  if (source === 'kml') return { z: pts.map(p => p.z), label: 'cotas del KML' };
+  try { return { z: await demIGN(pts), label: 'MDT05 del IGN (LiDAR, paso de malla 5 m)' }; }
+  catch (e) { console.warn('IGN', e); return { z: await demGlobal(pts), label: 'modelo global Copernicus de 90 m (el IGN no respondió; resultado orientativo)' }; }
+}
+
+let slopePick = null;
+const slopeHL = L.layerGroup().addTo(map);
+function showSlopeSegment(f, d0, d1) {
+  slopeHL.clearLayers();
+  const v = vertexTable(f).filter(p => p.d > d0 && p.d < d1);
+  const a = pointAtPK(f, d0), b = pointAtPK(f, d1);
+  L.polyline([[a.lat, a.lng], ...v.map(p => [p.lat, p.lng]), [b.lat, b.lng]], { renderer: hlRenderer, color: '#ff6b00', weight: 7, opacity: 0.85, interactive: false }).addTo(slopeHL);
+  [[a, fmtPK(d0)], [b, fmtPK(d1)]].forEach(([p, t]) => L.circleMarker([p.lat, p.lng], { renderer: hlRenderer, radius: 7, color: '#fff', weight: 3, fillColor: '#ff6b00', fillOpacity: 1, interactive: false })
+    .bindTooltip(t, { permanent: true, direction: 'top', offset: [0, -8], className: 'pk-tip' }).addTo(slopeHL));
+}
+function slopeSheet(f, rec, d0, d1, opts = {}) {
+  const hasZ = kmlHasZ(f);
+  const source = opts.source || (hasZ ? 'kml' : 'dem');
+  const b = openSheet(`<h2>Pendiente y perfil</h2><p class="sub">${esc(f.name)} · ${esc(rec.name)} · longitud total ${fmtLen(f.length)} (PK ${fmtPK(f.length)})</p>
+    <div class="pkrow">
+      <div class="field"><label for="pk0">Desde PK</label><input type="text" id="pk0" inputmode="decimal" value="${fmtPK(d0)}"></div>
+      <div class="field"><label for="pk1">Hasta PK</label><input type="text" id="pk1" inputmode="decimal" value="${fmtPK(d1)}"></div>
+    </div>
+    ${hasZ ? `<div class="field"><label for="zsrc">Cotas</label><select id="zsrc"><option value="kml" ${source === 'kml' ? 'selected' : ''}>Las del KML</option><option value="dem" ${source === 'dem' ? 'selected' : ''}>Modelo del terreno (MDT05 del IGN)</option></select></div>` : ''}
+    <div class="acts">
+      <button class="btn pri full" data-a="calc">${ICON.slope}Calcular pendiente</button>
+      <button class="btn" data-a="pick">Elegir tramo en el mapa</button>
+      <button class="btn" data-a="all">Toda la traza</button>
+    </div>
+    <p class="hint">Escribe los PK como 0+350 o en metros (350).</p>
+    <div id="slopeRes"></div>`);
+  showSlopeSegment(f, d0, d1);
+  onSheetClose(() => { if (!slopePick) slopeHL.clearLayers(); });
+  const read = () => {
+    let a = parsePK($('#pk0').value), c = parsePK($('#pk1').value);
+    if (!isFinite(a) || !isFinite(c)) { toast('Revisa los PK: escríbelos como 0+350 o en metros.'); return null; }
+    if (a > c) [a, c] = [c, a];
+    a = Math.max(0, a); c = Math.min(f.length, c);
+    $('#pk0').value = fmtPK(a); $('#pk1').value = fmtPK(c);
+    if (c - a < 5) { toast('El tramo es demasiado corto. Elige al menos 5 m.'); return null; }
+    return [a, c];
+  };
+  const src = () => ($('#zsrc') ? $('#zsrc').value : 'dem');
+  b.querySelector('[data-a=calc]').onclick = () => { const r = read(); if (r) { showSlopeSegment(f, r[0], r[1]); computeSlope(f, rec, r[0], r[1], src()); } };
+  b.querySelector('[data-a=all]').onclick = () => { $('#pk0').value = fmtPK(0); $('#pk1').value = fmtPK(f.length); showSlopeSegment(f, 0, f.length); computeSlope(f, rec, 0, f.length, src()); };
+  b.querySelector('[data-a=pick]').onclick = () => {
+    slopePick = { f, rec, pts: [], source: src() };
+    closeSheet(); slopeHL.clearLayers();
+    $('#pickText').textContent = 'Toca en el mapa el inicio del tramo';
+    $('#pickBar').hidden = false;
+  };
+  if (opts.autorun) computeSlope(f, rec, d0, d1, source);
+}
+function slopePickPoint(ll) {
+  const sp = slopePick; if (!sp) return;
+  const r = pkAt(sp.f, L.latLng(ll));
+  sp.pts.push(r.d);
+  const p = pointAtPK(sp.f, r.d);
+  L.circleMarker([p.lat, p.lng], { renderer: hlRenderer, radius: 7, color: '#fff', weight: 3, fillColor: '#ff6b00', fillOpacity: 1, interactive: false })
+    .bindTooltip(fmtPK(r.d), { permanent: true, direction: 'top', offset: [0, -8], className: 'pk-tip' }).addTo(slopeHL);
+  if (r.off > 60) toast(`Has tocado a ${Math.round(r.off)} m de la traza: se usa el punto más cercano (PK ${fmtPK(r.d)}).`, 4000);
+  if (sp.pts.length === 1) { $('#pickText').textContent = `Inicio en PK ${fmtPK(r.d)}. Toca ahora el final del tramo`; return; }
+  const [a, c] = sp.pts[0] <= sp.pts[1] ? sp.pts : [sp.pts[1], sp.pts[0]];
+  slopePick = null; $('#pickBar').hidden = true;
+  slopeSheet(sp.f, sp.rec, a, c, { source: sp.source, autorun: true });
+}
+$('#pickCancel').onclick = () => { slopePick = null; $('#pickBar').hidden = true; slopeHL.clearLayers(); };
+
+const fmtPct = v => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(2).replace('.', ',') + ' %';
+const fmtZ = z => z.toFixed(2).replace('.', ',') + ' m';
+async function computeSlope(f, rec, d0, d1, source) {
+  const box = $('#slopeRes'); if (!box) return;
+  const L0 = d1 - d0, step = Math.min(25, Math.max(5, L0 / 200));
+  const ds = []; for (let d = d0; d < d1; d += step) ds.push(d); ds.push(d1);
+  const pts = ds.map(d => pointAtPK(f, d));
+  box.innerHTML = `<p class="hint">Obteniendo ${pts.length} cotas…</p>`;
+  let res;
+  try { res = await profileElevations(f, pts, source); }
+  catch (e) { box.innerHTML = '<p class="hint">No se pudieron obtener las cotas del terreno. Comprueba la conexión y vuelve a intentarlo.</p>'; return; }
+  const prof = ds.map((d, i) => ({ d, z: res.z[i] })).filter(p => p.z != null && isFinite(p.z));
+  if (prof.length < 2) { box.innerHTML = '<p class="hint">No hay cotas suficientes para este tramo.</p>'; return; }
+  const zi = prof[0].z, zf = prof[prof.length - 1].z, dz = zf - zi, len = prof[prof.length - 1].d - prof[0].d;
+  const media = dz / len * 100;
+  let up = 0, down = 0; for (let i = 1; i < prof.length; i++) { const v = prof[i].z - prof[i - 1].z; v > 0 ? up += v : down -= v; }
+  const zmax = prof.reduce((a, b) => (b.z > a.z ? b : a)), zmin = prof.reduce((a, b) => (b.z < a.z ? b : a));
+  // pendientes por subtramos de 100 m (o la décima parte si el tramo es corto)
+  const win = Math.min(100, Math.max(20, len / 10)); let smax = null, smin = null;
+  for (let k = 0; k < prof.length; k++) {
+    const target = prof[k].d + win; let j = k; while (j < prof.length - 1 && prof[j].d < target) j++;
+    if (prof[j].d - prof[k].d < win * 0.8) break;
+    const s = (prof[j].z - prof[k].z) / (prof[j].d - prof[k].d) * 100;
+    if (!smax || s > smax.s) smax = { s, a: prof[k].d, b: prof[j].d };
+    if (!smin || s < smin.s) smin = { s, a: prof[k].d, b: prof[j].d };
+  }
+  const word = Math.abs(media) < 0.05 ? 'prácticamente horizontal' : media > 0 ? 'sube en el sentido del PK' : 'baja en el sentido del PK';
+  const text = `${f.name} · PK ${fmtPK(d0)} a ${fmtPK(d1)}\nLongitud: ${fmtLen(len)}\nCota inicial: ${fmtZ(zi)} · Cota final: ${fmtZ(zf)}\nDesnivel: ${(dz >= 0 ? '+' : '−') + fmtZ(Math.abs(dz))}\nPendiente media: ${fmtPct(media)} (${word})\nFuente: ${res.label}`;
+  box.innerHTML = `<div class="slope-main"><span>${fmtPct(media)}</span><small>pendiente media · ${word}</small></div>
+    <table class="attrs">
+      <tr><td>Tramo</td><td>PK ${fmtPK(d0)} a ${fmtPK(d1)} · ${fmtLen(len)}</td></tr>
+      <tr><td>Cota inicial / final</td><td>${fmtZ(zi)} / ${fmtZ(zf)}</td></tr>
+      <tr><td>Desnivel</td><td>${(dz >= 0 ? '+' : '−') + fmtZ(Math.abs(dz))} (${(Math.abs(dz) / len * 1000).toFixed(1).replace('.', ',')} m/km)</td></tr>
+      <tr><td>Cota máxima</td><td>${fmtZ(zmax.z)} en PK ${fmtPK(zmax.d)}</td></tr>
+      <tr><td>Cota mínima</td><td>${fmtZ(zmin.z)} en PK ${fmtPK(zmin.d)}</td></tr>
+      <tr><td>Subida / bajada acumulada</td><td>+${up.toFixed(1).replace('.', ',')} m / −${down.toFixed(1).replace('.', ',')} m</td></tr>
+      ${smax && smax.s > 0 ? `<tr><td>Mayor subida (tramos de ${Math.round(win)} m)</td><td>${fmtPct(smax.s)} entre PK ${fmtPK(smax.a)} y ${fmtPK(smax.b)}</td></tr>` : ''}
+      ${smin && smin.s < 0 ? `<tr><td>Mayor bajada (tramos de ${Math.round(win)} m)</td><td>${fmtPct(smin.s)} entre PK ${fmtPK(smin.a)} y ${fmtPK(smin.b)}</td></tr>` : ''}
+    </table>
+    ${profileSVG(prof)}
+    <p class="hint">Cotas: ${esc(res.label)}. Pendiente media = desnivel entre extremos ÷ longitud en planta.</p>
+    <div class="acts"><button class="btn full" data-a="copyres">${ICON.copy}Copiar resultados</button></div>`;
+  box.querySelector('[data-a=copyres]').onclick = () => copyText(text);
+}
+function profileSVG(prof) {
+  const W = 360, H = 170, pl = 46, pr = 10, pt = 10, pb = 26;
+  const d0 = prof[0].d, d1 = prof[prof.length - 1].d;
+  let z0 = Math.min(...prof.map(p => p.z)), z1 = Math.max(...prof.map(p => p.z));
+  if (z1 - z0 < 2) { const m = (z0 + z1) / 2; z0 = m - 1; z1 = m + 1; }
+  const pad = (z1 - z0) * 0.08; z0 -= pad; z1 += pad;
+  const X = d => pl + (d - d0) / (d1 - d0 || 1) * (W - pl - pr), Y = z => pt + (1 - (z - z0) / (z1 - z0)) * (H - pt - pb);
+  const line = prof.map((p, i) => `${i ? 'L' : 'M'}${X(p.d).toFixed(1)},${Y(p.z).toFixed(1)}`).join('');
+  const area = `${line}L${X(d1).toFixed(1)},${H - pb}L${X(d0).toFixed(1)},${H - pb}Z`;
+  const ticksZ = [0, 0.5, 1].map(t => z0 + pad + t * (z1 - z0 - 2 * pad));
+  const ticksD = [d0, (d0 + d1) / 2, d1];
+  return `<div class="profile"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Perfil longitudinal">
+    ${ticksZ.map(z => `<line x1="${pl}" x2="${W - pr}" y1="${Y(z).toFixed(1)}" y2="${Y(z).toFixed(1)}" class="pg"/><text x="${pl - 4}" y="${(Y(z) + 4).toFixed(1)}" text-anchor="end" class="pt">${Math.round(z)}</text>`).join('')}
+    <path d="${area}" class="pa"/><path d="${line}" class="pl"/>
+    ${ticksD.map((d, i) => `<text x="${X(d).toFixed(1)}" y="${H - 8}" text-anchor="${i === 0 ? 'start' : i === 2 ? 'end' : 'middle'}" class="pt">${fmtPK(d)}</text>`).join('')}
+    <circle cx="${X(d0).toFixed(1)}" cy="${Y(prof[0].z).toFixed(1)}" r="3.5" class="pe"/><circle cx="${X(d1).toFixed(1)}" cy="${Y(prof[prof.length - 1].z).toFixed(1)}" r="3.5" class="pe"/>
+  </svg></div>`;
+}
+
 /* ---------------- Medición ---------------- */
 let measure = null;
 const mDot = ll => L.circleMarker(ll, { renderer: hlRenderer, radius: 6, color: '#1f1a00', weight: 2, fillColor: '#ffd43b', fillOpacity: 1, interactive: false });
@@ -1230,7 +1447,7 @@ function updateMeasure() {
   $('#mText').textContent = p.length < 2 ? 'Toca el mapa para añadir puntos' : `Distancia: ${fmtLen(d)} · ${p.length} puntos`;
 }
 function endMeasure() { if (!measure) return; map.removeLayer(measure.line); map.removeLayer(measure.marks); measure = null; $('#measureBar').hidden = true; }
-map.on('click', e => { if (measure) addMeasurePt(e.latlng); });
+map.on('click', e => { if (slopePick) return slopePickPoint(e.latlng); if (measure) addMeasurePt(e.latlng); });
 $('#mUndo').onclick = () => {
   if (!measure || !measure.pts.length) return;
   measure.pts.pop(); measure.marks.clearLayers();
@@ -1466,7 +1683,7 @@ mapEl.addEventListener('dragover', e => { e.preventDefault(); });
 mapEl.addEventListener('drop', e => { e.preventDefault(); const f = Array.from(e.dataTransfer.files || []); if (f.length) handleIncoming(f); });
 
 map.on('moveend', () => { const c = map.getCenter(); settings.view = [c.lat, c.lng, map.getZoom()]; clearTimeout(map._svT); map._svT = setTimeout(saveSettings, 800); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (!$('#viewer').hidden) { $('#viewer').hidden = true; } else if (!$('#drawer').hidden) closeDrawer(); else if (measure) endMeasure(); else closeSheet(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (slopePick) { $('#pickCancel').click(); return; } if (!$('#viewer').hidden) { $('#viewer').hidden = true; } else if (!$('#drawer').hidden) closeDrawer(); else if (measure) endMeasure(); else closeSheet(); } });
 
 /* ---------------- Ficheros recibidos de otras apps ---------------- */
 async function receiveShared() { // web instalada: menú Compartir de Android
