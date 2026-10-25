@@ -61,7 +61,7 @@ const DB = (() => {
   };
 })();
 
-const settings = { base: 'pnoa', catastro: false, googleKey: '', travel: 'driving', stamp: true, view: null, notesVisible: true };
+const settings = { base: 'pnoa', catastro: false, googleKey: '', travel: 'driving', stamp: true, view: null, notesVisible: true, pk: true };
 const saveSettings = () => DB.put('kv', { ...settings }, 'settings').catch(() => {});
 
 /* ---------------- Utilidades geográficas ---------------- */
@@ -465,6 +465,81 @@ function layerVisible(id) {
   const e = layers.get(id); return !!(e && e.rec.visible);
 }
 
+/* ---------------- PK: marcas de distancia cada 100 m en las trazas ---------------- */
+const PK_STEP = 100;
+const fmtPK = d => `${Math.floor(d / 1000)}+${String(Math.round(d % 1000)).padStart(3, '0')}`;
+function lineParts(f) { return f.parts.filter(p => p.t === 'ln'); }
+function chainage(f) {
+  const out = []; let acc = 0, next = 0, last = null;
+  lineParts(f).forEach(p => {
+    const c = p.c;
+    for (let i = 1; i < c.length; i++) {
+      const a = L.latLng(c[i - 1]), b = L.latLng(c[i]), seg = a.distanceTo(b);
+      if (!seg) continue;
+      const dx = (b.lng - a.lng) * Math.cos(a.lat * Math.PI / 180), dy = b.lat - a.lat;
+      while (next <= acc + seg + 1e-6) {
+        const t = (next - acc) / seg;
+        out.push({ lat: a.lat + (b.lat - a.lat) * t, lng: a.lng + (b.lng - a.lng) * t, d: next, dx, dy });
+        next += PK_STEP;
+      }
+      acc += seg; last = { lat: b.lat, lng: b.lng, dx, dy };
+    }
+  });
+  if (last && acc - (next - PK_STEP) > 15) out.push({ ...last, d: acc, end: true }); // PK final de la traza
+  return out;
+}
+// PK del punto de la traza más cercano a una posición
+function pkAt(f, ll) {
+  const k = Math.cos(ll.lat * Math.PI / 180), M = 111320;
+  let best = Infinity, bestD = 0, acc = 0;
+  lineParts(f).forEach(p => {
+    const c = p.c;
+    for (let i = 1; i < c.length; i++) {
+      const ax = c[i - 1][1] * k * M, ay = c[i - 1][0] * M, bx = c[i][1] * k * M, by = c[i][0] * M, px = ll.lng * k * M, py = ll.lat * M;
+      const vx = bx - ax, vy = by - ay, L2 = vx * vx + vy * vy;
+      const t = L2 ? Math.max(0, Math.min(1, ((px - ax) * vx + (py - ay) * vy) / L2)) : 0;
+      const qx = ax + t * vx, qy = ay + t * vy, dist = Math.hypot(px - qx, py - qy);
+      const seg = L.latLng(c[i - 1]).distanceTo(c[i]);
+      if (dist < best) { best = dist; bestD = acc + t * seg; }
+      acc += seg;
+    }
+  });
+  return { d: bestD, off: best };
+}
+map.createPane('pk').style.zIndex = 420;
+map.getPane('pk').style.pointerEvents = 'none';
+const pkRenderer = L.canvas({ pane: 'pk' });
+const pkLayer = L.layerGroup().addTo(map);
+function drawPK() {
+  pkLayer.clearLayers();
+  const z = map.getZoom();
+  if (!settings.pk || z < 16) return;             // con menos zoom las marcas se amontonan: no se dibujan
+  const labelEvery = z >= 17 ? PK_STEP : 500;    // a zoom 16 solo rayas y etiqueta cada 500 m
+  const bounds = map.getBounds().pad(0.05);
+  let n = 0;
+  for (const e of layers.values()) {
+    if (typeOf(e.rec) !== 'kml' || !e.rec.visible || !e.pk) continue;
+    const op = e.rec.opacity ?? 1;
+    for (const m of e.pk) {
+      if (n > 800) return;
+      if (!bounds.contains([m.lat, m.lng])) continue;
+      const p = map.latLngToLayerPoint([m.lat, m.lng]);
+      const len = Math.hypot(m.dx, m.dy) || 1, nx = m.dy / len, ny = m.dx / len; // perpendicular en pantalla
+      const big = m.end || m.d % 1000 === 0, h = big ? 9 : 6;
+      const a = map.layerPointToLatLng([p.x + nx * h, p.y + ny * h]), b = map.layerPointToLatLng([p.x - nx * h, p.y - ny * h]);
+      L.polyline([a, b], { renderer: pkRenderer, color: '#102018', weight: 4, opacity: 0.55 * op, interactive: false }).addTo(pkLayer);
+      L.polyline([a, b], { renderer: pkRenderer, color: '#ffffff', weight: 2, opacity: op, interactive: false }).addTo(pkLayer);
+      if (m.end || Math.round(m.d) % labelEvery === 0) {
+        const at = map.layerPointToLatLng([p.x + nx * (h + 13), p.y + ny * (h + 13)]);
+        L.marker(at, { interactive: false, keyboard: false, pane: 'pk',
+          icon: L.divIcon({ className: 'pk-label' + (big ? ' big' : ''), html: `<span style="opacity:${op}">${fmtPK(m.d)}</span>`, iconSize: [0, 0] }) }).addTo(pkLayer);
+      }
+      n++;
+    }
+  }
+}
+let pkT; map.on('moveend', () => { clearTimeout(pkT); pkT = setTimeout(drawPK, 60); });
+
 function buildKml(entry) {
   const { rec } = entry;
   const { feats } = parseKML(rec.text);
@@ -486,6 +561,7 @@ function buildKml(entry) {
     });
   });
   entry.feats = feats; entry.group = group;
+  entry.pk = feats.filter(f => f.type === 'ln').flatMap(chainage);
 }
 function buildRaster(entry) {
   const r = entry.rec, common = { pane: 'rasters', opacity: r.opacity ?? 1, maxZoom: 21, attribution: r.attribution || '' };
@@ -512,6 +588,7 @@ function registerLayer(rec) {
 }
 function rebuildLayer(id) {
   const e = layers.get(id); if (!e) return;
+  setTimeout(drawPK, 0);
   if (e.group || e.tile) map.removeLayer(mapLayerOf(e));
   if (typeOf(e.rec) === 'kml') buildKml(e); else if (typeOf(e.rec) === 'wms') buildRaster(e);
   if (e.rec.visible) mapLayerOf(e).addTo(map);
@@ -527,6 +604,7 @@ function applyOrder() {
   });
 }
 async function setLayerVisible(id, on) {
+  setTimeout(drawPK, 0);
   if (id === 'notes') { settings.notesVisible = on; saveSettings(); on ? pointGroup('notes').addTo(map) : map.removeLayer(pointGroup('notes')); return; }
   const e = layers.get(id); if (!e) return;
   e.rec.visible = on;
@@ -564,7 +642,7 @@ async function deleteLayer(id) {
   map.removeLayer(mapLayerOf(e));
   for (const n of pts) { await DB.del('notes', n.id); notes.delete(n.id); noteMarkers.delete(n.id); }
   pointGroups.delete(id);
-  layers.delete(id); await DB.del('layers', id);
+  layers.delete(id); await DB.del('layers', id); drawPK();
   renderDrawer(); toast('Capa eliminada');
 }
 async function updateLayer(id, changes) {
@@ -589,7 +667,8 @@ function featureSheet(f, ll, rec) {
   acts += `<button class="btn" data-a="copy">${ICON.copy}Copiar coordenadas</button><button class="btn" data-a="measure">${ICON.ruler}Medir desde aquí</button>`;
 
   let coords = '';
-  if (f.type === 'ln') coords = `<div class="coords"><b>Inicio</b> ${fmtLL(...f.start)}${distFromMe(...f.start)}<br>${fmtUTM(...f.start)}<br><b>Final</b>&nbsp; ${fmtLL(...f.end)}${distFromMe(...f.end)}<br>${fmtUTM(...f.end)}</div>`;
+  const pkTap = f.type === 'ln' ? pkAt(f, ll) : null;
+  if (f.type === 'ln') coords = `<div class="coords"><b>PK del punto tocado</b> ${fmtPK(pkTap.d)} de ${fmtPK(f.length)}<br><b>Inicio</b> ${fmtLL(...f.start)}${distFromMe(...f.start)}<br>${fmtUTM(...f.start)}<br><b>Final</b>&nbsp; ${fmtLL(...f.end)}${distFromMe(...f.end)}<br>${fmtUTM(...f.end)}</div>`;
   else coords = coordsBlock(f.start[0], f.start[1]);
   const attrs = f.attrs.length ? `<table class="attrs">${f.attrs.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('')}</table>` : '';
 
@@ -636,6 +715,7 @@ async function importFiles(files) {
     } catch (e) { toast(e.message || 'No se pudo leer ' + file.name, 6000); }
   }
   if (last) map.fitBounds(last.group.getBounds().pad(0.1), { maxZoom: 18 });
+  drawPK();
   if (!$('#drawer').hidden) renderDrawer();
 }
 
@@ -1300,6 +1380,7 @@ async function renderDrawer() {
     <h3>Ajustes</h3>
     <div class="field"><label for="selTravel">Indicaciones de Google Maps</label>
       <select id="selTravel"><option value="driving">En coche</option><option value="walking">A pie</option></select></div>
+    <label class="opt"><input type="checkbox" id="chkPK" ${settings.pk ? 'checked' : ''}>Marcas de PK cada 100 m en las trazas (al acercar el mapa)</label>
     <label class="opt"><input type="checkbox" id="chkStamp" ${settings.stamp ? 'checked' : ''}>Sellar fecha y coordenadas en las fotos que hago</label>
     <div class="field"><label for="gKey">Clave de Google (API Map Tiles)</label>
       <input type="password" id="gKey" autocomplete="off" placeholder="AIza…" value="${esc(settings.googleKey)}">
@@ -1344,6 +1425,7 @@ async function renderDrawer() {
   d.querySelector('[data-t=cache]').onclick = () => { closeDrawer(); cacheArea(); };
   const sel = $('#selTravel'); sel.value = settings.travel; sel.onchange = () => { settings.travel = sel.value; saveSettings(); };
   $('#chkStamp').onchange = e => { settings.stamp = e.target.checked; saveSettings(); };
+  $('#chkPK').onchange = e => { settings.pk = e.target.checked; saveSettings(); drawPK(); };
   $('#gKeySave').onclick = () => { settings.googleKey = $('#gKey').value.trim(); googleCache = null; saveSettings(); toast('Clave guardada'); if (settings.base === 'google') setBase('google'); };
 }
 
@@ -1439,5 +1521,6 @@ function nativeInbox() { // app nativa: «Abrir con» y «Compartir»
     });
   }
   if (new URLSearchParams(location.search).has('shared')) { history.replaceState(null, '', './'); receiveShared(); }
+  drawPK();
   if (!layers.size && !notes.size) toast('Pulsa Importar para abrir un KML, un KMZ o fotos con GPS. Mantén pulsado en el mapa para ver las opciones de un punto.', 8000);
 })();

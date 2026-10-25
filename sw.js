@@ -1,6 +1,6 @@
 /* Service worker de OBRA-GIS: app disponible sin conexión, teselas PNOA en caché
    y recepción de KML/KMZ compartidos desde otras apps. */
-const SHELL = 'shell-v5';
+const SHELL = 'shell-v6';
 const TILES = 'tiles-v1';
 const ASSETS = ['./', 'index.html', 'app.css', 'app.js', 'manifest.webmanifest',
   'vendor/leaflet.js', 'vendor/leaflet.css', 'vendor/jszip.min.js',
