@@ -25,6 +25,8 @@ const ICON = {
   ruler: '<svg viewBox="0 0 24 24"><path d="M3 17L17 3l4 4L7 21zM7 13l2 2M10 10l2 2M13 7l2 2"/></svg>',
   copy: '<svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4H4v12h4"/></svg>',
   gallery: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 16l5-5 4 4 3-3 6 6"/></svg>',
+  right: '<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>',
+  folder: '<svg viewBox="0 0 24 24"><path d="M3 6h6l2 2h10v11H3z"/></svg>',
   up: '<svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg>',
   down: '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>',
   kml: '<svg viewBox="0 0 24 24"><path d="M3 18l6-8 4 5 3-3 5 6"/></svg>',
@@ -35,13 +37,14 @@ const ICON = {
 const DB = (() => {
   let dbp;
   const open = () => dbp || (dbp = new Promise((res, rej) => {
-    const r = indexedDB.open('campo-kml', 2);
+    const r = indexedDB.open('campo-kml', 3);
     r.onupgradeneeded = () => {
       const d = r.result, has = n => d.objectStoreNames.contains(n);
       if (!has('layers')) d.createObjectStore('layers', { keyPath: 'id' });
       if (!has('notes')) d.createObjectStore('notes', { keyPath: 'id' });
       if (!has('kv')) d.createObjectStore('kv');
       if (!has('acts')) d.createObjectStore('acts', { keyPath: 'id' }); // actuaciones lineales sobre trazas
+      if (!has('obras')) d.createObjectStore('obras', { keyPath: 'id' }); // cada obra agrupa sus capas y datos
     };
     r.onsuccess = () => res(r.result);
     r.onerror = () => rej(r.error);
@@ -64,7 +67,7 @@ const DB = (() => {
   };
 })();
 
-const settings = { base: 'pnoa', catastro: false, googleKey: '', travel: 'driving', stamp: true, view: null, notesVisible: true, pk: true };
+const settings = { base: 'pnoa', catastro: false, googleKey: '', travel: 'driving', stamp: true, view: null, notesVisible: true, pk: true, activeObra: null, collapsed: {} };
 const saveSettings = () => DB.put('kv', { ...settings }, 'settings').catch(() => {});
 
 /* ---------------- Utilidades geográficas ---------------- */
@@ -619,7 +622,7 @@ async function setLayerVisible(id, on) {
   await DB.put('layers', e.rec);
 }
 async function moveLayer(id, dir) {
-  const list = orderedLayers(); const i = list.findIndex(e => e.rec.id === id); const j = i + dir;
+  const me = layers.get(id); const list = orderedLayers().filter(e => folderOf(e.rec) === folderOf(me.rec)); const i = list.findIndex(e => e.rec.id === id); const j = i + dir;
   if (i < 0 || j < 0 || j >= list.length) return;
   const a = list[i].rec, b = list[j].rec;
   [a.order, b.order] = [b.order || 0, a.order || 0];
@@ -719,7 +722,7 @@ async function importFiles(files) {
       const { docName, feats } = parseKML(text);
       if (!feats.length) throw new Error(file.name + ': no contiene puntos, líneas ni polígonos.');
       const nk = [...layers.values()].filter(e => typeOf(e.rec) === 'kml').length;
-      const rec = { id: uid(), type: 'kml', name: file.name.replace(/\.km[lz]$/i, '') || docName || 'Capa', text, color: PALETTE[nk % PALETTE.length], visible: true, opacity: 1, order: nextOrder(), created: Date.now() };
+      const rec = { id: uid(), obraId: settings.activeObra, type: 'kml', name: file.name.replace(/\.km[lz]$/i, '') || docName || 'Capa', text, color: PALETTE[nk % PALETTE.length], visible: true, opacity: 1, order: nextOrder(), created: Date.now() };
       await DB.put('layers', rec);
       last = registerLayer(rec);
       toast(`${rec.name}: ${feats.length} elementos cargados`);
@@ -735,7 +738,7 @@ async function importPhotos(files) {
   const imgs = files.filter(f => f.type.startsWith('image/') || /\.jpe?g$/i.test(f.name));
   if (!imgs.length) return;
   toast(`Leyendo ${imgs.length} foto${imgs.length > 1 ? 's' : ''}…`, 10000);
-  const rec = { id: uid(), type: 'photos', name: 'Fotos ' + new Date().toLocaleDateString('es-ES'), visible: true, order: 0, created: Date.now() };
+  const rec = { id: uid(), obraId: settings.activeObra, type: 'photos', name: 'Fotos ' + new Date().toLocaleDateString('es-ES'), visible: true, order: 0, created: Date.now() };
   const added = [], missing = [];
   for (const f of imgs) {
     let ex = null;
@@ -743,7 +746,7 @@ async function importPhotos(files) {
     if (!ex || ex.lat == null) { missing.push(f.name); continue; }
     const blob = await processImage(f, null, false);
     added.push({
-      id: uid(), layerId: rec.id, lat: ex.lat, lng: ex.lng, acc: null, alt: ex.alt ?? null, dir: ex.dir ?? null, src: 'exif',
+      id: uid(), obraId: settings.activeObra, layerId: rec.id, lat: ex.lat, lng: ex.lng, acc: null, alt: ex.alt ?? null, dir: ex.dir ?? null, src: 'exif',
       title: f.name.replace(/\.[^.]+$/, ''), text: '', created: ex.date || f.lastModified || Date.now(),
       media: [{ id: uid(), kind: 'photo', blob, mime: blob.type || 'image/jpeg', t: Date.now() }],
     });
@@ -762,7 +765,15 @@ async function importPhotos(files) {
   else toast(`${added.length} fotos situadas. ${missing.length} sin coordenadas: ${missing.slice(0, 3).join(', ')}${missing.length > 3 ? '…' : ''}`, 8000);
   if (!$('#drawer').hidden) renderDrawer();
 }
-function handleIncoming(files) {
+async function handleIncoming(files) {
+  const rest = [];
+  for (const f of files) {
+    if (/\.zip$/i.test(f.name) || /zip/.test(f.type)) { const z = await isObraPackage(f); if (z) { await importObraPackage(f, z); continue; } }
+    rest.push(f);
+  }
+  if (rest.length) handleIncomingFiles(rest);
+}
+function handleIncomingFiles(files) {
   const k = files.filter(f => /\.km[lz]$/i.test(f.name) || /google-earth/.test(f.type));
   const p = files.filter(f => !k.includes(f) && (f.type.startsWith('image/') || /\.jpe?g$/i.test(f.name)));
   if (k.length) importFiles(k);
@@ -775,11 +786,13 @@ function importMenu() {
       <button class="btn full" data-a="kml">${ICON.kml}KML o KMZ</button>
       <button class="btn full" data-a="photos">${ICON.gallery}Fotos con coordenadas GPS</button>
       <button class="btn full" data-a="service">${ICON.wms}Capa de un servicio (WMS)</button>
+      <button class="btn full" data-a="obra">${ICON.folder}Obra completa (paquete .zip)</button>
     </div>
     <p class="hint">Las fotos se sitúan solas si la cámara guardó la ubicación. ${NATIVE ? '' : 'En Android, si llegan sin posición, elígelas desde «Archivos» y no desde la galería.'}</p>`);
   b.querySelector('[data-a=kml]').onclick = () => { closeSheet(); $('#inKml').click(); };
   b.querySelector('[data-a=photos]').onclick = () => { closeSheet(); $('#inPhotosImport').click(); };
   b.querySelector('[data-a=service]').onclick = serviceMenu;
+  b.querySelector('[data-a=obra]').onclick = () => { closeSheet(); $('#inObra').click(); };
 }
 let catalogQuery = '', catalogOpen = 'energia';
 function serviceMenu() {
@@ -825,7 +838,7 @@ const serviceExists = def => [...layers.values()].find(e => e.rec.url === def.ur
 async function addService(def, quiet = false) {
   const dup = serviceExists(def);
   if (dup) { if (!quiet) toast(`«${dup.rec.name}» ya está en tus capas.`); return false; }
-  const rec = { id: uid(), type: 'wms', kind: def.kind, name: def.name, url: def.url, layers: def.layers || '', maxNative: def.maxNative, info: def.info || '', cover: def.cover || '',
+  const rec = { id: uid(), obraId: settings.activeObra, type: 'wms', kind: def.kind, name: def.name, url: def.url, layers: def.layers || '', maxNative: def.maxNative, info: def.info || '', cover: def.cover || '',
     attribution: def.attribution || '', visible: true, opacity: def.opacity ?? 1, order: nextOrder(), created: Date.now() };
   await DB.put('layers', rec);
   registerLayer(rec);
@@ -1049,7 +1062,7 @@ let draft = null, draftMarker = null, recorder = null, recTimer = null;
 function openEditor(at) {
   const existing = at.note;
   draft = existing ? { ...existing, media: [...(existing.media || [])] }
-    : { id: uid(), lat: at.lat, lng: at.lng, acc: at.acc || null, src: at.src || 'gps', title: at.title || '', text: '', media: [], created: Date.now() };
+    : { id: uid(), obraId: settings.activeObra, lat: at.lat, lng: at.lng, acc: at.acc || null, src: at.src || 'gps', title: at.title || '', text: '', media: [], created: Date.now() };
   renderEditor();
 }
 function syncDraft() {
@@ -1510,7 +1523,7 @@ function drawActs() {
 let actDraft = null;
 function openActEditor(o) {
   if (o.act) actDraft = { ...o.act, media: [...(o.act.media || [])] };
-  else actDraft = { id: uid(), layerId: o.rec.id, featIdx: layers.get(o.rec.id).feats.indexOf(o.f), traceName: o.f.name, layerName: o.rec.name,
+  else actDraft = { id: uid(), obraId: settings.activeObra, layerId: o.rec.id, featIdx: layers.get(o.rec.id).feats.indexOf(o.f), traceName: o.f.name, layerName: o.rec.name,
     d0: o.d0, d1: o.d1, type: '', side: 'izq', text: '', media: [], created: Date.now(), coords: [] };
   renderActEditor();
 }
@@ -1656,15 +1669,218 @@ function actList() {
 async function exportActsCSV() {
   const list = actsSorted();
   if (!list.length) { toast('Todavía no hay actuaciones que exportar.'); return; }
+  const csv = actsCSV(list);
+  const name = `actuaciones_${new Date().toISOString().slice(0, 10)}.csv`;
+  try { await saveBlob(new Blob([csv], { type: 'text/csv' }), name); toast(`Exportadas ${list.length} actuaciones en ${name}`); }
+  catch (e) { if (!/cancel/i.test(e.message || '')) toast('No se pudo exportar: ' + (e.message || e), 6000); }
+}
+function actsCSV(list) {
   const n = v => String(v).replace('.', ',');
   const q = v => `"${String(v ?? '').replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`;
   const rows = [['Traza', 'Capa', 'Tipo', 'Margen', 'PK inicio', 'PK fin', 'Longitud (m)', 'Descripción', 'Fotos', 'Fecha', 'Lat inicio', 'Lon inicio', 'Lat fin', 'Lon fin']];
   list.forEach(a => { const p0 = a.coords[0], p1 = a.coords[a.coords.length - 1];
     rows.push([a.traceName, a.layerName, a.type, SIDES[a.side], fmtPK(a.d0), fmtPK(a.d1), n(Math.round((a.d1 - a.d0) * 10) / 10), a.text, (a.media || []).length, fmtDate(a.created), n(p0[0].toFixed(6)), n(p0[1].toFixed(6)), n(p1[0].toFixed(6)), n(p1[1].toFixed(6))]); });
-  const csv = '\ufeff' + rows.map(r => r.map(q).join(';')).join('\r\n');
-  const name = `actuaciones_${new Date().toISOString().slice(0, 10)}.csv`;
-  try { await saveBlob(new Blob([csv], { type: 'text/csv' }), name); toast(`Exportadas ${list.length} actuaciones en ${name}`); }
+  return '\ufeff' + rows.map(r => r.map(q).join(';')).join('\r\n');
+}
+
+/* ---------------- Obras: cada obra agrupa sus capas, anotaciones, fotos y actuaciones ---------------- */
+const obras = new Map();
+const safeName = s => String(s || 'obra').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w\-]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '').slice(0, 60) || 'obra';
+function updateObraLabel() { const o = obras.get(settings.activeObra); $('#obraName').textContent = o ? o.name : ''; }
+async function clearMapData() {
+  for (const e of layers.values()) { try { map.removeLayer(mapLayerOf(e)); } catch (_) {} }
+  pointGroups.forEach(g => map.removeLayer(g));
+  layers.clear(); pointGroups.clear(); notes.clear(); noteMarkers.clear(); acts.clear();
+  highlight.clearLayers(); slopeHL.clearLayers(); actsLayer.clearLayers(); pkLayer.clearLayers();
+}
+async function loadObra(id, fit) {
+  closeSheet(); await clearMapData();
+  settings.activeObra = id; saveSettings(); updateObraLabel();
+  const recs = (await DB.all('layers')).filter(r => r.obraId === id).sort((a, b) => a.created - b.created);
+  recs.forEach((r, i) => { if (r.order == null) r.order = i + 1; if (!r.type) r.type = 'kml'; });
+  for (const rec of recs) { try { registerLayer(rec); } catch (e) { console.error(e); } }
+  for (const r of recs) { // completa datos de capas añadidas con versiones anteriores
+    const c = r.type === 'wms' && !r.info && CATALOG.find(x => x.url === r.url && x.layers === r.layers);
+    if (c) { r.info = c.info || ''; r.cover = c.cover || ''; DB.put('layers', r); }
+  }
+  if (settings.notesVisible !== false) pointGroup('notes').addTo(map);
+  for (const n of (await DB.all('notes')).filter(n => n.obraId === id)) { notes.set(n.id, n); drawNote(n); }
+  for (const a of (await DB.all('acts')).filter(a => a.obraId === id)) acts.set(a.id, a);
+  drawActs(); drawPK();
+  if (fit) {
+    const pts = [];
+    layers.forEach(e => { if (e.group) { const b = e.group.getBounds(); if (b.isValid()) pts.push(b.getSouthWest(), b.getNorthEast()); } });
+    notes.forEach(n => pts.push(L.latLng(n.lat, n.lng)));
+    acts.forEach(a => a.coords.forEach(c => pts.push(L.latLng(c))));
+    if (pts.length) map.fitBounds(L.latLngBounds(pts).pad(0.1), { maxZoom: 17 });
+  }
+  if (!$('#drawer').hidden) renderDrawer();
+}
+async function createObra(name, desc = '') {
+  const o = { id: uid(), name: name.trim() || 'Obra nueva', desc, created: Date.now() };
+  await DB.put('obras', o); obras.set(o.id, o); return o;
+}
+async function obraCounts(id) {
+  const [l, n, a] = await Promise.all([DB.all('layers'), DB.all('notes'), DB.all('acts')]);
+  return { layers: l.filter(x => x.obraId === id).length, notes: n.filter(x => x.obraId === id).length, acts: a.filter(x => x.obraId === id).length };
+}
+async function deleteObraData(id) {
+  const [l, n, a] = await Promise.all([DB.all('layers'), DB.all('notes'), DB.all('acts')]);
+  for (const x of l.filter(x => x.obraId === id)) await DB.del('layers', x.id);
+  for (const x of n.filter(x => x.obraId === id)) await DB.del('notes', x.id);
+  for (const x of a.filter(x => x.obraId === id)) await DB.del('acts', x.id);
+}
+async function obrasSheet() {
+  const list = [...obras.values()].sort((a, b) => a.name.localeCompare(b.name));
+  const counts = await Promise.all(list.map(o => obraCounts(o.id)));
+  const b = openSheet(`<h2>Obras</h2><p class="sub">Cada obra guarda sus propias capas, anotaciones, fotos y actuaciones</p>
+    <div class="obras">${list.map((o, i) => { const c = counts[i], act = o.id === settings.activeObra;
+      return `<div class="obra ${act ? 'on' : ''}">
+        <button class="otitle" data-open="${o.id}" type="button"><b>${esc(o.name)}</b><small>${c.layers} capas · ${c.notes} anotaciones · ${c.acts} actuaciones${act ? ' · <em>activa</em>' : ''}</small></button>
+        <div class="row"><button class="mini" data-share="${o.id}">Exportar / compartir</button><button class="mini" data-ren="${o.id}">Renombrar</button>${list.length > 1 ? `<button class="mini del" data-delo="${o.id}">Eliminar</button>` : ''}</div>
+      </div>`; }).join('')}</div>
+    <h3 class="sh">Nueva obra</h3>
+    <div class="field row"><input type="text" id="newObra" placeholder="Nombre (p. ej. Modernización regadío Cuevas del Campo)"><button class="mini" data-a="create">Crear</button></div>
+    <div class="acts"><button class="btn full" data-a="import">${ICON.folder}Importar obra (paquete .zip)</button></div>
+    <p class="hint">«Exportar / compartir» crea un .zip con toda la obra: capas, KML originales, anotaciones, actuaciones, fotos, vídeos y notas de voz. Al abrir ese .zip en otro móvil con OBRA-GIS, la obra aparece completa.</p>`);
+  b.querySelectorAll('[data-open]').forEach(bt => bt.onclick = () => loadObra(bt.dataset.open, true).then(() => toast(`Obra activa: ${obras.get(bt.dataset.open).name}`)));
+  b.querySelectorAll('[data-share]').forEach(bt => bt.onclick = () => exportObraPackage(bt.dataset.share));
+  b.querySelectorAll('[data-ren]').forEach(bt => bt.onclick = () => {
+    const o = obras.get(bt.dataset.ren);
+    const s2 = openSheet(`<h2>Renombrar obra</h2><div class="field"><input type="text" id="renObra" value="${esc(o.name)}"></div><div class="acts"><button class="btn pri full" data-a="ok">Guardar</button></div>`);
+    s2.querySelector('[data-a=ok]').onclick = async () => { o.name = $('#renObra').value.trim() || o.name; await DB.put('obras', o); updateObraLabel(); obrasSheet(); };
+  });
+  b.querySelectorAll('[data-delo]').forEach(bt => bt.onclick = async () => {
+    const o = obras.get(bt.dataset.delo);
+    if (!confirm(`¿Eliminar la obra «${o.name}» con todas sus capas, anotaciones, fotos y actuaciones? No se puede deshacer. Si quieres conservarla, expórtala antes.`)) return;
+    await deleteObraData(o.id); await DB.del('obras', o.id); obras.delete(o.id);
+    if (settings.activeObra === o.id) await loadObra([...obras.keys()][0], true);
+    obrasSheet(); toast('Obra eliminada');
+  });
+  b.querySelector('[data-a=create]').onclick = async () => {
+    const name = $('#newObra').value.trim(); if (!name) { toast('Escribe el nombre de la obra.'); return; }
+    const o = await createObra(name); await loadObra(o.id); toast(`Obra «${o.name}» creada. Ya puedes importar sus KML y capas.`, 5000);
+  };
+  b.querySelector('[data-a=import]').onclick = () => $('#inObra').click();
+}
+
+// Paquete de obra (.zip): estructura de carpetas legible desde QGIS, Excel o Google Earth
+const MIME_EXT = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', mp4: 'video/mp4', webm: 'video/webm', m4a: 'audio/mp4', ogg: 'audio/ogg' };
+async function exportObraPackage(id) {
+  const o = obras.get(id); if (!o) return;
+  toast('Preparando el paquete de la obra…', 15000);
+  const [L0, N0, A0] = await Promise.all([DB.all('layers'), DB.all('notes'), DB.all('acts')]);
+  const lays = L0.filter(x => x.obraId === id), nts = N0.filter(x => x.obraId === id), ats = A0.filter(x => x.obraId === id);
+  const zip = new JSZip(), root = `OBRA-GIS_${safeName(o.name)}`, Z = zip.folder(root);
+  const layerName = lid => { const l = lays.find(x => x.id === lid); return l ? l.name : 'Mis anotaciones'; };
+  const media = (owner, list, dir) => (list || []).map((m, i) => {
+    const path = `multimedia/${dir}/${safeName(owner)}_${i + 1}.${extFor(m)}`; Z.file(path, m.blob);
+    return { archivo: path, tipo: { photo: 'foto', video: 'video', audio: 'audio' }[m.kind], mime: m.mime };
+  });
+  const capas = lays.map(r => {
+    const c = { id: r.id, tipo: r.type || 'kml', nombre: r.name, carpeta: folderOf(r), orden: r.order || 0, visible: !!r.visible, opacidad: r.opacity ?? 1 };
+    if (c.tipo === 'kml') { c.archivo = `capas/kml/${safeName(r.name)}_${r.id}.kml`; c.color = r.color; Z.file(c.archivo, r.text); }
+    if (c.tipo === 'wms') Object.assign(c, { servicio: r.kind, url: r.url, capas_wms: r.layers, consulta: r.info || '', cobertura: r.cover || '', atribucion: r.attribution || '', zoom_max_nativo: r.maxNative || null });
+    return c;
+  });
+  const notePts = nts.map(n => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [n.lng, n.lat] },
+    properties: { id: n.id, titulo: n.title, texto: n.text || '', fecha: new Date(n.created).toISOString(), origen_posicion: n.src || '', precision_m: n.acc ?? null,
+      altitud_m: n.alt ?? null, orientacion_grados: n.dir ?? null, capa: layerName(n.layerId), capa_id: n.layerId || null, multimedia: media(n.title + '_' + n.id.slice(-4), n.media, n.layerId ? 'fotos_importadas' : 'anotaciones') } }));
+  const actFeats = ats.map(a => ({ type: 'Feature',
+    geometry: a.coords.length > 1 && a.d1 > a.d0 ? { type: 'LineString', coordinates: a.coords.map(c => [c[1], c[0]]) } : { type: 'Point', coordinates: [a.coords[0][1], a.coords[0][0]] },
+    properties: { id: a.id, tipo: a.type, margen: SIDES[a.side] || '', margen_cod: a.side, pk_inicio: fmtPK(a.d0), pk_fin: fmtPK(a.d1), pk_inicio_m: +a.d0.toFixed(2), pk_fin_m: +a.d1.toFixed(2),
+      longitud_m: +(a.d1 - a.d0).toFixed(2), traza: a.traceName, capa: a.layerName, capa_id: a.layerId, elemento: a.featIdx, descripcion: a.text || '', fecha: new Date(a.created).toISOString(),
+      multimedia: media(`${a.type}_PK${fmtPK(a.d0)}_${a.id.slice(-4)}`, a.media, 'actuaciones') } }));
+  const fc = features => JSON.stringify({ type: 'FeatureCollection', crs: { type: 'name', properties: { name: 'urn:ogc:def:crs:OGC:1.3:CRS84' } }, features }, null, 1);
+  Z.file('datos/anotaciones.geojson', fc(notePts.filter(f => !f.properties.capa_id)));
+  Z.file('datos/fotos_importadas.geojson', fc(notePts.filter(f => f.properties.capa_id)));
+  Z.file('datos/actuaciones.geojson', fc(actFeats));
+  Z.file('datos/actuaciones.csv', actsCSV(ats.sort((a, b) => (a.traceName || '').localeCompare(b.traceName || '') || a.d0 - b.d0)));
+  Z.file('obra.json', JSON.stringify({ formato: 'OBRA-GIS', version: 1, exportado: new Date().toISOString(),
+    obra: { id: o.id, nombre: o.name, descripcion: o.desc || '', creada: new Date(o.created).toISOString() },
+    sistema_referencia: 'WGS84 / ETRS89 geográficas (EPSG:4326)', capas,
+    resumen: { capas: capas.length, anotaciones: notePts.length, actuaciones: actFeats.length } }, null, 2));
+  Z.file('LEEME.txt', [`OBRA-GIS · ${o.name}`, `Exportado el ${fmtDate(Date.now())}`, '',
+    'obra.json                    Datos de la obra y lista de capas (carpeta, orden, estilo, servicios WMS)',
+    'capas/kml/                   KML originales de las trazas',
+    'datos/anotaciones.geojson    Anotaciones de campo (puntos)',
+    'datos/fotos_importadas.geojson  Fotos situadas por sus coordenadas GPS',
+    'datos/actuaciones.geojson    Actuaciones sobre las trazas (líneas o puntos) con tipo, margen y PK',
+    'datos/actuaciones.csv        Listado de actuaciones para Excel',
+    'multimedia/                  Fotos, vídeos y notas de voz, enlazados desde los GeoJSON (campo multimedia)', '',
+    'Para cargar la obra completa en otro móvil: abre este .zip con OBRA-GIS (Compartir → OBRA-GIS, o Obras → Importar obra).',
+    'Los GeoJSON se abren directamente en QGIS (coordenadas EPSG:4326).'].join('\r\n'));
+  const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/zip', compression: 'DEFLATE', compressionOptions: { level: 5 } });
+  const name = `${root}_${new Date().toISOString().slice(0, 10)}.zip`;
+  try { await saveBlob(blob, name); toast(`Paquete listo: ${name} (${(blob.size / 1048576).toFixed(1).replace('.', ',')} MB)`, 6000); }
   catch (e) { if (!/cancel/i.test(e.message || '')) toast('No se pudo exportar: ' + (e.message || e), 6000); }
+}
+async function isObraPackage(file) {
+  try { const zip = await JSZip.loadAsync(file); return zip.file(/(^|\/)obra\.json$/)[0] ? zip : null; } catch (e) { return null; }
+}
+async function importObraPackage(file, zipIn) {
+  const zip = zipIn || await JSZip.loadAsync(file);
+  const entry = zip.file(/(^|\/)obra\.json$/)[0];
+  if (!entry) { toast('Este .zip no es un paquete de obra de OBRA-GIS.'); return; }
+  const pre = entry.name.replace(/obra\.json$/, '');
+  const meta = JSON.parse(await entry.async('string'));
+  if (meta.formato !== 'OBRA-GIS') { toast('Este .zip no es un paquete de obra de OBRA-GIS.'); return; }
+  const exists = obras.get(meta.obra.id);
+  const mode = exists ? await askImportMode(exists.name) : 'new';
+  if (!mode) return;
+  toast('Importando la obra…', 15000);
+  const obraId = mode === 'replace' ? meta.obra.id : (exists ? uid() : meta.obra.id);
+  if (mode === 'replace') await deleteObraData(obraId);
+  const o = { id: obraId, name: mode === 'copy' ? meta.obra.nombre + ' (copia)' : meta.obra.nombre, desc: meta.obra.descripcion || '', created: Date.parse(meta.obra.creada) || Date.now() };
+  await DB.put('obras', o); obras.set(o.id, o);
+  const idMap = {};
+  for (const c of meta.capas || []) {
+    const nid = uid(); idMap[c.id] = nid;
+    const base = { id: nid, obraId, type: c.tipo, name: c.nombre, folder: c.carpeta, order: c.orden, visible: c.visible, opacity: c.opacidad, created: Date.now() };
+    if (c.tipo === 'kml') { const f = zip.file(pre + c.archivo); if (!f) continue; Object.assign(base, { text: await f.async('string'), color: c.color || PALETTE[0] }); }
+    if (c.tipo === 'wms') Object.assign(base, { kind: c.servicio, url: c.url, layers: c.capas_wms, info: c.consulta, cover: c.cobertura, attribution: c.atribucion, maxNative: c.zoom_max_nativo || undefined });
+    if (c.tipo === 'photos') base.order = 0;
+    if (DEFAULT_FOLDER[c.tipo] === c.carpeta) delete base.folder;
+    await DB.put('layers', base);
+  }
+  const readMedia = async list => {
+    const out = [];
+    for (const m of list || []) {
+      const f = zip.file(pre + m.archivo); if (!f) continue;
+      const ext = m.archivo.split('.').pop().toLowerCase();
+      const kind = { foto: 'photo', video: 'video', audio: 'audio' }[m.tipo] || 'photo';
+      out.push({ id: uid(), kind, blob: new Blob([await f.async('arraybuffer')], { type: m.mime || MIME_EXT[ext] || '' }), mime: m.mime || MIME_EXT[ext] || '', t: Date.now() });
+    }
+    return out;
+  };
+  const readFC = async path => { const f = zip.file(pre + path); return f ? JSON.parse(await f.async('string')).features || [] : []; };
+  let nN = 0, nA = 0;
+  for (const ft of [...await readFC('datos/anotaciones.geojson'), ...await readFC('datos/fotos_importadas.geojson')]) {
+    const p = ft.properties, [lng, lat] = ft.geometry.coordinates;
+    await DB.put('notes', { id: uid(), obraId, layerId: p.capa_id ? idMap[p.capa_id] || null : null, lat, lng, title: p.titulo, text: p.texto, created: Date.parse(p.fecha) || Date.now(),
+      src: p.origen_posicion, acc: p.precision_m, alt: p.altitud_m, dir: p.orientacion_grados, media: await readMedia(p.multimedia) }); nN++;
+  }
+  for (const ft of await readFC('datos/actuaciones.geojson')) {
+    const p = ft.properties, g = ft.geometry;
+    const coords = g.type === 'LineString' ? g.coordinates.map(c => [c[1], c[0]]) : [[g.coordinates[1], g.coordinates[0]]];
+    await DB.put('acts', { id: uid(), obraId, layerId: idMap[p.capa_id] || null, featIdx: p.elemento, traceName: p.traza, layerName: p.capa, d0: p.pk_inicio_m, d1: p.pk_fin_m,
+      type: p.tipo, side: p.margen_cod || 'izq', text: p.descripcion, created: Date.parse(p.fecha) || Date.now(), coords, media: await readMedia(p.multimedia) }); nA++;
+  }
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  await loadObra(obraId, true);
+  toast(`Obra «${o.name}» importada: ${(meta.capas || []).length} capas, ${nN} anotaciones y ${nA} actuaciones.`, 7000);
+}
+function askImportMode(name) {
+  return new Promise(res => {
+    const b = openSheet(`<h2>La obra ya existe</h2><p class="sub">Ya tienes «${esc(name)}» en este móvil.</p><div class="acts">
+      <button class="btn pri full" data-m="replace">Reemplazarla por la del paquete</button>
+      <button class="btn full" data-m="copy">Importarla como copia</button>
+      <button class="btn full" data-m="">Cancelar</button></div>
+      <p class="hint">Reemplazar borra lo que tienes ahora de esa obra en este móvil y lo sustituye por el contenido del paquete.</p>`);
+    let done = false;
+    b.querySelectorAll('[data-m]').forEach(bt => bt.onclick = () => { done = true; closeSheet(); res(bt.dataset.m || null); });
+    onSheetClose(() => { if (!done) res(null); });
+  });
 }
 
 /* ---------------- Medición ---------------- */
@@ -1786,7 +2002,7 @@ async function cacheArea() {
 }
 
 /* ---------------- Panel lateral con el gestor de capas ---------------- */
-let openLayerId = null;
+let openLayerId = null, folderIds = new Map();
 function openDrawer() { renderDrawer(); $('#drawer').hidden = false; $('#scrim').hidden = false; }
 function closeDrawer() { $('#drawer').hidden = true; $('#scrim').hidden = true; }
 
@@ -1807,6 +2023,7 @@ function layerOptions(e) {
   if (t === 'kml') h += `<label class="rng">Color<input type="color" value="${r.color}" data-col="${id}"></label>`;
   h += `<div class="field row"><input type="text" value="${esc(r.name)}" data-name="${id}" aria-label="Nombre de la capa"><button class="mini" data-rename="${id}">Renombrar</button></div>`;
   h += `<div class="row">${t !== 'wms' ? `<button class="mini" data-zoom="${id}">Encuadrar</button>` : ''}<button class="mini del" data-dell="${id}">Eliminar capa</button></div>`;
+  h += `<div class="field row"><input type="text" list="folderList" value="${esc(folderOf(r))}" data-folder="${id}" aria-label="Carpeta de la capa"><button class="mini" data-movefolder="${id}">Mover a carpeta</button></div>`;
   if (t === 'wms' && r.kind !== 'wmts') h += `<div class="legend"><img src="${esc(legendUrl(r))}" alt="Leyenda de ${esc(r.name)}" onerror="this.parentNode.remove()"></div>`;
   if (t === 'wms') h += `<p class="hint">${esc(r.url)}${r.layers ? ' · ' + esc(r.layers) : ''}${r.cover ? ' · cobertura: ' + esc(r.cover) : ''}</p>`;
   return h;
@@ -1819,6 +2036,8 @@ function layerSub(e) {
   const n = [...notes.values()].filter(x => x.layerId === e.rec.id).length;
   return `Fotos con GPS · ${n}`;
 }
+const DEFAULT_FOLDER = { kml: 'Trazas y KML', wms: 'Servicios y afecciones', photos: 'Fotos importadas' };
+const folderOf = rec => (rec.folder || '').trim() || DEFAULT_FOLDER[typeOf(rec)] || 'Capas';
 async function renderDrawer() {
   const d = $('#drawer');
   const scroll = d.scrollTop;
@@ -1827,21 +2046,42 @@ async function renderDrawer() {
   const own = [...notes.values()].filter(n => !n.layerId).sort((a, b) => b.created - a.created);
   let storage = '';
   try { const e = await navigator.storage.estimate(); storage = `${(e.usage / 1048576).toFixed(1).replace('.', ',')} MB usados en el dispositivo`; } catch (e) {}
+  const obra = obras.get(settings.activeObra);
 
-  const actRow = layerRow('acts', 'Actuaciones en trazas', `${acts.size} actuaciones`, `<span class="sw" style="background:linear-gradient(90deg,#8d6e63,#1e88e5,#00acc1)"></span>`,
-    { move: false, body: `<div class="row"><button class="mini" data-actlist>Ver listado</button></div>` });
-  const pointRows = actRow + layerRow('notes', 'Mis anotaciones', `${own.length} anotaciones`, `<span class="sw pin-sw note"></span>`,
-    { move: false, body: `<div class="row"><button class="mini" data-zoom="notes">Encuadrar</button></div>` })
-    + photoLayers.map(e => layerRow(e.rec.id, e.rec.name, layerSub(e), `<span class="sw pin-sw photo"></span>`, { move: false, body: layerOptions(e) })).join('');
-  const otherRows = ordered.map(e => layerRow(e.rec.id, e.rec.name, layerSub(e),
-    typeOf(e.rec) === 'kml' ? `<span class="sw" style="background:${e.rec.color}"></span>` : `<span class="sw ic">${ICON.wms}</span>`,
-    { move: ordered.length > 1, body: layerOptions(e) })).join('');
+  // Árbol: obra → carpetas → capas. «Datos de campo» siempre arriba.
+  const fieldRows = layerRow('acts', 'Actuaciones en trazas', `${acts.size} actuaciones`, `<span class="sw" style="background:linear-gradient(90deg,#8d6e63,#1e88e5,#00acc1)"></span>`,
+    { move: false, body: `<div class="row"><button class="mini" data-actlist>Ver listado</button></div>` })
+    + layerRow('notes', 'Mis anotaciones', `${own.length} anotaciones`, `<span class="sw pin-sw note"></span>`,
+    { move: false, body: `<div class="row"><button class="mini" data-zoom="notes">Encuadrar</button></div>` });
+  const folders = new Map();
+  [...ordered, ...photoLayers].forEach(e => { const k = folderOf(e.rec); if (!folders.has(k)) folders.set(k, []); folders.get(k).push(e); });
+  const folderHtml = (name, rows, ids, count) => {
+    const closed = settings.collapsed && settings.collapsed[name];
+    const anyVis = ids.some(id => layerVisible(id));
+    return `<div class="folder ${closed ? '' : 'open'}">
+      <div class="fhead"><input type="checkbox" data-fvis="${esc(name)}" ${anyVis ? 'checked' : ''} aria-label="Mostrar carpeta ${esc(name)}">
+        <button class="fname" data-fold="${esc(name)}" type="button"><span class="caret">${closed ? ICON.right : ICON.down}</span>${ICON.folder}<span class="ft">${esc(name)}</span><small>${count}</small></button></div>
+      ${closed ? '' : `<div class="fbody">${rows}</div>`}
+    </div>`;
+  };
+  folderIds = new Map([['Datos de campo', ['acts', 'notes']]]);
+  let tree = folderHtml('Datos de campo', fieldRows, ['acts', 'notes'], 2);
+  for (const [name, list] of folders) {
+    folderIds.set(name, list.map(e => e.rec.id));
+    const movable = list.filter(e => !isPointLayer(e.rec)).length > 1;
+    const rows = list.map(e => layerRow(e.rec.id, e.rec.name, layerSub(e),
+      isPointLayer(e.rec) ? `<span class="sw pin-sw photo"></span>` : typeOf(e.rec) === 'kml' ? `<span class="sw" style="background:${e.rec.color}"></span>` : `<span class="sw ic">${ICON.wms}</span>`,
+      { move: movable && !isPointLayer(e.rec), body: layerOptions(e) })).join('');
+    tree += folderHtml(name, rows, list.map(e => e.rec.id), list.length);
+  }
+  const folderNames = [...new Set([...folders.keys(), ...Object.values(DEFAULT_FOLDER), 'Proyecto', 'Replanteo', 'Afecciones'])];
 
   d.innerHTML = `<div class="dhead"><h2>OBRA-GIS</h2><button class="mini ic" id="dClose" aria-label="Cerrar">${ICON.close}</button></div>
-    <h3>Capas</h3>
-    <div class="lgroup">${pointRows}</div>
-    <div class="lgroup">${otherRows || '<p class="empty">Aún no hay capas KML ni servicios.</p>'}</div>
-    ${ordered.length > 1 ? '<p class="hint">Las de arriba se dibujan encima. Las capas KML quedan siempre sobre las de imagen.</p>' : ''}
+    <button class="obra-card" data-t="obras" type="button"><small>Obra activa</small><b>${esc(obra ? obra.name : '—')}</b><span>${obras.size} obra${obras.size === 1 ? '' : 's'} · Cambiar, crear o compartir</span></button>
+    <h3>Capas de la obra</h3>
+    <div class="tree">${tree}</div>
+    <datalist id="folderList">${folderNames.map(n => `<option value="${esc(n)}">`).join('')}</datalist>
+    ${ordered.length > 1 ? '<p class="hint">Dentro de cada carpeta, las capas de arriba se dibujan encima. Las capas KML quedan siempre sobre las de imagen.</p>' : ''}
     <div class="acts"><button class="btn pri full" data-t="add">${ICON.plus}Añadir capa</button></div>
     <h3>Mapa base</h3>
     ${Object.entries(BASES).map(([id, b]) => `<label class="opt"><input type="radio" name="base" value="${id}" ${settings.base === id ? 'checked' : ''}>${esc(b.name)}</label>`).join('')}
@@ -1900,6 +2140,13 @@ async function renderDrawer() {
     map.setView([n.lat, n.lng], Math.max(map.getZoom(), 17)); viewNote(n.id);
   });
   d.querySelector('[data-t=add]').onclick = () => { closeDrawer(); importMenu(); };
+  d.querySelector('[data-t=obras]').onclick = () => { closeDrawer(); obrasSheet(); };
+  d.querySelectorAll('[data-fold]').forEach(bt => bt.onclick = () => { settings.collapsed = settings.collapsed || {}; settings.collapsed[bt.dataset.fold] = !settings.collapsed[bt.dataset.fold]; saveSettings(); renderDrawer(); });
+  d.querySelectorAll('[data-fvis]').forEach(c => c.onchange = async () => { for (const id of folderIds.get(c.dataset.fvis) || []) await setLayerVisible(id, c.checked); renderDrawer(); });
+  d.querySelectorAll('[data-movefolder]').forEach(bt => bt.onclick = async () => {
+    const id = bt.dataset.movefolder, v = d.querySelector(`[data-folder="${id}"]`).value.trim();
+    await updateLayer(id, { folder: v }); settings.collapsed[v] = false; renderDrawer(); toast(v ? `Capa movida a «${v}»` : 'Capa devuelta a su carpeta por defecto');
+  });
   d.querySelector('[data-t=export]').onclick = exportKMZ;
   d.querySelector('[data-t=csv]').onclick = exportActsCSV;
   d.querySelector('[data-t=actlist]').onclick = () => { closeDrawer(); actList(); };
@@ -1923,6 +2170,8 @@ $('#scrim').onclick = closeDrawer;
 $('#sheetX').onclick = closeSheet;
 $('#btnImport').onclick = importMenu;
 $('#inKml').addEventListener('change', e => { const f = Array.from(e.target.files || []); e.target.value = ''; if (f.length) importFiles(f); });
+$('#inObra').addEventListener('change', async e => { const f = (e.target.files || [])[0]; e.target.value = ''; if (f) { const z = await isObraPackage(f); z ? importObraPackage(f, z) : toast('Este .zip no es un paquete de obra de OBRA-GIS.'); } });
+$('#btnObra').onclick = obrasSheet;
 $('#inPhotosImport').addEventListener('change', e => { const f = Array.from(e.target.files || []); e.target.value = ''; if (f.length) importPhotos(f); });
 $('#fabLocate').onclick = locate;
 
@@ -2000,19 +2249,21 @@ function nativeInbox() { // app nativa: «Abrir con» y «Compartir»
   if (settings.view) map.setView([settings.view[0], settings.view[1]], settings.view[2]);
   await setBase(settings.base in BASES ? settings.base : 'pnoa');
   try {
-    const recs = (await DB.all('layers')).sort((a, b) => a.created - b.created);
-    recs.forEach((r, i) => { if (r.order == null) r.order = i + 1; if (!r.type) r.type = 'kml'; });
-    for (const rec of recs) { try { registerLayer(rec); } catch (e) { console.error(e); } }
-    const cat = CATALOG.find(c => c.name === 'Parcelas de Catastro');
-    if (settings.catastro && !recs.some(r => r.url === cat.url)) { settings.catastro = false; saveSettings(); addService(cat, true); } // versión anterior
-    for (const r of recs) { // completa datos de capas añadidas con versiones anteriores
-      const c = r.type === 'wms' && !r.info && CATALOG.find(x => x.url === r.url && x.layers === r.layers);
-      if (c) { r.info = c.info || ''; r.cover = c.cover || ''; DB.put('layers', r); }
+    for (const o of await DB.all('obras')) obras.set(o.id, o);
+    // Migración: los datos de versiones anteriores pasan a una primera obra
+    const [L0, N0, A0] = await Promise.all([DB.all('layers'), DB.all('notes'), DB.all('acts')]);
+    const orphans = [...L0, ...N0, ...A0].some(x => !x.obraId);
+    if (!obras.size || orphans) {
+      const o = obras.get(settings.activeObra) || [...obras.values()][0] || await createObra('Mi primera obra');
+      for (const x of L0) if (!x.obraId) { x.obraId = o.id; await DB.put('layers', x); }
+      for (const x of N0) if (!x.obraId) { x.obraId = o.id; await DB.put('notes', x); }
+      for (const x of A0) if (!x.obraId) { x.obraId = o.id; await DB.put('acts', x); }
+      if (!obras.get(settings.activeObra)) settings.activeObra = o.id;
     }
-    if (settings.notesVisible !== false) pointGroup('notes').addTo(map);
-    for (const n of await DB.all('notes')) { notes.set(n.id, n); drawNote(n); }
-    for (const a of await DB.all('acts')) acts.set(a.id, a);
-    drawActs();
+    if (!obras.get(settings.activeObra)) settings.activeObra = [...obras.keys()][0];
+    await loadObra(settings.activeObra);
+    const cat = CATALOG.find(c => c.name === 'Parcelas de Catastro');
+    if (settings.catastro && ![...layers.values()].some(e => e.rec.url === cat.url)) { settings.catastro = false; saveSettings(); addService(cat, true); } // versión anterior
   } catch (e) { toast('No se pudieron leer los datos guardados: ' + e.message, 7000); }
   if (NATIVE) nativeInbox();
   else if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW', e));

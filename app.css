@@ -21,7 +21,8 @@ svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-l
 .bar{position:absolute;top:0;left:0;right:0;z-index:1000;display:flex;align-items:center;gap:8px;
   padding:calc(var(--safe-t) + 8px) calc(var(--safe-r) + 10px) 8px calc(var(--safe-l) + 10px);
   background:linear-gradient(var(--bar),rgba(11,61,46,.88));color:var(--bar-fg)}
-.brand{flex:1;font-size:1.1rem;letter-spacing:.02em}
+.brand{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;background:none;border:0;color:inherit;font:inherit;font-size:1.1rem;letter-spacing:.02em;text-align:left;cursor:pointer;padding:0}
+.brand small{font-size:.74rem;opacity:.85;letter-spacing:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .brand b{color:#ffb37a}
 .ibtn,.tbtn{border:0;background:rgba(255,255,255,.12);color:inherit;border-radius:10px;min-height:42px;cursor:pointer;font:600 .95rem inherit;font-family:inherit}
 .ibtn{width:42px;display:grid;place-items:center}
@@ -194,3 +195,26 @@ textarea{resize:vertical;min-height:70px}
 .nrow .dot{margin-right:0}
 .act-label{pointer-events:none}
 .act-label span{position:absolute;transform:translate(-50%,-50%);white-space:nowrap;font:600 11px system-ui,sans-serif;color:#fff;background:rgba(16,32,24,.78);border-left:4px solid;padding:2px 6px;border-radius:3px}
+/* obras y árbol de capas */
+.obra-card{width:100%;text-align:left;display:flex;flex-direction:column;gap:2px;border:1px solid var(--line);border-left:4px solid var(--go);background:var(--bg2);color:var(--fg);border-radius:12px;padding:10px 12px;margin:10px 0 4px;cursor:pointer;font:inherit}
+.obra-card small{color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.08em}
+.obra-card b{font-size:1.05rem}
+.obra-card span{color:var(--accent);font-size:.82rem;font-weight:600}
+.tree{display:flex;flex-direction:column;gap:8px}
+.folder{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.fhead{display:flex;align-items:center;gap:6px;padding:4px 8px;background:var(--bg2)}
+.fhead input{width:20px;height:20px;accent-color:var(--accent);flex:none}
+.fname{flex:1;min-width:0;display:flex;align-items:center;gap:6px;background:none;border:0;color:var(--fg);font:600 .92rem inherit;font-family:inherit;padding:8px 2px;cursor:pointer;text-align:left}
+.fname .caret svg{width:16px;height:16px}
+.fname svg{width:18px;height:18px;color:var(--muted)}
+.fname .ft{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fname small{color:var(--muted);font-weight:500}
+.fbody .lyr{border-bottom:1px solid var(--line)}
+.fbody .lyr:last-child{border-bottom:0}
+.fbody .lrow{padding-left:20px}
+.obras{display:flex;flex-direction:column;gap:8px}
+.obra{border:1px solid var(--line);border-radius:12px;padding:6px 10px 10px}
+.obra.on{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.otitle{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;background:none;border:0;color:var(--fg);font:inherit;text-align:left;padding:6px 0;cursor:pointer}
+.otitle small{color:var(--muted)}
+.otitle em{color:var(--accent);font-style:normal;font-weight:600}

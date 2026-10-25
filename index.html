@@ -17,7 +17,7 @@
 
 <header class="bar">
   <button id="btnMenu" class="ibtn" type="button" aria-label="Capas, mapa base y herramientas"></button>
-  <div class="brand">OBRA<b>-GIS</b></div>
+  <button id="btnObra" class="brand" type="button" aria-label="Obras"><span>OBRA<b>-GIS</b></span><small id="obraName"></small></button>
   <button id="btnImport" class="tbtn" type="button">Importar</button>
 </header>
 
@@ -53,6 +53,7 @@
 <input type="file" id="inPhoto" accept="image/*" capture="environment" hidden>
 <input type="file" id="inVideo" accept="video/*" capture="environment" hidden>
 <input type="file" id="inPhotosImport" accept="image/jpeg,image/*" multiple hidden>
+<input type="file" id="inObra" accept=".zip,application/zip" hidden>
 <input type="file" id="inGallery" accept="image/*,video/*,audio/*" multiple hidden>
 
 <script src="vendor/leaflet.js"></script>
