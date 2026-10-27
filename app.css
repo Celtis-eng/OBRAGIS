@@ -1,4 +1,4 @@
-/* Campo KML — app de campo: barra verde monte, acción principal naranja alta visibilidad */
+/* OBRA-GIS v1.9.0 (2026-10-25) — estilos. Barra verde monte, acción principal naranja de alta visibilidad */
 :root{
   --bar:#0b3d2e; --bar-fg:#f2f7f4;
   --bg:#ffffff; --bg2:#f1f5f2; --fg:#16211c; --muted:#5b6b63; --line:#d5ddd8;
@@ -218,3 +218,12 @@ textarea{resize:vertical;min-height:70px}
 .otitle{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;background:none;border:0;color:var(--fg);font:inherit;text-align:left;padding:6px 0;cursor:pointer}
 .otitle small{color:var(--muted)}
 .otitle em{color:var(--accent);font-style:normal;font-weight:600}
+/* versión y novedades */
+.version{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:22px;padding-top:12px;border-top:1px solid var(--line);font-size:.85rem;color:var(--muted)}
+.version b{color:var(--fg)}
+.news{display:flex;flex-direction:column;gap:10px;margin-top:8px}
+.nv{display:grid;grid-template-columns:72px 1fr;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.nv div{display:flex;flex-direction:column}
+.nv small{color:var(--muted);font-size:.75rem}
+.nv p{margin:0;font-size:.9rem}
+.nv.on b{color:var(--accent)}

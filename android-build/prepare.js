@@ -1,4 +1,4 @@
-// Prepara el proyecto Android de Campo KML.
+// Prepara el proyecto Android de OBRA-GIS. La versión se toma de APP_VERSION en app.js.
 //   node prepare.js www      → copia la web (carpeta raíz del repositorio) a www/
 //   node prepare.js android  → personaliza el proyecto generado por "npx cap add android"
 const fs = require('fs');
@@ -82,7 +82,9 @@ ${data(['image/*', ...kmlTypes, 'application/octet-stream'])}
   const run = parseInt(process.env.GITHUB_RUN_NUMBER || '1', 10);
   const bg = path.join(app, 'build.gradle');
   let g = fs.readFileSync(bg, 'utf8');
-  g = g.replace(/versionCode \d+/, `versionCode ${run}`).replace(/versionName "[^"]*"/, `versionName "1.0.${run}"`);
+  const m = /const APP_VERSION = '([^']+)'/.exec(fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8'));
+  const ver = m ? m[1] : '1.0.0';
+  g = g.replace(/versionCode \d+/, `versionCode ${run}`).replace(/versionName "[^"]*"/, `versionName "${ver}"`);
   fs.writeFileSync(bg, g);
-  console.log(`Proyecto Android preparado (versión 1.0.${run})`);
+  console.log(`Proyecto Android preparado: versión ${ver} (compilación ${run})`);
 }

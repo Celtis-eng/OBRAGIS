@@ -1,5 +1,7 @@
 # OBRA-GIS
 
+**Versión actual: 1.9.0** · historial completo en [CHANGELOG.md](CHANGELOG.md)
+
 App de campo para Android (también funciona en iPhone y en el ordenador) que:
 
 - Abre ficheros **KML y KMZ** (con sus colores, carpetas, descripciones y atributos) sobre **ortofoto híbrida**.
@@ -84,3 +86,7 @@ El repositorio compila la app Android solo, con GitHub Actions, cada vez que sub
 **Fotos con GPS en la app nativa:** la forma más fiable es seleccionarlas en la Galería y usar Compartir → OBRA-GIS. Así la app puede pedir a Android la foto original con las coordenadas.
 
 **Google híbrido en la app nativa:** si restringes la clave de Google por sitio web, añade `https://localhost/*` a la lista.
+
+## Versiones
+
+Cada entrega lleva su número de versión (`APP_VERSION` en `app.js` y `VERSION` en `sw.js`). Dentro de la app se ve en **Capas → final del panel → Novedades**. El historial está en `CHANGELOG.md`.

@@ -1,7 +1,25 @@
 'use strict';
-/* OBRA-GIS — visor de KML/KMZ sobre ortofoto con gestor de capas, anotaciones
+/* OBRA-GIS v1.9.0 (2026-10-25) — visor de KML/KMZ sobre ortofoto con gestor de capas, anotaciones
    georreferenciadas (fotos, vídeos, notas de voz y texto), importación de fotos con GPS
    y navegación con Google Maps. Funciona como web instalable y como app nativa (Capacitor). */
+
+/* ---------------- Versión de la app ----------------
+   Cambia APP_VERSION en cada entrega (también se usa como versión de la app Android).
+   Formato MAYOR.MENOR.CORRECCIÓN: menor = función nueva, corrección = arreglo. */
+const APP_VERSION = '1.9.0';
+const APP_DATE = '2026-10-25';
+const CHANGELOG = [
+  ['1.9.0', '25/10/2026', 'Control de versiones: número de versión visible, historial de novedades y versión en los paquetes de obra.'],
+  ['1.8.0', '25/10/2026', 'Obras: cada obra guarda sus capas y datos. Árbol de capas por carpetas. Paquete de obra (.zip) para exportar, compartir e importar en otro móvil.'],
+  ['1.7.0', '25/10/2026', 'Actuaciones en trazas (escolleras, badenes, cunetas…) por PK, margen y fotos. Listado y exportación a Excel (CSV) y KMZ.'],
+  ['1.6.0', '25/10/2026', 'Pendiente media y perfil longitudinal de una traza o un tramo (por PK o tocando el mapa). Cotas del KML o del MDT05 del IGN.'],
+  ['1.5.0', '25/10/2026', 'Marcas de PK cada 100 m en las trazas según el zoom. PK del punto tocado.'],
+  ['1.4.0', '23/10/2026', 'La app pasa a llamarse OBRA-GIS.'],
+  ['1.3.0', '23/10/2026', 'Catálogo de servicios públicos (DERA, REDIAM, MITECO, Catastro, SIGPAC), kit de afecciones y consulta de afecciones en un punto.'],
+  ['1.2.0', '22/10/2026', 'Fotos con GPS, gestor de capas con servicios WMS y versión nativa Android compilada en GitHub.'],
+  ['1.1.0', '22/10/2026', 'Abrir KML/KMZ compartidos desde otras apps.'],
+  ['1.0.0', '22/10/2026', 'Primera versión: visor de KML/KMZ sobre ortofoto, navegación con Google Maps, anotaciones con fotos, vídeo y voz.'],
+];
 
 const $ = (s, r = document) => r.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -1796,7 +1814,7 @@ async function exportObraPackage(id) {
   Z.file('datos/fotos_importadas.geojson', fc(notePts.filter(f => f.properties.capa_id)));
   Z.file('datos/actuaciones.geojson', fc(actFeats));
   Z.file('datos/actuaciones.csv', actsCSV(ats.sort((a, b) => (a.traceName || '').localeCompare(b.traceName || '') || a.d0 - b.d0)));
-  Z.file('obra.json', JSON.stringify({ formato: 'OBRA-GIS', version: 1, exportado: new Date().toISOString(),
+  Z.file('obra.json', JSON.stringify({ formato: 'OBRA-GIS', version: 1, app_version: APP_VERSION, exportado: new Date().toISOString(),
     obra: { id: o.id, nombre: o.name, descripcion: o.desc || '', creada: new Date(o.created).toISOString() },
     sistema_referencia: 'WGS84 / ETRS89 geográficas (EPSG:4326)', capas,
     resumen: { capas: capas.length, anotaciones: notePts.length, actuaciones: actFeats.length } }, null, 2));
@@ -1881,6 +1899,12 @@ function askImportMode(name) {
     b.querySelectorAll('[data-m]').forEach(bt => bt.onclick = () => { done = true; closeSheet(); res(bt.dataset.m || null); });
     onSheetClose(() => { if (!done) res(null); });
   });
+}
+
+/* ---------------- Novedades por versión ---------------- */
+function newsSheet() {
+  openSheet(`<h2>Novedades</h2><p class="sub">Versión instalada: <b>v${APP_VERSION}</b> (${APP_DATE.split('-').reverse().join('/')})</p>
+    <div class="news">${CHANGELOG.map(([v, d, t], i) => `<div class="nv ${i === 0 ? 'on' : ''}"><div><b>v${v}</b><small>${d}</small></div><p>${esc(t)}</p></div>`).join('')}</div>`);
 }
 
 /* ---------------- Medición ---------------- */
@@ -2106,7 +2130,8 @@ async function renderDrawer() {
       <input type="password" id="gKey" autocomplete="off" placeholder="AIza…" value="${esc(settings.googleKey)}">
       <button class="mini" id="gKeySave" type="button">Guardar clave</button>
       <p class="hint">Solo hace falta para el fondo Google híbrido. La ortofoto PNOA del IGN funciona sin clave.</p></div>
-    <p class="hint">${storage}${NATIVE ? ' · App Android' : ''}</p>`;
+    <div class="version"><span>OBRA-GIS <b>v${APP_VERSION}</b> · ${NATIVE ? 'app Android' : 'versión web'}</span><button class="mini" data-t="news" type="button">Novedades</button></div>
+    <p class="hint">${storage}</p>`;
   d.scrollTop = scroll;
 
   $('#dClose').onclick = closeDrawer;
@@ -2141,6 +2166,7 @@ async function renderDrawer() {
   });
   d.querySelector('[data-t=add]').onclick = () => { closeDrawer(); importMenu(); };
   d.querySelector('[data-t=obras]').onclick = () => { closeDrawer(); obrasSheet(); };
+  d.querySelector('[data-t=news]').onclick = () => { closeDrawer(); newsSheet(); };
   d.querySelectorAll('[data-fold]').forEach(bt => bt.onclick = () => { settings.collapsed = settings.collapsed || {}; settings.collapsed[bt.dataset.fold] = !settings.collapsed[bt.dataset.fold]; saveSettings(); renderDrawer(); });
   d.querySelectorAll('[data-fvis]').forEach(c => c.onchange = async () => { for (const id of folderIds.get(c.dataset.fvis) || []) await setLayerVisible(id, c.checked); renderDrawer(); });
   d.querySelectorAll('[data-movefolder]').forEach(bt => bt.onclick = async () => {
@@ -2275,5 +2301,7 @@ function nativeInbox() { // app nativa: «Abrir con» y «Compartir»
   }
   if (new URLSearchParams(location.search).has('shared')) { history.replaceState(null, '', './'); receiveShared(); }
   drawPK();
-  if (!layers.size && !notes.size) toast('Pulsa Importar para abrir un KML, un KMZ o fotos con GPS. Mantén pulsado en el mapa para ver las opciones de un punto.', 8000);
+  if (settings.lastVersion && settings.lastVersion !== APP_VERSION) { toast(`OBRA-GIS actualizada a la versión ${APP_VERSION}. Novedades en Capas → Novedades.`, 7000); }
+  if (settings.lastVersion !== APP_VERSION) { settings.lastVersion = APP_VERSION; saveSettings(); }
+  else if (!layers.size && !notes.size) toast('Pulsa Importar para abrir un KML, un KMZ o fotos con GPS. Mantén pulsado en el mapa para ver las opciones de un punto.', 8000);
 })();
