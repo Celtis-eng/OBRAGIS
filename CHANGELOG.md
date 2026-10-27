@@ -6,7 +6,8 @@ La app Android toma la misma versión; el número de compilación lo pone GitHub
 
 | Versión | Fecha | Cambios |
 |---|---|---|
-| **1.9.0** | 25/10/2026 | Control de versiones: número de versión visible en la app, pantalla de novedades, aviso al actualizar, versión en los paquetes de obra y en la app Android. |
+| **1.10.0** | 27/10/2026 | Anchos del camino: toma de datos cada X metros o en cada cambio, ancho medio ponderado, mínimo, máximo y superficie (también por tramos), plataforma dibujada en el mapa y exportación a CSV y GeoJSON. Trazas nuevas dibujando en el mapa o grabando con GPS. |
+| 1.9.0 | 25/10/2026 | Control de versiones: número de versión visible en la app, pantalla de novedades, aviso al actualizar, versión en los paquetes de obra y en la app Android. |
 | 1.8.0 | 25/10/2026 | Obras: cada obra guarda sus capas y datos. Árbol de capas por carpetas. Paquete de obra (.zip) para exportar, compartir e importar en otro móvil. |
 | 1.7.0 | 25/10/2026 | Actuaciones en trazas (escolleras, badenes, cunetas…) por PK, margen y fotos. Listado y exportación a CSV y KMZ. |
 | 1.6.0 | 25/10/2026 | Pendiente media y perfil longitudinal de una traza o tramo. Cotas del KML o del MDT05 del IGN. |

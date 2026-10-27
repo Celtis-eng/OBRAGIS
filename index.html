@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- OBRA-GIS v1.9.0 (2026-10-25) -->
+<!-- OBRA-GIS v1.10.0 (2026-10-27) -->
 <html lang="es">
 <head>
 <meta charset="utf-8">
@@ -11,7 +11,7 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="vendor/leaflet.css">
-<link rel="stylesheet" href="app.css?v=1.9.0">
+<link rel="stylesheet" href="app.css?v=1.10.0">
 </head>
 <body>
 <div id="map"></div>
@@ -31,6 +31,13 @@
 <div id="pickBar" class="mbar pick" hidden>
   <span id="pickText">Toca en el mapa el inicio del tramo</span>
   <button id="pickCancel" class="tbtn" type="button">Cancelar</button>
+</div>
+
+<div id="drawBar" class="mbar draw" hidden>
+  <span id="drawText">Dibujando</span>
+  <button id="drawUndo" class="tbtn" type="button">Deshacer</button>
+  <button id="drawEnd" class="tbtn" type="button">Terminar</button>
+  <button id="drawCancel" class="tbtn" type="button" aria-label="Cancelar">✕</button>
 </div>
 
 <div class="fabs">
@@ -59,6 +66,6 @@
 
 <script src="vendor/leaflet.js"></script>
 <script src="vendor/jszip.min.js"></script>
-<script src="app.js?v=1.9.0"></script>
+<script src="app.js?v=1.10.0"></script>
 </body>
 </html>

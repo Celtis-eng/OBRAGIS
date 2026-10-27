@@ -1,14 +1,15 @@
 'use strict';
-/* OBRA-GIS v1.9.0 (2026-10-25) — visor de KML/KMZ sobre ortofoto con gestor de capas, anotaciones
+/* OBRA-GIS v1.10.0 (2026-10-27) — visor de KML/KMZ sobre ortofoto con gestor de capas, anotaciones
    georreferenciadas (fotos, vídeos, notas de voz y texto), importación de fotos con GPS
    y navegación con Google Maps. Funciona como web instalable y como app nativa (Capacitor). */
 
 /* ---------------- Versión de la app ----------------
    Cambia APP_VERSION en cada entrega (también se usa como versión de la app Android).
    Formato MAYOR.MENOR.CORRECCIÓN: menor = función nueva, corrección = arreglo. */
-const APP_VERSION = '1.9.0';
-const APP_DATE = '2026-10-25';
+const APP_VERSION = '1.10.0';
+const APP_DATE = '2026-10-27';
 const CHANGELOG = [
+  ['1.10.0', '27/10/2026', 'Anchos del camino: datos cada X metros o en cada cambio de ancho, ancho medio, mínimo, máximo y superficie, también por tramos. Plataforma dibujada en el mapa. Trazas nuevas dibujando en el mapa o grabando con el GPS.'],
   ['1.9.0', '25/10/2026', 'Control de versiones: número de versión visible, historial de novedades y versión en los paquetes de obra.'],
   ['1.8.0', '25/10/2026', 'Obras: cada obra guarda sus capas y datos. Árbol de capas por carpetas. Paquete de obra (.zip) para exportar, compartir e importar en otro móvil.'],
   ['1.7.0', '25/10/2026', 'Actuaciones en trazas (escolleras, badenes, cunetas…) por PK, margen y fotos. Listado y exportación a Excel (CSV) y KMZ.'],
@@ -38,6 +39,8 @@ const ICON = {
   plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
   nav: '<svg viewBox="0 0 24 24"><path d="M3 11l18-8-8 18-2-8z"/></svg>',
   close: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  width: '<svg viewBox="0 0 24 24"><path d="M5 3v18M19 3v18M8 12h8M8 12l2-2M8 12l2 2M16 12l-2-2M16 12l-2 2"/></svg>',
+  pen: '<svg viewBox="0 0 24 24"><path d="M4 20l4-1 11-11-3-3L5 16z"/></svg>',
   road: '<svg viewBox="0 0 24 24"><path d="M8 3L4 21M16 3l4 18M12 4v3M12 10v3M12 16v3"/></svg>',
   slope: '<svg viewBox="0 0 24 24"><path d="M3 19L21 7M3 19h18M15 19v-8"/></svg>',
   ruler: '<svg viewBox="0 0 24 24"><path d="M3 17L17 3l4 4L7 21zM7 13l2 2M10 10l2 2M13 7l2 2"/></svg>',
@@ -563,7 +566,7 @@ function drawPK() {
     }
   }
 }
-let pkT; map.on('moveend', () => { clearTimeout(pkT); pkT = setTimeout(() => { drawPK(); drawActs(); }, 60); });
+let pkT; map.on('moveend', () => { clearTimeout(pkT); pkT = setTimeout(() => { drawPK(); drawActs(); drawWidths(); }, 60); });
 
 function buildKml(entry) {
   const { rec } = entry;
@@ -579,7 +582,7 @@ function buildKml(entry) {
       else lyr = L.circleMarker(p.c[0], { radius: 7, color: '#fff', weight: 2, opacity: op, fillColor: st.icon || rec.color, fillOpacity: op });
       lyr.on('click', e => {
         L.DomEvent.stop(e);
-        if (slopePick || actPick) return slopePickPoint(e.latlng);
+        if (drawing && !drawing.gps) return addDrawPt(L.latLng(e && e.latlng ? e.latlng : e)); if (slopePick || actPick || widthPick) return slopePickPoint(e.latlng);
         if (measure) return addMeasurePt(e.latlng);
         featureSheet(f, e.latlng, rec);
       });
@@ -614,7 +617,7 @@ function registerLayer(rec) {
 }
 function rebuildLayer(id) {
   const e = layers.get(id); if (!e) return;
-  setTimeout(() => { drawPK(); drawActs(); }, 0);
+  setTimeout(() => { drawPK(); drawActs(); drawWidths(); }, 0);
   if (e.group || e.tile) map.removeLayer(mapLayerOf(e));
   if (typeOf(e.rec) === 'kml') buildKml(e); else if (typeOf(e.rec) === 'wms') buildRaster(e);
   if (e.rec.visible) mapLayerOf(e).addTo(map);
@@ -630,7 +633,7 @@ function applyOrder() {
   });
 }
 async function setLayerVisible(id, on) {
-  setTimeout(() => { drawPK(); drawActs(); }, 0);
+  setTimeout(() => { drawPK(); drawActs(); drawWidths(); }, 0);
   if (id === 'acts') { settings.actsVisible = on; saveSettings(); drawActs(); return; }
   if (id === 'notes') { settings.notesVisible = on; saveSettings(); on ? pointGroup('notes').addTo(map) : map.removeLayer(pointGroup('notes')); return; }
   const e = layers.get(id); if (!e) return;
@@ -691,7 +694,7 @@ function featureSheet(f, ll, rec) {
   }
   const noteAt = f.type === 'pt' ? { lat: f.start[0], lng: f.start[1] } : ll;
   acts += `<button class="btn" data-a="note">${ICON.note}Anotar aquí</button><button class="btn" data-a="fit">Encuadrar</button>`;
-  if (f.type === 'ln') acts += `<button class="btn go full" data-a="newact">${ICON.road}Nueva actuación en esta traza</button><button class="btn pri full" data-a="slope">${ICON.slope}Pendiente y perfil</button>`;
+  if (f.type === 'ln') acts += `<button class="btn go full" data-a="newact">${ICON.road}Nueva actuación en esta traza</button><button class="btn pri" data-a="slope">${ICON.slope}Pendiente</button><button class="btn pri" data-a="width">${ICON.width}Anchos</button>`;
   acts += `<button class="btn" data-a="copy">${ICON.copy}Copiar coordenadas</button><button class="btn" data-a="measure">${ICON.ruler}Medir desde aquí</button>`;
 
   let coords = '';
@@ -718,6 +721,8 @@ function featureSheet(f, ll, rec) {
   b.querySelector('[data-a=measure]').onclick = () => { closeSheet(); startMeasure(ll); };
   const sl = b.querySelector('[data-a=slope]');
   if (sl) sl.onclick = () => slopeSheet(f, rec, 0, f.length);
+  const wb = b.querySelector('[data-a=width]');
+  if (wb) wb.onclick = () => widthSheet(rec, f);
   const na = b.querySelector('[data-a=newact]');
   if (na) na.onclick = () => { const d = pkAt(f, ll).d; openActEditor({ rec, f, d0: d, d1: d }); };
 }
@@ -805,12 +810,16 @@ function importMenu() {
       <button class="btn full" data-a="photos">${ICON.gallery}Fotos con coordenadas GPS</button>
       <button class="btn full" data-a="service">${ICON.wms}Capa de un servicio (WMS)</button>
       <button class="btn full" data-a="obra">${ICON.folder}Obra completa (paquete .zip)</button>
+      <button class="btn" data-a="drawtap">${ICON.pen}Dibujar traza nueva</button>
+      <button class="btn" data-a="drawgps">${ICON.locate}Grabar traza con GPS</button>
     </div>
     <p class="hint">Las fotos se sitúan solas si la cámara guardó la ubicación. ${NATIVE ? '' : 'En Android, si llegan sin posición, elígelas desde «Archivos» y no desde la galería.'}</p>`);
   b.querySelector('[data-a=kml]').onclick = () => { closeSheet(); $('#inKml').click(); };
   b.querySelector('[data-a=photos]').onclick = () => { closeSheet(); $('#inPhotosImport').click(); };
   b.querySelector('[data-a=service]').onclick = serviceMenu;
   b.querySelector('[data-a=obra]').onclick = () => { closeSheet(); $('#inObra').click(); };
+  b.querySelector('[data-a=drawtap]').onclick = () => { closeSheet(); startDrawing(false); };
+  b.querySelector('[data-a=drawgps]').onclick = () => { closeSheet(); startDrawing(true); };
 }
 let catalogQuery = '', catalogOpen = 'energia';
 function serviceMenu() {
@@ -894,7 +903,7 @@ let longFired = 0;
 })();
 
 function pointMenu(ll) {
-  if (slopePick || actPick) return slopePickPoint(ll);
+  if (drawing && !drawing.gps) return addDrawPt(L.latLng(ll)); if (slopePick || actPick || widthPick) return slopePickPoint(ll);
   if (measure) return addMeasurePt(ll);
   const queryable = orderedLayers().filter(e => e.rec.visible && e.tile && e.rec.kind === 'wms' && e.rec.info);
   const b = openSheet(`<h2>Punto seleccionado</h2><p class="sub">Pulsación larga${distFromMe(ll.lat, ll.lng)}</p>
@@ -992,6 +1001,7 @@ function geoErr(e) {
 }
 function onPos(p) {
   lastPos = { lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy, t: Date.now() };
+  if (drawing && drawing.gps) drawGpsPoint(lastPos);
   const ll = [lastPos.lat, lastPos.lng];
   if (!meMarker) {
     meCircle = L.circle(ll, { renderer: hlRenderer, radius: lastPos.acc, color: '#1c7ed6', weight: 1, fillOpacity: 0.12, interactive: false }).addTo(map);
@@ -1067,7 +1077,7 @@ function drawNote(n) {
   let m = noteMarkers.get(n.id);
   if (!m) {
     m = L.marker([n.lat, n.lng], { icon: pinIcon(noteType(n), n.dir) }).addTo(g);
-    m.on('click', e => { L.DomEvent.stop(e); if (slopePick || actPick) return slopePickPoint(e.latlng); if (measure) return addMeasurePt(e.latlng); viewNote(n.id); });
+    m.on('click', e => { L.DomEvent.stop(e); if (drawing && !drawing.gps) return addDrawPt(L.latLng(e && e.latlng ? e.latlng : e)); if (slopePick || actPick || widthPick) return slopePickPoint(e.latlng); if (measure) return addMeasurePt(e.latlng); viewNote(n.id); });
     noteMarkers.set(n.id, m);
   } else { m.setLatLng([n.lat, n.lng]).setIcon(pinIcon(noteType(n), n.dir)); }
 }
@@ -1406,7 +1416,7 @@ var slopePickPoint = function (ll) {
   slopePick = null; $('#pickBar').hidden = true;
   slopeSheet(sp.f, sp.rec, a, c, { source: sp.source, autorun: true });
 };
-$('#pickCancel').onclick = () => { slopePick = null; $('#pickBar').hidden = true; slopeHL.clearLayers(); if (actPick) { actPick = null; renderActEditor(); } };
+$('#pickCancel').onclick = () => { slopePick = null; $('#pickBar').hidden = true; slopeHL.clearLayers(); if (actPick) { actPick = null; renderActEditor(); } if (widthPick) { widthPick = null; renderWidthSheet(); } };
 
 const fmtPct = v => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(2).replace('.', ',') + ' %';
 const fmtZ = z => z.toFixed(2).replace('.', ',') + ' m';
@@ -1526,7 +1536,7 @@ function drawActs() {
         const ll = offsetLatLngs(c.length > 1 ? c : a.coords, px);
         lyr = L.circleMarker(ll[Math.floor(ll.length / 2)] || L.latLng(a.coords[0]), { radius: 7, color: '#fff', weight: 2, fillColor: col, fillOpacity: 1 });
       }
-      lyr.on('click', e => { L.DomEvent.stop(e); if (slopePick || actPick) return slopePickPoint(e.latlng); if (measure) return addMeasurePt(e.latlng); viewAct(a.id); });
+      lyr.on('click', e => { L.DomEvent.stop(e); if (drawing && !drawing.gps) return addDrawPt(L.latLng(e && e.latlng ? e.latlng : e)); if (slopePick || actPick || widthPick) return slopePickPoint(e.latlng); if (measure) return addMeasurePt(e.latlng); viewAct(a.id); });
       lyr.addTo(actsLayer);
     });
     if (z >= 17) {
@@ -1709,7 +1719,7 @@ async function clearMapData() {
   for (const e of layers.values()) { try { map.removeLayer(mapLayerOf(e)); } catch (_) {} }
   pointGroups.forEach(g => map.removeLayer(g));
   layers.clear(); pointGroups.clear(); notes.clear(); noteMarkers.clear(); acts.clear();
-  highlight.clearLayers(); slopeHL.clearLayers(); actsLayer.clearLayers(); pkLayer.clearLayers();
+  highlight.clearLayers(); slopeHL.clearLayers(); actsLayer.clearLayers(); pkLayer.clearLayers(); widthLayer.clearLayers();
 }
 async function loadObra(id, fit) {
   closeSheet(); await clearMapData();
@@ -1724,7 +1734,7 @@ async function loadObra(id, fit) {
   if (settings.notesVisible !== false) pointGroup('notes').addTo(map);
   for (const n of (await DB.all('notes')).filter(n => n.obraId === id)) { notes.set(n.id, n); drawNote(n); }
   for (const a of (await DB.all('acts')).filter(a => a.obraId === id)) acts.set(a.id, a);
-  drawActs(); drawPK();
+  drawActs(); drawPK(); drawWidths();
   if (fit) {
     const pts = [];
     layers.forEach(e => { if (e.group) { const b = e.group.getBounds(); if (b.isValid()) pts.push(b.getSouthWest(), b.getNorthEast()); } });
@@ -1797,7 +1807,7 @@ async function exportObraPackage(id) {
   });
   const capas = lays.map(r => {
     const c = { id: r.id, tipo: r.type || 'kml', nombre: r.name, carpeta: folderOf(r), orden: r.order || 0, visible: !!r.visible, opacidad: r.opacity ?? 1 };
-    if (c.tipo === 'kml') { c.archivo = `capas/kml/${safeName(r.name)}_${r.id}.kml`; c.color = r.color; Z.file(c.archivo, r.text); }
+    if (c.tipo === 'kml') { c.archivo = `capas/kml/${safeName(r.name)}_${r.id}.kml`; c.color = r.color; Z.file(c.archivo, r.text); if (r.widths && Object.keys(r.widths).length) c.anchos = r.widths; }
     if (c.tipo === 'wms') Object.assign(c, { servicio: r.kind, url: r.url, capas_wms: r.layers, consulta: r.info || '', cobertura: r.cover || '', atribucion: r.attribution || '', zoom_max_nativo: r.maxNative || null });
     return c;
   });
@@ -1813,6 +1823,8 @@ async function exportObraPackage(id) {
   Z.file('datos/anotaciones.geojson', fc(notePts.filter(f => !f.properties.capa_id)));
   Z.file('datos/fotos_importadas.geojson', fc(notePts.filter(f => f.properties.capa_id)));
   Z.file('datos/actuaciones.geojson', fc(actFeats));
+  const wx = widthsExport(lays.filter(r => (r.type || 'kml') === 'kml' && r.widths));
+  if (wx.rows > 1) { Z.file('datos/anchos.csv', wx.csv); Z.file('datos/anchos_superficie.geojson', fc(wx.polys)); }
   Z.file('datos/actuaciones.csv', actsCSV(ats.sort((a, b) => (a.traceName || '').localeCompare(b.traceName || '') || a.d0 - b.d0)));
   Z.file('obra.json', JSON.stringify({ formato: 'OBRA-GIS', version: 1, app_version: APP_VERSION, exportado: new Date().toISOString(),
     obra: { id: o.id, nombre: o.name, descripcion: o.desc || '', creada: new Date(o.created).toISOString() },
@@ -1825,6 +1837,8 @@ async function exportObraPackage(id) {
     'datos/fotos_importadas.geojson  Fotos situadas por sus coordenadas GPS',
     'datos/actuaciones.geojson    Actuaciones sobre las trazas (líneas o puntos) con tipo, margen y PK',
     'datos/actuaciones.csv        Listado de actuaciones para Excel',
+    'datos/anchos.csv             Anchos del camino por tramos (PK, ancho, longitud, superficie)',
+    'datos/anchos_superficie.geojson  Plataforma del camino con su ancho (polígonos, con superficie en m²)',
     'multimedia/                  Fotos, vídeos y notas de voz, enlazados desde los GeoJSON (campo multimedia)', '',
     'Para cargar la obra completa en otro móvil: abre este .zip con OBRA-GIS (Compartir → OBRA-GIS, o Obras → Importar obra).',
     'Los GeoJSON se abren directamente en QGIS (coordenadas EPSG:4326).'].join('\r\n'));
@@ -1858,6 +1872,7 @@ async function importObraPackage(file, zipIn) {
     if (c.tipo === 'kml') { const f = zip.file(pre + c.archivo); if (!f) continue; Object.assign(base, { text: await f.async('string'), color: c.color || PALETTE[0] }); }
     if (c.tipo === 'wms') Object.assign(base, { kind: c.servicio, url: c.url, layers: c.capas_wms, info: c.consulta, cover: c.cobertura, attribution: c.atribucion, maxNative: c.zoom_max_nativo || undefined });
     if (c.tipo === 'photos') base.order = 0;
+    if (c.anchos) base.widths = c.anchos;
     if (DEFAULT_FOLDER[c.tipo] === c.carpeta) delete base.folder;
     await DB.put('layers', base);
   }
@@ -1901,6 +1916,276 @@ function askImportMode(name) {
   });
 }
 
+/* ---------------- Anchos del camino ----------------
+   Dos formas de tomar datos sobre una traza:
+   · «interval»: estaciones cada X m; el ancho varía linealmente entre estaciones.
+   · «changes»: puntos de cambio; cada ancho vale desde su PK hasta el siguiente cambio (o el final). */
+const fmtW = w => (Math.round(w * 100) / 100).toFixed(2).replace('.', ',') + ' m';
+const fmtArea = a => (a >= 10000 ? (a / 10000).toFixed(3).replace('.', ',') + ' ha' : thousands(a) + ' m²');
+const parseNum = t => { const v = parseFloat(String(t || '').replace(',', '.')); return isFinite(v) ? v : NaN; };
+function widthSegments(data, f) {
+  const pts = (data.points || []).filter(p => isFinite(p.w) && p.w > 0 && isFinite(p.d)).sort((a, b) => a.d - b.d);
+  const segs = [];
+  if (!pts.length) return segs;
+  if (data.mode === 'changes') {
+    pts.forEach((p, i) => { const b = i + 1 < pts.length ? pts[i + 1].d : f.length; if (b > p.d) segs.push({ a: p.d, b, wa: p.w, wb: p.w }); });
+  } else {
+    for (let i = 0; i + 1 < pts.length; i++) if (pts[i + 1].d > pts[i].d) segs.push({ a: pts[i].d, b: pts[i + 1].d, wa: pts[i].w, wb: pts[i + 1].w });
+  }
+  return segs;
+}
+function widthAt(segs, d) {
+  for (const s of segs) if (d >= s.a && d <= s.b) return s.b > s.a ? s.wa + (s.wb - s.wa) * (d - s.a) / (s.b - s.a) : s.wa;
+  return null;
+}
+function widthStats(segs, d0 = -Infinity, d1 = Infinity) {
+  let len = 0, area = 0, min = Infinity, max = -Infinity, from = Infinity, to = -Infinity;
+  for (const s of segs) {
+    const a = Math.max(s.a, d0), b = Math.min(s.b, d1); if (b <= a) continue;
+    const wa = widthAt([s], a), wb = widthAt([s], b);
+    len += b - a; area += (wa + wb) / 2 * (b - a);
+    min = Math.min(min, wa, wb); max = Math.max(max, wa, wb); from = Math.min(from, a); to = Math.max(to, b);
+  }
+  return len ? { len, area, mean: area / len, min, max, from, to } : null;
+}
+// Polígono de la plataforma: desplaza el eje ±ancho/2 en metros, perpendicular a la traza
+function widthPolygon(f, segs) {
+  const out = [];
+  segs.forEach(sg => {
+    const ds = new Set([sg.a, sg.b]);
+    for (let d = sg.a; d < sg.b; d += 5) ds.add(d);
+    vertexTable(f).forEach(v => { if (v.d > sg.a && v.d < sg.b) ds.add(v.d); });
+    const list = [...ds].sort((a, b) => a - b), left = [], right = [];
+    list.forEach(d => {
+      const p = pointAtPK(f, d), q0 = pointAtPK(f, Math.max(0, d - 1)), q1 = pointAtPK(f, Math.min(f.length, d + 1));
+      const k = Math.cos(p.lat * Math.PI / 180), ex = (q1.lng - q0.lng) * 111320 * k, ny = (q1.lat - q0.lat) * 111320;
+      const l = Math.hypot(ex, ny) || 1, nx = -ny / l, nn = ex / l, h = widthAt([sg], d) / 2;
+      left.push([p.lat + nn * h / 111320, p.lng + nx * h / (111320 * k)]);
+      right.push([p.lat - nn * h / 111320, p.lng - nx * h / (111320 * k)]);
+    });
+    if (list.length > 1) out.push({ ring: [...left, ...right.reverse()], seg: sg });
+  });
+  return out;
+}
+const widthLayer = L.layerGroup().addTo(map);
+function drawWidths() {
+  widthLayer.clearLayers();
+  const z = map.getZoom(); if (z < 15) return;
+  const bounds = map.getBounds().pad(0.2);
+  for (const e of layers.values()) {
+    if (typeOf(e.rec) !== 'kml' || !e.rec.visible || !e.rec.widths) continue;
+    for (const [fi, data] of Object.entries(e.rec.widths)) {
+      const f = e.feats[+fi]; if (!f || data.show === false) continue;
+      const segs = widthSegments(data, f); if (!segs.length) continue;
+      const key = (data.updated || 0) + ':' + fi;
+      if (!f._wpoly || f._wkey !== key) { f._wpoly = widthPolygon(f, segs); f._wkey = key; }
+      f._wpoly.forEach(pg => {
+        if (!bounds.intersects(L.latLngBounds(pg.ring))) return;
+        L.polygon(pg.ring, { renderer: hlRenderer, color: '#ffffff', weight: 1, dashArray: '4 3', fillColor: '#ffd43b', fillOpacity: 0.22, interactive: false }).addTo(widthLayer);
+      });
+      if (z >= 17) (data.points || []).filter(p => p.w > 0).forEach(p => {
+        const c = pointAtPK(f, p.d); if (!bounds.contains([c.lat, c.lng])) return;
+        L.marker([c.lat, c.lng], { interactive: false, keyboard: false, pane: 'pk', icon: L.divIcon({ className: 'w-label', html: `<span>${fmtW(p.w)}</span>`, iconSize: [0, 0] }) }).addTo(widthLayer);
+      });
+    }
+  }
+}
+
+let wDraft = null, widthPick = null;
+function widthSheet(rec, f) {
+  const fi = layers.get(rec.id).feats.indexOf(f);
+  const saved = rec.widths && rec.widths[fi];
+  wDraft = saved ? JSON.parse(JSON.stringify({ ...saved, rec: undefined })) : { mode: 'interval', interval: 20, points: [] };
+  wDraft.points = (wDraft.points || []).map(p => ({ d: p.d, w: p.w == null ? NaN : p.w }));
+  Object.assign(wDraft, { recId: rec.id, fi, r0: '', r1: '' });
+  renderWidthSheet();
+}
+function wCtx() { const e = layers.get(wDraft.recId); return e ? { rec: e.rec, f: e.feats[wDraft.fi] } : null; }
+function syncWidth() {
+  if (!wDraft) return;
+  document.querySelectorAll('[data-wi]').forEach(inp => { const p = wDraft.points[+inp.dataset.wi]; if (p) p.w = parseNum(inp.value); });
+  const iv = $('#wInt'); if (iv) { const v = parseNum(iv.value); if (v > 0) wDraft.interval = v; }
+  ['wcPk', 'wcW', 'wR0', 'wR1'].forEach(id => { const el = $('#' + id); if (el) wDraft['_' + id] = el.value; });
+}
+function renderWidthSheet() {
+  const ctx = wCtx(); if (!ctx || !wDraft) return;
+  const { rec, f } = ctx, d = wDraft;
+  d.points.sort((a, b) => a.d - b.d);
+  const segs = widthSegments(d, f), st = widthStats(segs);
+  const rows = d.mode === 'interval'
+    ? (d.points.length ? `<div class="wtable">${d.points.map((p, i) => `<div class="wrow" id="wr${i}"><span>PK ${fmtPK(p.d)}</span><input type="text" inputmode="decimal" data-wi="${i}" value="${isFinite(p.w) ? String(p.w).replace('.', ',') : ''}" placeholder="ancho (m)"></div>`).join('')}</div>`
+      : '<p class="hint">Pulsa «Generar estaciones» para crear los puntos de toma de datos a lo largo de la traza.</p>')
+    : `<div class="wtable">${d.points.map((p, i) => `<div class="wrow"><span>Desde PK ${fmtPK(p.d)}</span><input type="text" inputmode="decimal" data-wi="${i}" value="${isFinite(p.w) ? String(p.w).replace('.', ',') : ''}"><button class="mini ic del" data-wdel="${i}" aria-label="Quitar">${ICON.close}</button></div>`).join('') || '<p class="hint">Añade el primer ancho, normalmente desde el PK 0+000.</p>'}</div>
+      <div class="wadd">
+        <div class="pkrow"><div class="field"><label for="wcPk">Desde PK</label><input type="text" id="wcPk" inputmode="decimal" value="${esc(d._wcPk ?? (d.points.length ? '' : '0+000'))}"></div>
+          <div class="field"><label for="wcW">Ancho (m)</label><input type="text" id="wcW" inputmode="decimal" value="${esc(d._wcW || '')}"></div></div>
+        <div class="row"><button class="mini" data-a="cgps">PK: mi posición</button><button class="mini" data-a="cmap">PK: tocar mapa</button><button class="mini pri" data-a="cadd">Añadir cambio</button></div>
+      </div>`;
+  const b = openSheet(`<h2>Anchos del camino</h2><p class="sub">${esc(f.name)} · ${esc(rec.name)} · ${fmtLen(f.length)}</p>
+    <div class="seg two"><button type="button" class="${d.mode === 'interval' ? 'on' : ''}" data-wmode="interval">Cada X metros</button><button type="button" class="${d.mode === 'changes' ? 'on' : ''}" data-wmode="changes">Cuando cambia</button></div>
+    ${d.mode === 'interval' ? `<div class="field row" style="margin-top:10px"><label for="wInt" class="grow">Separación entre estaciones (m)</label><input type="text" id="wInt" inputmode="decimal" value="${String(d.interval).replace('.', ',')}" style="max-width:80px"><button class="mini" data-a="gen">Generar estaciones</button></div>
+      <div class="row"><button class="mini" data-a="near">${ICON.locate}Estación más cercana a mí</button></div>` : '<p class="hint" style="margin-top:10px">Cada ancho vale desde su PK hasta el siguiente cambio o el final de la traza.</p>'}
+    ${rows}
+    <div id="wRes">${widthResultsHtml(st, d, f)}</div>
+    <div class="pkrow"><div class="field"><label for="wR0">Tramo desde PK</label><input type="text" id="wR0" inputmode="decimal" value="${esc(d._wR0 || '')}" placeholder="0+000"></div>
+      <div class="field"><label for="wR1">hasta PK</label><input type="text" id="wR1" inputmode="decimal" value="${esc(d._wR1 || '')}" placeholder="${fmtPK(f.length)}"></div></div>
+    <div class="acts">
+      <button class="btn" data-a="calc">${ICON.width}Recalcular</button>
+      <button class="btn" data-a="csv">Anchos a Excel (CSV)</button>
+      <label class="opt full"><input type="checkbox" id="wShow" ${d.show === false ? '' : 'checked'}>Dibujar la plataforma en el mapa</label>
+      <button class="btn pri full" data-a="save">Guardar anchos</button>
+      ${rec.widths && rec.widths[d.fi] ? '<button class="btn del full" data-a="clear">Borrar los anchos de esta traza</button>' : ''}
+    </div>`);
+  showSlopeSegment(f, 0, f.length);
+  onSheetClose(() => setTimeout(() => { if (!widthPick && !$('#wRes')) slopeHL.clearLayers(); }, 0));
+  b.querySelectorAll('[data-wmode]').forEach(bt => bt.onclick = () => {
+    syncWidth(); if (d.mode === bt.dataset.wmode) return;
+    if (d.points.some(p => p.w > 0) && !confirm('Al cambiar de forma de toma de datos se vacía la lista actual. ¿Continuar?')) return;
+    d.mode = bt.dataset.wmode; d.points = d.mode === 'changes' ? [] : d.points; renderWidthSheet();
+  });
+  b.querySelectorAll('[data-wi]').forEach(inp => inp.onchange = () => { syncWidth(); $('#wRes').innerHTML = widthResultsHtml(widthStats(widthSegments(d, f), ...rangeOf(f)), d, f); });
+  b.querySelectorAll('[data-wdel]').forEach(bt => bt.onclick = () => { syncWidth(); d.points.splice(+bt.dataset.wdel, 1); renderWidthSheet(); });
+  const gen = b.querySelector('[data-a=gen]');
+  if (gen) gen.onclick = () => {
+    syncWidth();
+    const step = d.interval, old = new Map(d.points.map(p => [Math.round(p.d), p.w])), pts = [];
+    for (let x = 0; x < f.length - 0.5; x += step) pts.push({ d: x, w: old.get(Math.round(x)) ?? NaN });
+    pts.push({ d: f.length, w: old.get(Math.round(f.length)) ?? NaN });
+    if (pts.length > 400) { toast('Salen demasiadas estaciones. Aumenta la separación.'); return; }
+    d.points = pts; renderWidthSheet(); toast(`${pts.length} estaciones cada ${String(step).replace('.', ',')} m`);
+  };
+  const near = b.querySelector('[data-a=near]');
+  if (near) near.onclick = async () => {
+    syncWidth(); if (!d.points.length) { toast('Genera primero las estaciones.'); return; }
+    try {
+      const p = await getPos(), r = pkAt(f, L.latLng(p.lat, p.lng));
+      let bi = 0; d.points.forEach((q, i) => { if (Math.abs(q.d - r.d) < Math.abs(d.points[bi].d - r.d)) bi = i; });
+      const row = $('#wr' + bi); row.scrollIntoView({ block: 'center', behavior: 'smooth' }); row.classList.add('hit'); row.querySelector('input').focus();
+      toast(`Estás en el PK ${fmtPK(r.d)}${r.off > 30 ? ` (a ${Math.round(r.off)} m de la traza)` : ''}. Estación más cercana: PK ${fmtPK(d.points[bi].d)}.`, 5000);
+    } catch (e) { toast(geoErr(e), 6000); }
+  };
+  const cgps = b.querySelector('[data-a=cgps]');
+  if (cgps) cgps.onclick = async () => { syncWidth(); try { const p = await getPos(), r = pkAt(f, L.latLng(p.lat, p.lng)); $('#wcPk').value = fmtPK(r.d); d._wcPk = fmtPK(r.d); if (r.off > 30) toast(`Estás a ${Math.round(r.off)} m de la traza: se usa el punto más cercano.`, 5000); $('#wcW').focus(); } catch (e) { toast(geoErr(e), 6000); } };
+  const cmap = b.querySelector('[data-a=cmap]');
+  if (cmap) cmap.onclick = () => { syncWidth(); widthPick = true; closeSheet(); $('#pickText').textContent = 'Toca en el mapa dónde cambia el ancho'; $('#pickBar').hidden = false; };
+  const cadd = b.querySelector('[data-a=cadd]');
+  if (cadd) cadd.onclick = () => {
+    syncWidth();
+    const pk = parsePK($('#wcPk').value), w = parseNum($('#wcW').value);
+    if (!isFinite(pk) || pk < 0 || pk > f.length + 0.5) { toast('Revisa el PK (entre 0+000 y ' + fmtPK(f.length) + ').'); return; }
+    if (!(w > 0)) { toast('Escribe el ancho en metros.'); return; }
+    d.points = d.points.filter(p => Math.abs(p.d - pk) > 0.5); d.points.push({ d: Math.min(pk, f.length), w });
+    d._wcPk = ''; d._wcW = ''; renderWidthSheet();
+  };
+  b.querySelector('[data-a=calc]').onclick = () => { syncWidth(); $('#wRes').innerHTML = widthResultsHtml(widthStats(widthSegments(d, f), ...rangeOf(f)), d, f); };
+  b.querySelector('[data-a=csv]').onclick = async () => {
+    syncWidth(); const x = widthsExport([{ ...rec, widths: { [d.fi]: { ...d } } }]);
+    if (x.rows <= 1) { toast('Todavía no hay anchos que exportar.'); return; }
+    try { await saveBlob(new Blob([x.csv], { type: 'text/csv' }), `anchos_${safeName(f.name)}_${new Date().toISOString().slice(0, 10)}.csv`); } catch (e) { if (!/cancel/i.test(e.message || '')) toast('No se pudo exportar.'); }
+  };
+  b.querySelector('[data-a=save]').onclick = async () => {
+    syncWidth();
+    const data = { mode: d.mode, interval: d.interval, points: d.points.filter(p => isFinite(p.d)).map(p => ({ d: +p.d.toFixed(2), w: isFinite(p.w) ? p.w : null })), show: $('#wShow').checked, updated: Date.now() };
+    rec.widths = { ...(rec.widths || {}), [d.fi]: data };
+    await updateLayer(rec.id, { widths: rec.widths }); drawWidths();
+    const s2 = widthStats(widthSegments(data, f));
+    toast(s2 ? `Anchos guardados. Ancho medio ${fmtW(s2.mean)} en ${fmtLen(s2.len)}.` : 'Anchos guardados.', 5000);
+  };
+  const clr = b.querySelector('[data-a=clear]');
+  if (clr) clr.onclick = async () => {
+    if (!confirm('¿Borrar todos los anchos de esta traza?')) return;
+    delete rec.widths[d.fi]; await updateLayer(rec.id, { widths: rec.widths }); drawWidths(); widthSheet(rec, f);
+  };
+}
+function rangeOf(f) { const a = parsePK($('#wR0') && $('#wR0').value), b = parsePK($('#wR1') && $('#wR1').value); return [isFinite(a) ? a : -Infinity, isFinite(b) ? b : Infinity]; }
+function widthResultsHtml(st, d, f) {
+  if (!st) return '<p class="hint">Introduce al menos ' + (d.mode === 'interval' ? 'dos estaciones con ancho' : 'un cambio de ancho') + ' para calcular.</p>';
+  const full = st.from <= 0.5 && st.to >= f.length - 0.5;
+  return `<div class="slope-main"><span>${fmtW(st.mean)}</span><small>ancho medio ponderado por longitud</small></div>
+    <table class="attrs">
+      <tr><td>Tramo calculado</td><td>PK ${fmtPK(st.from)} a ${fmtPK(st.to)} · ${fmtLen(st.len)}${full ? '' : ' (no cubre toda la traza)'}</td></tr>
+      <tr><td>Ancho mínimo / máximo</td><td>${fmtW(st.min)} / ${fmtW(st.max)}</td></tr>
+      <tr><td>Superficie</td><td>${fmtArea(st.area)}</td></tr>
+    </table>`;
+}
+var slopePickPoint2 = slopePickPoint;
+slopePickPoint = function (ll) {
+  if (!widthPick) return slopePickPoint2(ll);
+  widthPick = null; $('#pickBar').hidden = true;
+  const ctx = wCtx(); const r = pkAt(ctx.f, L.latLng(ll));
+  wDraft._wcPk = fmtPK(r.d); renderWidthSheet(); const w = $('#wcW'); if (w) w.focus();
+};
+function widthsExport(recs) {
+  const n = v => String(v).replace('.', ','), q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const rows = [['Capa', 'Traza', 'Forma de toma', 'PK inicio', 'PK fin', 'Ancho inicio (m)', 'Ancho fin (m)', 'Longitud (m)', 'Superficie (m2)']];
+  const polys = [];
+  recs.forEach(r => {
+    const feats = (layers.get(r.id) || {}).feats || parseKML(r.text).feats;
+    Object.entries(r.widths || {}).forEach(([fi, data]) => {
+      const f = feats[+fi]; if (!f) return;
+      const segs = widthSegments(data, f), st = widthStats(segs); if (!st) return;
+      segs.forEach(s => rows.push([r.name, f.name, data.mode === 'changes' ? 'Cambios de ancho' : `Cada ${data.interval} m`, fmtPK(s.a), fmtPK(s.b), n(s.wa), n(s.wb), n((s.b - s.a).toFixed(2)), n(((s.wa + s.wb) / 2 * (s.b - s.a)).toFixed(2))]));
+      rows.push([r.name, f.name, 'TOTAL', fmtPK(st.from), fmtPK(st.to), n(st.min.toFixed(2)) + ' mín', n(st.max.toFixed(2)) + ' máx', n(st.len.toFixed(2)), n(st.area.toFixed(2))]);
+      rows.push([r.name, f.name, 'ANCHO MEDIO', '', '', n(st.mean.toFixed(3)), '', '', '']);
+      widthPolygon(f, segs).forEach(pg => polys.push({ type: 'Feature', geometry: { type: 'Polygon', coordinates: [[...pg.ring, pg.ring[0]].map(c => [+c[1].toFixed(7), +c[0].toFixed(7)])] },
+        properties: { capa: r.name, traza: f.name, pk_inicio: fmtPK(pg.seg.a), pk_fin: fmtPK(pg.seg.b), ancho_inicio_m: pg.seg.wa, ancho_fin_m: pg.seg.wb,
+          longitud_m: +(pg.seg.b - pg.seg.a).toFixed(2), superficie_m2: +((pg.seg.wa + pg.seg.wb) / 2 * (pg.seg.b - pg.seg.a)).toFixed(2) } }));
+    });
+  });
+  return { csv: '\ufeff' + rows.map(r => r.map(q).join(';')).join('\r\n'), polys, rows: rows.length };
+}
+
+/* ---------------- Dibujar o grabar una traza nueva ---------------- */
+let drawing = null;
+function startDrawing(gps) {
+  if (drawing) endDrawing(false);
+  drawing = { gps, pts: [], line: L.polyline([], { renderer: hlRenderer, color: '#ff6b00', weight: 4, interactive: false }).addTo(map), dots: L.layerGroup().addTo(map) };
+  $('#drawBar').hidden = false; updateDrawBar();
+  if (gps) { if (!startWatch()) { endDrawing(false); return; } if (lastPos && Date.now() - lastPos.t < 10000) drawGpsPoint(lastPos); toast('Grabando: camina por el eje del camino. Se añade un punto cada 5 m.', 5000); }
+  else toast('Toca el mapa para ir añadiendo los vértices de la traza.', 4000);
+}
+function addDrawPt(ll) {
+  if (!drawing) return;
+  drawing.pts.push(L.latLng(ll.lat, ll.lng));
+  drawing.line.setLatLngs(drawing.pts);
+  if (!drawing.gps) L.circleMarker(ll, { renderer: hlRenderer, radius: 5, color: '#fff', weight: 2, fillColor: '#ff6b00', fillOpacity: 1, interactive: false }).addTo(drawing.dots);
+  updateDrawBar();
+}
+function drawGpsPoint(p) {
+  if (!drawing || (p.acc && p.acc > 25)) return;
+  const ll = L.latLng(p.lat, p.lng), last = drawing.pts[drawing.pts.length - 1];
+  if (!last || last.distanceTo(ll) >= 5) { addDrawPt(ll); map.panTo(ll, { animate: true }); }
+}
+function updateDrawBar() {
+  let len = 0; const p = drawing.pts; for (let i = 1; i < p.length; i++) len += p[i - 1].distanceTo(p[i]);
+  $('#drawText').textContent = `${drawing.gps ? 'Grabando con GPS' : 'Dibujando'} · ${p.length} puntos · ${fmtLen(len)}`;
+}
+function endDrawing(save) {
+  if (!drawing) return;
+  const pts = drawing.pts;
+  map.removeLayer(drawing.line); map.removeLayer(drawing.dots); $('#drawBar').hidden = true;
+  drawing = null;
+  if (!save) return;
+  if (pts.length < 2) { toast('La traza necesita al menos dos puntos.'); return; }
+  const b = openSheet(`<h2>Guardar traza</h2><p class="sub">${pts.length} puntos</p>
+    <div class="field"><input type="text" id="trName" placeholder="Nombre (p. ej. Camino de servicio C-3)" value="Traza ${new Date().toLocaleDateString('es-ES')}"></div>
+    <div class="acts"><button class="btn pri full" data-a="ok">Guardar como capa KML de la obra</button><button class="btn full" data-a="no">Descartar</button></div>`);
+  b.querySelector('[data-a=no]').onclick = closeSheet;
+  b.querySelector('[data-a=ok]').onclick = async () => {
+    const name = $('#trName').value.trim() || 'Traza nueva';
+    const text = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>${xml(name)}</name>\n<Placemark><name>${xml(name)}</name><LineString><tessellate>1</tessellate><coordinates>${pts.map(p => `${p.lng.toFixed(7)},${p.lat.toFixed(7)},0`).join(' ')}</coordinates></LineString></Placemark>\n</Document></kml>`;
+    const nk = [...layers.values()].filter(e => typeOf(e.rec) === 'kml').length;
+    const rec = { id: uid(), obraId: settings.activeObra, type: 'kml', name, text, color: PALETTE[nk % PALETTE.length], visible: true, opacity: 1, order: nextOrder(), created: Date.now(), drawn: true };
+    await DB.put('layers', rec);
+    const e = registerLayer(rec); drawPK();
+    closeSheet(); toast(`Traza «${name}» guardada en la obra.`);
+    const f = e.feats[0]; featureSheet(f, L.latLng(f.start[0], f.start[1]), rec);
+  };
+}
+$('#drawUndo').onclick = () => { if (!drawing || !drawing.pts.length) return; drawing.pts.pop(); drawing.line.setLatLngs(drawing.pts); const ds = drawing.dots.getLayers(); if (ds.length) drawing.dots.removeLayer(ds[ds.length - 1]); updateDrawBar(); };
+$('#drawEnd').onclick = () => endDrawing(true);
+$('#drawCancel').onclick = () => endDrawing(false);
+
 /* ---------------- Novedades por versión ---------------- */
 function newsSheet() {
   openSheet(`<h2>Novedades</h2><p class="sub">Versión instalada: <b>v${APP_VERSION}</b> (${APP_DATE.split('-').reverse().join('/')})</p>
@@ -1927,7 +2212,7 @@ function updateMeasure() {
   $('#mText').textContent = p.length < 2 ? 'Toca el mapa para añadir puntos' : `Distancia: ${fmtLen(d)} · ${p.length} puntos`;
 }
 function endMeasure() { if (!measure) return; map.removeLayer(measure.line); map.removeLayer(measure.marks); measure = null; $('#measureBar').hidden = true; }
-map.on('click', e => { if (slopePick || actPick) return slopePickPoint(e.latlng); if (measure) addMeasurePt(e.latlng); });
+map.on('click', e => { if (drawing && !drawing.gps) return addDrawPt(L.latLng(e && e.latlng ? e.latlng : e)); if (slopePick || actPick || widthPick) return slopePickPoint(e.latlng); if (measure) addMeasurePt(e.latlng); });
 $('#mUndo').onclick = () => {
   if (!measure || !measure.pts.length) return;
   measure.pts.pop(); measure.marks.clearLayers();

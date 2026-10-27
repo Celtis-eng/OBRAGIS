@@ -1,4 +1,4 @@
-/* OBRA-GIS v1.9.0 (2026-10-25) — estilos. Barra verde monte, acción principal naranja de alta visibilidad */
+/* OBRA-GIS v1.10.0 (2026-10-27) — estilos. Barra verde monte, acción principal naranja de alta visibilidad */
 :root{
   --bar:#0b3d2e; --bar-fg:#f2f7f4;
   --bg:#ffffff; --bg2:#f1f5f2; --fg:#16211c; --muted:#5b6b63; --line:#d5ddd8;
@@ -227,3 +227,18 @@ textarea{resize:vertical;min-height:70px}
 .nv small{color:var(--muted);font-size:.75rem}
 .nv p{margin:0;font-size:.9rem}
 .nv.on b{color:var(--accent)}
+/* anchos del camino y dibujo de trazas */
+.seg.two{grid-template-columns:1fr 1fr}
+.wtable{display:flex;flex-direction:column;max-height:38vh;overflow-y:auto;border:1px solid var(--line);border-radius:10px;margin:10px 0}
+.wrow{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--line)}
+.wrow:last-child{border-bottom:0}
+.wrow span{flex:1;font:500 .9rem ui-monospace,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+.wrow input{max-width:110px;text-align:right;font-variant-numeric:tabular-nums}
+.wrow.hit{background:color-mix(in srgb,var(--go) 18%,transparent)}
+.wadd{border:1px dashed var(--line);border-radius:10px;padding:8px 10px;margin:6px 0}
+.mini.pri{background:var(--accent);color:#fff;border-color:var(--accent)}
+.opt.full{grid-column:1/-1}
+.mbar.draw{background:#ff6b00;color:#fff}
+.mbar.draw .tbtn{background:rgba(0,0,0,.18);color:#fff}
+.w-label{pointer-events:none}
+.w-label span{position:absolute;transform:translate(-50%,-140%);white-space:nowrap;font:700 11px ui-monospace,Menlo,Consolas,monospace;color:#1f1a00;background:#ffd43b;padding:1px 5px;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.4)}

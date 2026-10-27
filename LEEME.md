@@ -1,6 +1,6 @@
 # OBRA-GIS
 
-**Versión actual: 1.9.0** · historial completo en [CHANGELOG.md](CHANGELOG.md)
+**Versión actual: 1.10.0** · historial completo en [CHANGELOG.md](CHANGELOG.md)
 
 App de campo para Android (también funciona en iPhone y en el ordenador) que:
 
