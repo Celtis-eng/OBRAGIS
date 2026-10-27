@@ -1,11 +1,11 @@
-/* OBRA-GIS v1.10.0 (2026-10-27) — service worker: app disponible sin conexión, teselas PNOA en caché
+/* OBRA-GIS v1.11.0 (2026-10-27) — service worker: app disponible sin conexión, teselas PNOA en caché
    y recepción de KML/KMZ compartidos desde otras apps.
    VERSION debe coincidir con APP_VERSION de app.js: al cambiarla, los móviles descargan la versión nueva. */
-const VERSION = '1.10.0';
+const VERSION = '1.11.0';
 const SHELL = 'shell-' + VERSION;
 const TILES = 'tiles-v1';
 const ASSETS = ['./', 'index.html', 'app.css', 'app.js', 'manifest.webmanifest',
-  'vendor/leaflet.js', 'vendor/leaflet.css', 'vendor/jszip.min.js',
+  'vendor/leaflet.js', 'vendor/leaflet.css', 'vendor/jszip.min.js', 'vendor/piexif.js',
   'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', e => {

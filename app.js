@@ -1,14 +1,15 @@
 'use strict';
-/* OBRA-GIS v1.10.0 (2026-10-27) — visor de KML/KMZ sobre ortofoto con gestor de capas, anotaciones
+/* OBRA-GIS v1.11.0 (2026-10-27) — visor de KML/KMZ sobre ortofoto con gestor de capas, anotaciones
    georreferenciadas (fotos, vídeos, notas de voz y texto), importación de fotos con GPS
    y navegación con Google Maps. Funciona como web instalable y como app nativa (Capacitor). */
 
 /* ---------------- Versión de la app ----------------
    Cambia APP_VERSION en cada entrega (también se usa como versión de la app Android).
    Formato MAYOR.MENOR.CORRECCIÓN: menor = función nueva, corrección = arreglo. */
-const APP_VERSION = '1.10.0';
+const APP_VERSION = '1.11.0';
 const APP_DATE = '2026-10-27';
 const CHANGELOG = [
+  ['1.11.0', '27/10/2026', 'Fotos con marca de agua: la app lee el texto de la marca (coordenadas, UTM, fecha, altitud), sitúa la foto y le vuelve a escribir los metadatos GPS. Las fotos hechas con la app llevan también GPS en sus metadatos. Compartir fotos con GPS.'],
   ['1.10.0', '27/10/2026', 'Anchos del camino: datos cada X metros o en cada cambio de ancho, ancho medio, mínimo, máximo y superficie, también por tramos. Plataforma dibujada en el mapa. Trazas nuevas dibujando en el mapa o grabando con el GPS.'],
   ['1.9.0', '25/10/2026', 'Control de versiones: número de versión visible, historial de novedades y versión en los paquetes de obra.'],
   ['1.8.0', '25/10/2026', 'Obras: cada obra guarda sus capas y datos. Árbol de capas por carpetas. Paquete de obra (.zip) para exportar, compartir e importar en otro móvil.'],
@@ -758,22 +759,34 @@ async function importFiles(files) {
 
 // Fotos con coordenadas en el EXIF → nueva capa de fotos
 async function importPhotos(files) {
-  const imgs = files.filter(f => f.type.startsWith('image/') || /\.jpe?g$/i.test(f.name));
+  const imgs = files.filter(f => f.type.startsWith('image/') || /\.(jpe?g|png|webp)$/i.test(f.name));
   if (!imgs.length) return;
   toast(`Leyendo ${imgs.length} foto${imgs.length > 1 ? 's' : ''}…`, 10000);
   const rec = { id: uid(), obraId: settings.activeObra, type: 'photos', name: 'Fotos ' + new Date().toLocaleDateString('es-ES'), visible: true, order: 0, created: Date.now() };
-  const added = [], missing = [];
+  const added = [], noExif = [], report = [];
   for (const f of imgs) {
     let ex = null;
     try { ex = await readExif(f); } catch (e) { ex = null; }
-    if (!ex || ex.lat == null) { missing.push(f.name); continue; }
-    const blob = await processImage(f, null, false);
-    added.push({
-      id: uid(), obraId: settings.activeObra, layerId: rec.id, lat: ex.lat, lng: ex.lng, acc: null, alt: ex.alt ?? null, dir: ex.dir ?? null, src: 'exif',
-      title: f.name.replace(/\.[^.]+$/, ''), text: '', created: ex.date || f.lastModified || Date.now(),
-      media: [{ id: uid(), kind: 'photo', blob, mime: blob.type || 'image/jpeg', t: Date.now() }],
-    });
+    if (!ex || ex.lat == null) { noExif.push(f); continue; }
+    let blob = await processImage(f, null, false);
+    blob = await writeExif(blob, { lat: ex.lat, lng: ex.lng, alt: ex.alt, date: ex.date });
+    added.push(photoNote(rec, f, blob, { lat: ex.lat, lng: ex.lng, alt: ex.alt ?? null, dir: ex.dir ?? null, src: 'exif', created: ex.date || f.lastModified || Date.now() }));
   }
+  // Fotos sin GPS en los metadatos (p. ej. recibidas por WhatsApp): se intenta leer la marca de agua
+  for (let i = 0; i < noExif.length; i++) {
+    const f = noExif[i];
+    toast(`Leyendo la marca de agua ${i + 1} de ${noExif.length}…`, 60000);
+    let r = null;
+    try { r = await ocrWatermark(f); } catch (e) { console.warn(e); r = { error: e.message || String(e) }; }
+    if (r && r.lat != null) {
+      let blob = await processImage(f, null, false);
+      blob = await writeExif(blob, { lat: r.lat, lng: r.lng, alt: r.alt, date: r.date, desc: r.text });
+      const n = photoNote(rec, f, blob, { lat: r.lat, lng: r.lng, alt: r.alt ?? null, acc: r.acc ?? null, src: 'marca', created: r.date || f.lastModified || Date.now(),
+        text: 'Datos recuperados de la marca de agua (' + r.method + '):\n' + r.text });
+      added.push(n); report.push({ name: f.name, ok: true, n, r });
+    } else report.push({ name: f.name, ok: false, r });
+  }
+  ocrDone();
   if (added.length) {
     try {
       await DB.put('layers', rec);
@@ -783,10 +796,189 @@ async function importPhotos(files) {
       zoomToLayer(rec.id);
     } catch (e) { toast('No se pudieron guardar las fotos: ' + (e.message || 'almacenamiento lleno'), 7000); return; }
   }
-  if (!missing.length) toast(`${added.length} fotos situadas en el mapa (capa «${rec.name}»).`, 5000);
-  else if (!added.length) toast(`Ninguna foto trae coordenadas. ${NATIVE ? '' : 'En Android, elígelas desde «Archivos» en lugar de la galería, porque la galería puede quitarles la ubicación. '}Comprueba también que la cámara tenía activada la ubicación.`, 10000);
-  else toast(`${added.length} fotos situadas. ${missing.length} sin coordenadas: ${missing.slice(0, 3).join(', ')}${missing.length > 3 ? '…' : ''}`, 8000);
+  const fromExif = added.length - report.filter(x => x.ok).length;
+  if (report.length) watermarkReport(report, fromExif, rec);
+  else toast(`${added.length} fotos situadas en el mapa (capa «${rec.name}»).`, 5000);
   if (!$('#drawer').hidden) renderDrawer();
+}
+function photoNote(rec, f, blob, o) {
+  return { id: uid(), obraId: settings.activeObra, layerId: rec.id, lat: o.lat, lng: o.lng, acc: o.acc ?? null, alt: o.alt ?? null, dir: o.dir ?? null, src: o.src,
+    title: f.name.replace(/\.[^.]+$/, ''), text: o.text || '', created: o.created, media: [{ id: uid(), kind: 'photo', blob, mime: blob.type || 'image/jpeg', t: Date.now() }] };
+}
+function watermarkReport(report, fromExif, rec) {
+  $('#toast').hidden = true;
+  const ok = report.filter(x => x.ok);
+  const b = openSheet(`<h2>Fotos sin GPS en los metadatos</h2>
+    <p class="sub">${ok.length} de ${report.length} recuperadas leyendo la marca de agua${fromExif ? ` · ${fromExif} más con GPS propio` : ''}</p>
+    <div class="wmlist">${report.map((x, i) => `<div class="wm ${x.ok ? 'ok' : 'ko'}">
+      <b>${esc(x.name)}</b>
+      ${x.ok ? `<small>${fmtLL(x.r.lat, x.r.lng)}${x.r.date ? ' · ' + fmtDate(x.r.date) : ''}${x.r.alt != null ? ' · ' + Math.round(x.r.alt) + ' m' : ''} · ${esc(x.r.method)}</small>
+        <div class="row"><button class="mini" data-see="${i}">Ver en el mapa</button><button class="mini" data-fix="${i}">Corregir posición</button></div>`
+      : `<small>${x.r && x.r.error ? 'Error: ' + esc(x.r.error) : x.r && x.r.text ? 'No se han encontrado coordenadas en la marca de agua.' : 'No se ha encontrado texto.'}</small>`}
+      ${x.r && x.r.text ? `<details><summary>Texto leído</summary><pre>${esc(x.r.text)}</pre></details>` : ''}
+    </div>`).join('')}</div>
+    ${ok.length ? `<div class="acts"><button class="btn pri full" data-a="share">${ICON.photo}Compartir las fotos con su GPS</button></div>
+    <p class="hint">Cada foto se guarda ya con las coordenadas, la fecha y la altitud escritas en sus metadatos (EXIF). Compartidas como archivo (no como foto de WhatsApp) las conservan.</p>` : ''}
+    ${report.length > ok.length ? '<p class="hint">Si una foto no se ha podido leer, ábrela desde «Mantén pulsado en el mapa → Foto en este punto» para situarla a mano.</p>' : ''}`);
+  b.querySelectorAll('[data-see]').forEach(bt => bt.onclick = () => { const n = report[+bt.dataset.see].n; map.setView([n.lat, n.lng], 18); viewNote(n.id); });
+  b.querySelectorAll('[data-fix]').forEach(bt => bt.onclick = () => { const n = report[+bt.dataset.fix].n; map.setView([n.lat, n.lng], 18); openEditor({ note: n }); });
+  const sh = b.querySelector('[data-a=share]'); if (sh) sh.onclick = () => sharePhotos(ok.map(x => x.n), rec.name);
+}
+async function sharePhotos(list, label) {
+  const items = list.flatMap(n => (n.media || []).filter(m => m.kind === 'photo').map((m, i) => ({ blob: m.blob, name: `${safeName(n.title)}${i ? '_' + (i + 1) : ''}.jpg` })));
+  if (!items.length) { toast('No hay fotos que compartir.'); return; }
+  try {
+    if (items.length === 1) { await saveBlob(new Blob([items[0].blob], { type: 'image/jpeg' }), items[0].name); return; }
+    const zip = new JSZip(); const used = new Set();
+    items.forEach(it => { let nm = it.name, k = 2; while (used.has(nm)) nm = it.name.replace(/\.jpg$/, `_${k++}.jpg`); used.add(nm); zip.file(nm, it.blob); });
+    await saveBlob(await zip.generateAsync({ type: 'blob', mimeType: 'application/zip' }), `fotos_GPS_${safeName(label)}.zip`);
+  } catch (e) { if (!/cancel/i.test(e.message || '')) toast('No se pudieron compartir: ' + (e.message || e), 6000); }
+}
+
+/* ---------------- Lectura de la marca de agua (OCR) ---------------- */
+let ocrWorker = null, ocrIdle = null;
+function loadScript(src) {
+  return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('No se pudo cargar el lector de texto')); document.head.appendChild(s); });
+}
+async function getOcr() {
+  clearTimeout(ocrIdle);
+  if (ocrWorker) return ocrWorker;
+  if (!window.Tesseract) await loadScript('vendor/tesseract/tesseract.min.js');
+  const abs = p => new URL(p, location.href).href;
+  ocrWorker = await Tesseract.createWorker('eng', 1, { workerPath: abs('vendor/tesseract/worker.min.js'), corePath: abs('vendor/tesseract/core'), langPath: abs('vendor/tesseract/lang'), gzip: true, cacheMethod: 'none' });
+  await ocrWorker.setParameters({ preserve_interword_spaces: '1' });
+  return ocrWorker;
+}
+function ocrDone() { clearTimeout(ocrIdle); ocrIdle = setTimeout(() => { if (ocrWorker) { ocrWorker.terminate(); ocrWorker = null; } }, 60000); }
+function ocrCanvas(bmp, rx, ry, rw, rh, invert, mask) {
+  const sx = Math.round(bmp.width * rx), sy = Math.round(bmp.height * ry), sw = Math.round(bmp.width * rw), sh = Math.round(bmp.height * rh);
+  const scale = Math.min(2.5, Math.max(1, 1800 / sw));
+  const c = document.createElement('canvas'); c.width = Math.round(sw * scale); c.height = Math.round(sh * scale);
+  const g = c.getContext('2d'); g.drawImage(bmp, sx, sy, sw, sh, 0, 0, c.width, c.height);
+  const im = g.getImageData(0, 0, c.width, c.height), d = im.data;
+  for (let i = 0; i < d.length; i += 4) {
+    let v = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    if (mask) { // solo el texto claro (marca blanca o amarilla con borde oscuro): texto negro sobre fondo blanco
+      const mx = Math.max(d[i], d[i + 1], d[i + 2]), mn = Math.min(d[i], d[i + 1], d[i + 2]);
+      v = (mx > 205 && (mx - mn < 60 || (d[i] > 200 && d[i + 1] > 200))) ? 0 : 255;
+    } else { v = Math.max(0, Math.min(255, (v - 128) * 1.5 + 128)); if (invert) v = 255 - v; }
+    d[i] = d[i + 1] = d[i + 2] = v;
+  }
+  g.putImageData(im, 0, 0);
+  return c;
+}
+async function ocrWatermark(file) {
+  const w = await getOcr();
+  const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+  const passes = [[0, 0.55, 1, 0.45, false], [0, 0.55, 1, 0.45, false, true], [0, 0.55, 1, 0.45, true], [0, 0, 1, 0.3, false], [0, 0, 1, 0.3, false, true], [0, 0, 1, 1, false]];
+  let all = '';
+  for (const [x, y, ww, hh, inv, mask] of passes) {
+    const { data } = await w.recognize(ocrCanvas(bmp, x, y, ww, hh, inv, mask));
+    const t = (data.text || '').trim(); if (t) all += t + '\n';
+    const p = parseWatermark(t);
+    if (p.lat != null) { const full = parseWatermark(all); return { ...p, date: p.date || full.date, alt: p.alt ?? full.alt, text: t }; }
+  }
+  const p = parseWatermark(all);
+  return p.lat != null ? { ...p, text: all.trim() } : { text: all.trim() };
+}
+
+// Interpreta coordenadas, fecha y altitud en el texto de una marca de agua (tolerante a errores de lectura)
+const MONTHS = { ene: 1, jan: 1, feb: 2, mar: 3, abr: 4, apr: 4, may: 5, jun: 6, jul: 7, ago: 8, aug: 8, sep: 9, set: 9, oct: 10, nov: 11, dic: 12, dec: 12 };
+function parseWatermark(raw) {
+  const out = { lat: null, lng: null, alt: null, date: null, acc: null, method: '' };
+  if (!raw) return out;
+  const t = raw.replace(/[º˚°*]/g, '°').replace(/[’´′`‘]/g, "'").replace(/[”″“]/g, '"').replace(/''/g, '"').replace(/\u2212/g, '-')
+    .replace(/(?<=\d)[lI|](?=\d)/g, '1').replace(/(?<=\d)[oO](?=\d)/g, '0').replace(/(?<=\d)[,.] (?=\d{4,})/g, m => m[0]); // confusiones típicas del OCR
+  const num = s => parseFloat(String(s).replace(',', '.'));
+  const inSpain = (la, lo) => la >= 27 && la <= 44.5 && lo >= -19 && lo <= 5;
+  const okLL = (la, lo) => isFinite(la) && isFinite(lo) && Math.abs(la) <= 90 && Math.abs(lo) <= 180 && !(la === 0 && lo === 0);
+  const set = (la, lo, m) => { if (out.lat == null && okLL(la, lo)) { out.lat = la; out.lng = lo; out.method = m; } };
+  // 1) grados, minutos y segundos: 37°36'44.4"N 2°54'55.6"W
+  const dms = [...t.matchAll(/(\d{1,3})\s*[°:]\s*(\d{1,2})\s*['":]\s*(\d{1,2}(?:[.,]\d+)?)\s*["':]{0,2}\s*([NSEWO])/gi)];
+  if (dms.length >= 2) {
+    const v = m => (num(m[1]) + num(m[2]) / 60 + num(m[3]) / 3600) * (/[SWO]/i.test(m[4]) ? -1 : 1);
+    const la = dms.find(m => /[NS]/i.test(m[4])), lo = dms.find(m => /[EWO]/i.test(m[4]));
+    if (la && lo) set(v(la), v(lo), 'grados, minutos y segundos');
+  }
+  // 2) grados y minutos decimales: 37°36.740'N
+  if (out.lat == null) {
+    const dm = [...t.matchAll(/(\d{1,3})\s*°\s*(\d{1,2}[.,]\d+)\s*'?\s*([NSEWO])/gi)];
+    const la = dm.find(m => /[NS]/i.test(m[3])), lo = dm.find(m => /[EWO]/i.test(m[3]));
+    if (la && lo) set((num(la[1]) + num(la[2]) / 60) * (/S/i.test(la[3]) ? -1 : 1), (num(lo[1]) + num(lo[2]) / 60) * (/[WO]/i.test(lo[3]) ? -1 : 1), 'grados y minutos');
+  }
+  // 3) grados decimales con etiqueta: Lat 37.612345 Long -2.915432
+  if (out.lat == null) {
+    const la = /lat(?:itud|itude)?\.?\s*[:=]?\s*([+-]?\d{1,2}[.,]\d{3,})\s*°?\s*([NS])?/i.exec(t);
+    const lo = /(?:lon(?:g(?:itud|itude)?)?|lng)\.?\s*[:=]?\s*([+-]?\d{1,3}[.,]\d{3,})\s*°?\s*([EWO])?/i.exec(t);
+    if (la && lo) set(num(la[1]) * (la[2] && /S/i.test(la[2]) ? -1 : 1), num(lo[1]) * (lo[2] && /[WO]/i.test(lo[2]) && num(lo[1]) > 0 ? -1 : 1), 'grados decimales');
+  }
+  // 4) par de grados decimales sin etiqueta: 37,613764, -2,917264  ·  37.6137N 2.9172W
+  if (out.lat == null) {
+    const re = /([+-]?\d{1,2}[.,]\d{4,})\s*°?\s*([NS])?[\s,;/|]+([+-]?\d{1,3}[.,]\d{4,})\s*°?\s*([EWO])?/gi;
+    for (const m of t.matchAll(re)) {
+      let la = num(m[1]), lo = num(m[3]);
+      if (m[2] && /S/i.test(m[2])) la = -Math.abs(la);
+      if (m[4] && /[WO]/i.test(m[4])) lo = -Math.abs(lo);
+      if (okLL(la, lo) && (inSpain(la, lo) || m[2] || m[4])) { set(la, lo, 'grados decimales'); break; }
+    }
+  }
+  // 5) UTM: «UTM ETRS89 H30 X 507.302 Y 4.162.826» · «X: 446862 Y: 4114708» · «30S 446862 4114708»
+  if (out.lat == null) {
+    const zm = /\bH\s?(2[7-9]|3[01])\b|\b(2[7-9]|3[01])\s?[STN]\b|huso\s*(2[7-9]|3[01])|zona?\s*(2[7-9]|3[01])/i.exec(t);
+    const zone = zm ? +(zm[1] || zm[2] || zm[3] || zm[4]) : 30;
+    const clean = s => +String(s).replace(/[.\s]/g, '').replace(',', '.');
+    let xy = /X\s*[:=]?\s*(\d{3}[.\s]?\d{3}(?:[.,]\d+)?)\s*[,;]?\s*(?:m\s*)?Y\s*[:=]?\s*(\d{1}[.\s]?\d{3}[.\s]?\d{3}(?:[.,]\d+)?)/i.exec(t);
+    if (!xy) xy = /\b(?:2[7-9]|3[01])\s?[STN]\s+(\d{6}(?:[.,]\d+)?)\s*(?:m\s*E)?[\s,]+(\d{7}(?:[.,]\d+)?)/i.exec(t);
+    if (xy) {
+      const x = clean(xy[1]), y = clean(xy[2]);
+      if (x > 100000 && x < 900000 && y > 3000000 && y < 5000000) { const ll = fromUTM(zone, x, y); set(ll.lat, ll.lng, `UTM huso ${zone}`); }
+    }
+  }
+  // fecha y hora
+  let m = /(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})[\s,T]+(\d{1,2})[:.h](\d{2})(?:[:.](\d{2}))?\s*(AM|PM)?/i.exec(t);
+  if (m) { let Y = +m[3]; if (Y < 100) Y += 2000; let H = +m[4]; if (m[7]) { if (/PM/i.test(m[7]) && H < 12) H += 12; if (/AM/i.test(m[7]) && H === 12) H = 0; } out.date = new Date(Y, +m[2] - 1, +m[1], H, +m[5], +(m[6] || 0)).getTime(); }
+  else if ((m = /(\d{4})[\/.-](\d{1,2})[\/.-](\d{1,2})[\s,T]+(\d{1,2})[:.](\d{2})(?:[:.](\d{2}))?/.exec(t))) out.date = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0)).getTime();
+  else if ((m = /(\d{1,2})\s+(?:de\s+)?([a-zA-Zé]{3})[a-zA-Zé]*\.?\s+(?:de\s+)?(\d{4})[\s,]+(\d{1,2}):(\d{2})/i.exec(t)) && MONTHS[m[2].toLowerCase()]) out.date = new Date(+m[3], MONTHS[m[2].toLowerCase()] - 1, +m[1], +m[4], +m[5]).getTime();
+  else if ((m = /\b([a-zA-Z]{3})[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})[\s,]+(\d{1,2}):(\d{2})\s*(AM|PM)?/i.exec(t)) && MONTHS[m[1].toLowerCase()]) { let H = +m[4]; if (m[6] && /PM/i.test(m[6]) && H < 12) H += 12; out.date = new Date(+m[3], MONTHS[m[1].toLowerCase()] - 1, +m[2], H, +m[5]).getTime(); }
+  if (out.date && (out.date > Date.now() + 864e5 || out.date < Date.UTC(2000, 0, 1))) out.date = null;
+  // altitud y precisión
+  if ((m = /(?:alt(?:itud|itude|\.)?|elev(?:aci[oó]n|ation)?|cota|asl)\s*[:=]?\s*(-?\d{1,4}(?:[.,]\d+)?)\s*m/i.exec(t))) out.alt = num(m[1]);
+  if ((m = /(?:±|\+\/-|precisi[oó]n|accuracy)\s*[:=]?\s*(\d{1,4}(?:[.,]\d+)?)\s*m/i.exec(t))) out.acc = num(m[1]);
+  return out;
+}
+function fromUTM(zone, x, y, north = true) { // UTM (ETRS89 ≈ WGS84) → latitud/longitud
+  const a = 6378137, f = 1 / 298.257223563, k0 = 0.9996, e2 = f * (2 - f), ep2 = e2 / (1 - e2);
+  const e1 = (1 - Math.sqrt(1 - e2)) / (1 + Math.sqrt(1 - e2));
+  const X = x - 500000, Y = north ? y : y - 10000000, M = Y / k0;
+  const mu = M / (a * (1 - e2 / 4 - 3 * e2 ** 2 / 64 - 5 * e2 ** 3 / 256));
+  const p1 = mu + (3 * e1 / 2 - 27 * e1 ** 3 / 32) * Math.sin(2 * mu) + (21 * e1 ** 2 / 16 - 55 * e1 ** 4 / 32) * Math.sin(4 * mu) + (151 * e1 ** 3 / 96) * Math.sin(6 * mu) + (1097 * e1 ** 4 / 512) * Math.sin(8 * mu);
+  const N1 = a / Math.sqrt(1 - e2 * Math.sin(p1) ** 2), T1 = Math.tan(p1) ** 2, C1 = ep2 * Math.cos(p1) ** 2;
+  const R1 = a * (1 - e2) / Math.pow(1 - e2 * Math.sin(p1) ** 2, 1.5), D = X / (N1 * k0);
+  const lat = p1 - (N1 * Math.tan(p1) / R1) * (D * D / 2 - (5 + 3 * T1 + 10 * C1 - 4 * C1 * C1 - 9 * ep2) * D ** 4 / 24 + (61 + 90 * T1 + 298 * C1 + 45 * T1 * T1 - 252 * ep2 - 3 * C1 * C1) * D ** 6 / 720);
+  const lon = (D - (1 + 2 * T1 + C1) * D ** 3 / 6 + (5 - 2 * C1 + 28 * T1 - 3 * C1 * C1 + 8 * ep2 + 24 * T1 * T1) * D ** 5 / 120) / Math.cos(p1);
+  return { lat: lat * 180 / Math.PI, lng: ((zone - 1) * 6 - 180 + 3) + lon * 180 / Math.PI };
+}
+
+// Escribe GPS, fecha y descripción en los metadatos EXIF de una foto JPEG
+async function writeExif(blob, m) {
+  if (!window.piexif || !m || m.lat == null) return blob;
+  try {
+    let jpg = blob;
+    if (!/jpe?g/i.test(blob.type || '')) { const bmp = await createImageBitmap(blob); const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height; c.getContext('2d').drawImage(bmp, 0, 0); jpg = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.92)); }
+    const u8 = new Uint8Array(await jpg.arrayBuffer()); let bin = '';
+    for (let i = 0; i < u8.length; i += 0x8000) bin += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+    let ex; try { ex = piexif.load(bin); } catch (e) { ex = null; }
+    ex = ex || {}; ['0th', 'Exif', 'GPS', '1st'].forEach(k => { ex[k] = ex[k] || {}; }); ex.thumbnail = null; ex['1st'] = {};
+    const G = piexif.GPSIFD, dms = v => piexif.GPSHelper.degToDmsRational(Math.abs(v));
+    Object.assign(ex.GPS, { [G.GPSVersionID]: [2, 3, 0, 0], [G.GPSLatitudeRef]: m.lat >= 0 ? 'N' : 'S', [G.GPSLatitude]: dms(m.lat), [G.GPSLongitudeRef]: m.lng >= 0 ? 'E' : 'W', [G.GPSLongitude]: dms(m.lng), [G.GPSMapDatum]: 'WGS-84' });
+    if (m.alt != null && isFinite(m.alt)) Object.assign(ex.GPS, { [G.GPSAltitudeRef]: m.alt < 0 ? 1 : 0, [G.GPSAltitude]: [Math.round(Math.abs(m.alt) * 100), 100] });
+    if (m.date) { const d = new Date(m.date), p = n => String(n).padStart(2, '0'); const s2 = `${d.getFullYear()}:${p(d.getMonth() + 1)}:${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`; ex.Exif[piexif.ExifIFD.DateTimeOriginal] = s2; ex['0th'][piexif.ImageIFD.DateTime] = s2; }
+    if (m.desc) ex['0th'][piexif.ImageIFD.ImageDescription] = String(m.desc).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\x20-\x7E]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 500);
+    ex['0th'][piexif.ImageIFD.Software] = 'OBRA-GIS ' + APP_VERSION;
+    const out = piexif.insert(piexif.dump(ex), bin);
+    const o8 = new Uint8Array(out.length); for (let i = 0; i < out.length; i++) o8[i] = out.charCodeAt(i);
+    return new Blob([o8], { type: 'image/jpeg' });
+  } catch (e) { console.warn('EXIF', e); return blob; }
 }
 async function handleIncoming(files) {
   const rest = [];
@@ -807,7 +999,7 @@ function importMenu() {
   const b = openSheet(`<h2>Importar</h2><p class="sub">Elige qué quieres añadir al mapa</p>
     <div class="acts">
       <button class="btn full" data-a="kml">${ICON.kml}KML o KMZ</button>
-      <button class="btn full" data-a="photos">${ICON.gallery}Fotos con coordenadas GPS</button>
+      <button class="btn full" data-a="photos">${ICON.gallery}Fotos (con GPS o con marca de agua)</button>
       <button class="btn full" data-a="service">${ICON.wms}Capa de un servicio (WMS)</button>
       <button class="btn full" data-a="obra">${ICON.folder}Obra completa (paquete .zip)</button>
       <button class="btn" data-a="drawtap">${ICON.pen}Dibujar traza nueva</button>
@@ -1107,7 +1299,7 @@ function mediaHtml(list, editable) {
     return `<div class="m aud"><audio src="${u}" controls preload="metadata"></audio>${rm}</div>`;
   }).join('');
 }
-const srcLabel = s => ({ gps: 'posición GPS', exif: 'coordenadas de la foto', mapa: 'punto del mapa' }[s] || 'punto del mapa');
+const srcLabel = s => ({ gps: 'posición GPS', exif: 'coordenadas de la foto', marca: 'marca de agua de la foto', mapa: 'punto del mapa' }[s] || 'punto del mapa');
 function renderEditor() {
   const d = draft; if (!d) return;
   const isNew = !notes.has(d.id);
@@ -1166,7 +1358,8 @@ async function addMedia(files) {
   for (const f of files) {
     const kind = f.type.startsWith('image/') ? 'photo' : f.type.startsWith('video/') ? 'video' : f.type.startsWith('audio/') ? 'audio' : null;
     if (!kind) { toast(f.name + ': tipo de archivo no admitido'); continue; }
-    const blob = kind === 'photo' ? await processImage(f, draft) : f;
+    let blob = kind === 'photo' ? await processImage(f, draft) : f;
+    if (kind === 'photo') blob = await writeExif(blob, { lat: draft.lat, lng: draft.lng, date: Date.now(), desc: draft.title || 'OBRA-GIS' });
     draft.media.push({ id: uid(), kind, blob, mime: blob.type || f.type, t: Date.now() });
   }
   renderEditor();
@@ -1622,7 +1815,8 @@ function renderActEditor() {
     syncAct();
     for (const fl of files) {
       const kind = fl.type.startsWith('image/') ? 'photo' : fl.type.startsWith('video/') ? 'video' : null; if (!kind) continue;
-      const blob = kind === 'photo' ? await processImage(fl, stampAt()) : fl;
+      const sa = stampAt(); let blob = kind === 'photo' ? await processImage(fl, sa) : fl;
+      if (kind === 'photo') blob = await writeExif(blob, { lat: sa.lat, lng: sa.lng, date: Date.now(), desc: sa.label });
       actDraft.media.push({ id: uid(), kind, blob, mime: blob.type || fl.type, t: Date.now() });
     }
     renderActEditor();
@@ -2331,7 +2525,7 @@ function layerOptions(e) {
   if (t !== 'photos') h += `<label class="rng">Opacidad<input type="range" min="10" max="100" step="5" value="${Math.round((r.opacity ?? 1) * 100)}" data-op="${id}"></label>`;
   if (t === 'kml') h += `<label class="rng">Color<input type="color" value="${r.color}" data-col="${id}"></label>`;
   h += `<div class="field row"><input type="text" value="${esc(r.name)}" data-name="${id}" aria-label="Nombre de la capa"><button class="mini" data-rename="${id}">Renombrar</button></div>`;
-  h += `<div class="row">${t !== 'wms' ? `<button class="mini" data-zoom="${id}">Encuadrar</button>` : ''}<button class="mini del" data-dell="${id}">Eliminar capa</button></div>`;
+  h += `<div class="row">${t !== 'wms' ? `<button class="mini" data-zoom="${id}">Encuadrar</button>` : ''}${t === 'photos' ? `<button class="mini" data-sharephotos="${id}">Compartir fotos con GPS</button>` : ''}<button class="mini del" data-dell="${id}">Eliminar capa</button></div>`;
   h += `<div class="field row"><input type="text" list="folderList" value="${esc(folderOf(r))}" data-folder="${id}" aria-label="Carpeta de la capa"><button class="mini" data-movefolder="${id}">Mover a carpeta</button></div>`;
   if (t === 'wms' && r.kind !== 'wmts') h += `<div class="legend"><img src="${esc(legendUrl(r))}" alt="Leyenda de ${esc(r.name)}" onerror="this.parentNode.remove()"></div>`;
   if (t === 'wms') h += `<p class="hint">${esc(r.url)}${r.layers ? ' · ' + esc(r.layers) : ''}${r.cover ? ' · cobertura: ' + esc(r.cover) : ''}</p>`;
@@ -2451,6 +2645,7 @@ async function renderDrawer() {
   });
   d.querySelector('[data-t=add]').onclick = () => { closeDrawer(); importMenu(); };
   d.querySelector('[data-t=obras]').onclick = () => { closeDrawer(); obrasSheet(); };
+  d.querySelectorAll('[data-sharephotos]').forEach(bt => bt.onclick = () => { const id = bt.dataset.sharephotos; sharePhotos([...notes.values()].filter(n => n.layerId === id), layers.get(id).rec.name); });
   d.querySelector('[data-t=news]').onclick = () => { closeDrawer(); newsSheet(); };
   d.querySelectorAll('[data-fold]').forEach(bt => bt.onclick = () => { settings.collapsed = settings.collapsed || {}; settings.collapsed[bt.dataset.fold] = !settings.collapsed[bt.dataset.fold]; saveSettings(); renderDrawer(); });
   d.querySelectorAll('[data-fvis]').forEach(c => c.onchange = async () => { for (const id of folderIds.get(c.dataset.fvis) || []) await setLayerVisible(id, c.checked); renderDrawer(); });

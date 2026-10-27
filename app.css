@@ -1,4 +1,4 @@
-/* OBRA-GIS v1.10.0 (2026-10-27) — estilos. Barra verde monte, acción principal naranja de alta visibilidad */
+/* OBRA-GIS v1.11.0 (2026-10-27) — estilos. Barra verde monte, acción principal naranja de alta visibilidad */
 :root{
   --bar:#0b3d2e; --bar-fg:#f2f7f4;
   --bg:#ffffff; --bg2:#f1f5f2; --fg:#16211c; --muted:#5b6b63; --line:#d5ddd8;
@@ -242,3 +242,10 @@ textarea{resize:vertical;min-height:70px}
 .mbar.draw .tbtn{background:rgba(0,0,0,.18);color:#fff}
 .w-label{pointer-events:none}
 .w-label span{position:absolute;transform:translate(-50%,-140%);white-space:nowrap;font:700 11px ui-monospace,Menlo,Consolas,monospace;color:#1f1a00;background:#ffd43b;padding:1px 5px;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+/* fotos con marca de agua */
+.wmlist{display:flex;flex-direction:column;gap:8px;margin:8px 0}
+.wm{border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:4px}
+.wm.ko{border-left-color:var(--danger)}
+.wm small{color:var(--muted);font-variant-numeric:tabular-nums}
+.wm details summary{cursor:pointer;color:var(--muted);font-size:.82rem}
+.wm pre{white-space:pre-wrap;font-size:.75rem;background:var(--bg2);padding:6px;border-radius:6px;margin:4px 0 0;max-height:140px;overflow:auto}
