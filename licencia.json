@@ -1,0 +1,9 @@
+{
+  "activa": true,
+  "tipo": "Gratuita",
+  "mensaje": "",
+  "aviso": "",
+  "version_minima": "1.0.0",
+  "dias_sin_conexion": 60,
+  "url": "https://github.com/Celtis-eng/OBRAGIS"
+}

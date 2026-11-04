@@ -1,6 +1,6 @@
 # OBRA-GIS
 
-**Versión actual: 1.11.0** · historial completo en [CHANGELOG.md](CHANGELOG.md)
+**Versión actual: 1.12.0** · historial completo en [CHANGELOG.md](CHANGELOG.md)
 
 App de campo para Android (también funciona en iPhone y en el ordenador) que:
 
@@ -24,18 +24,8 @@ Todo se guarda en el propio móvil. No hay servidor ni cuentas.
 | Fondo | Clave | Notas |
 |---|---|---|
 | Ortofoto PNOA híbrida (IGN) | No | Por defecto. Ortofoto del PNOA con carreteras y topónimos del IGN. Gratuita (CC-BY 4.0). Se puede guardar sin conexión. |
-| Google híbrido | Sí | Usa la API oficial *Map Tiles* de Google. No se puede usar sin conexión (lo prohíben las condiciones de Google). |
 | Ortofoto PNOA sin rótulos | No | |
 | OpenStreetMap | No | Callejero. |
-
-### Activar Google híbrido (opcional)
-
-1. Entra en Google Cloud Console con tu cuenta de Google y crea un proyecto. Hay que asociar una cuenta de facturación, aunque la API tiene una cuota gratuita mensual. Revisa la tarifa vigente.
-2. En *APIs y servicios → Biblioteca*, activa **Map Tiles API**.
-3. En *Credenciales*, crea una **clave de API**. Restríngela a *Map Tiles API* y a la dirección web donde publiques la app (restricción por sitios web/HTTP referrer).
-4. En la app: menú ☰ → Ajustes → *Clave de Google* → Guardar clave. Después elige *Google híbrido* como mapa base.
-
-No uses las URL "directas" de las teselas de Google (mt1.google.com…). Van contra sus condiciones y Google las puede bloquear.
 
 ## Cómo ponerla en el móvil
 
@@ -70,6 +60,7 @@ Los datos viven en el navegador del móvil. Si desinstalas la app o borras los d
 - `manifest.webmanifest`, `icons/`: instalación como app.
 - `vendor/`: Leaflet 1.9.4 (mapa) y JSZip 3.10.1 (KMZ).
 - `ejemplo-red-riego.kml`: KML de prueba.
+- `licencia.json`, `LICENCIA.txt`: licencia de uso y desactivación remota.
 
 ## App nativa Android (APK)
 
@@ -85,7 +76,23 @@ El repositorio compila la app Android solo, con GitHub Actions, cada vez que sub
 
 **Fotos con GPS en la app nativa:** la forma más fiable es seleccionarlas en la Galería y usar Compartir → OBRA-GIS. Así la app puede pedir a Android la foto original con las coordenadas.
 
-**Google híbrido en la app nativa:** si restringes la clave de Google por sitio web, añade `https://localhost/*` a la lista.
+## Licencia y desactivación remota
+
+- `LICENCIA.txt` contiene las condiciones de uso, que la app muestra y pide aceptar la primera vez.
+- `licencia.json` controla la app a distancia. La app lo lee desde `https://celtis-eng.github.io/OBRAGIS/licencia.json` al abrirse y cada 6 horas.
+  - `"activa": false` bloquea la app en todos los móviles. El texto de `"mensaje"` es el que verán. Aun bloqueada, la app deja **exportar las obras**.
+  - `"version_minima": "1.12.0"` obliga a actualizar las versiones anteriores.
+  - `"aviso"` muestra un mensaje una vez sin bloquear (p. ej. "A partir de enero la app será de pago").
+  - `"dias_sin_conexion"` (60 por defecto) son los días que la app funciona sin poder comprobar la licencia.
+- Para cambiarlo, edita `licencia.json` en GitHub (icono del lápiz) y guarda. Tarda unos minutos en llegar.
+- Requiere que GitHub Pages esté activado en el repositorio (Settings → Pages).
+
+## Usar OBRA-GIS en Windows
+
+Abre la dirección de GitHub Pages en **Edge o Chrome** y pulsa el icono *Instalar* de la barra de direcciones. Queda como un programa más, con icono en el menú Inicio. En el ordenador:
+- el clic derecho hace lo mismo que mantener pulsado en el móvil;
+- puedes arrastrar KML, KMZ, fotos o paquetes de obra encima del mapa;
+- los KML y KMZ se pueden abrir con doble clic (Abrir con → OBRA-GIS) una vez instalada.
 
 ## Versiones
 

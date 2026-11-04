@@ -1,14 +1,15 @@
 'use strict';
-/* OBRA-GIS v1.11.0 (2026-10-27) — visor de KML/KMZ sobre ortofoto con gestor de capas, anotaciones
+/* OBRA-GIS v1.12.0 (2026-11-04) — visor de KML/KMZ sobre ortofoto con gestor de capas, anotaciones
    georreferenciadas (fotos, vídeos, notas de voz y texto), importación de fotos con GPS
    y navegación con Google Maps. Funciona como web instalable y como app nativa (Capacitor). */
 
 /* ---------------- Versión de la app ----------------
    Cambia APP_VERSION en cada entrega (también se usa como versión de la app Android).
    Formato MAYOR.MENOR.CORRECCIÓN: menor = función nueva, corrección = arreglo. */
-const APP_VERSION = '1.11.0';
-const APP_DATE = '2026-10-27';
+const APP_VERSION = '1.12.0';
+const APP_DATE = '2026-11-04';
 const CHANGELOG = [
+  ['1.12.0', '04/11/2026', 'Carpetas en árbol y selección múltiple de capas (mantener pulsado): mostrar, ocultar, subir, bajar, mover a carpeta, unir, exportar y borrar. Invertir el sentido de una traza con sus PK. KML de puntos. Unión de KML sin perder información. Tabla de atributos con exportación e importación CSV (Excel/Calc). Propiedades de la capa. Capa de recursos (plantas de RCD, hormigón, canteras, aglomerado…). Calculadora: distancias, áreas, pendientes, coordenadas y distancia por carretera. Pendientes por tramos ≤/≥. Fecha de la ortofoto. Modo sin conexión por municipio o tocando el mapa. Licencia de uso. Se retira Google híbrido.'],
   ['1.11.0', '27/10/2026', 'Fotos con marca de agua: la app lee el texto de la marca (coordenadas, UTM, fecha, altitud), sitúa la foto y le vuelve a escribir los metadatos GPS. Las fotos hechas con la app llevan también GPS en sus metadatos. Compartir fotos con GPS.'],
   ['1.10.0', '27/10/2026', 'Anchos del camino: datos cada X metros o en cada cambio de ancho, ancho medio, mínimo, máximo y superficie, también por tramos. Plataforma dibujada en el mapa. Trazas nuevas dibujando en el mapa o grabando con el GPS.'],
   ['1.9.0', '25/10/2026', 'Control de versiones: número de versión visible, historial de novedades y versión en los paquetes de obra.'],
@@ -40,6 +41,12 @@ const ICON = {
   plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
   nav: '<svg viewBox="0 0 24 24"><path d="M3 11l18-8-8 18-2-8z"/></svg>',
   close: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  dots: '<svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/></svg>',
+  swap: '<svg viewBox="0 0 24 24"><path d="M7 4v16M7 20l-3-3M7 20l3-3M17 20V4M17 4l-3 3M17 4l3 3"/></svg>',
+  info: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>',
+  calc: '<svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h2M12 12h2M8 16h2M12 16h2M16 12v4"/></svg>',
+  pin: '<svg viewBox="0 0 24 24"><path d="M12 21s-6-6-6-11a6 6 0 0 1 12 0c0 5-6 11-6 11z"/><circle cx="12" cy="10" r="2"/></svg>',
+  table: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 9h18M3 14h18M9 4v16"/></svg>',
   width: '<svg viewBox="0 0 24 24"><path d="M5 3v18M19 3v18M8 12h8M8 12l2-2M8 12l2 2M16 12l-2-2M16 12l-2 2"/></svg>',
   pen: '<svg viewBox="0 0 24 24"><path d="M4 20l4-1 11-11-3-3L5 16z"/></svg>',
   road: '<svg viewBox="0 0 24 24"><path d="M8 3L4 21M16 3l4 18M12 4v3M12 10v3M12 16v3"/></svg>',
@@ -59,7 +66,7 @@ const ICON = {
 const DB = (() => {
   let dbp;
   const open = () => dbp || (dbp = new Promise((res, rej) => {
-    const r = indexedDB.open('campo-kml', 3);
+    const r = indexedDB.open('campo-kml', 4);
     r.onupgradeneeded = () => {
       const d = r.result, has = n => d.objectStoreNames.contains(n);
       if (!has('layers')) d.createObjectStore('layers', { keyPath: 'id' });
@@ -67,6 +74,7 @@ const DB = (() => {
       if (!has('kv')) d.createObjectStore('kv');
       if (!has('acts')) d.createObjectStore('acts', { keyPath: 'id' }); // actuaciones lineales sobre trazas
       if (!has('obras')) d.createObjectStore('obras', { keyPath: 'id' }); // cada obra agrupa sus capas y datos
+      if (!has('resources')) d.createObjectStore('resources', { keyPath: 'id' }); // plantas, canteras… comunes a todas las obras
     };
     r.onsuccess = () => res(r.result);
     r.onerror = () => rej(r.error);
@@ -258,15 +266,17 @@ const CachedTileLayer = L.TileLayer.extend({
   },
 });
 const tiles = (url, o) => new CachedTileLayer(url, o);
+const CachedWMS = L.TileLayer.WMS.extend({ createTile: CachedTileLayer.prototype.createTile });
 const pnoaTiles = () => tiles(URL_PNOA, { maxNativeZoom: 19, maxZoom: 21, attribution: ATTR_IGN });
 
 const BASES = {
   pnoa: { name: 'Ortofoto PNOA híbrida (IGN)', make: () => L.layerGroup([pnoaTiles(), tiles(URL_LABELS, { maxNativeZoom: 18, maxZoom: 21 })]) },
-  google: { name: 'Google híbrido (con clave)', make: makeGoogle },
+  // google: { name: 'Google híbrido', make: makeGoogle },  ← reservado para una futura versión premium con usuarios
   pnoaSolo: { name: 'Ortofoto PNOA sin rótulos', make: pnoaTiles },
   osm: { name: 'Callejero OpenStreetMap', make: () => L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 21, maxNativeZoom: 19, attribution: '© OpenStreetMap' }) },
 };
 
+// Capa Google (API Map Tiles): retirada de la versión gratuita. Se conserva para una futura versión premium.
 let googleCache = null;
 async function makeGoogle() {
   const key = (settings.googleKey || '').trim();
@@ -300,7 +310,7 @@ async function setBase(id) {
   }
   if (baseLayer) map.removeLayer(baseLayer);
   baseLayer = layer.addTo(map);
-  settings.base = id; saveSettings();
+  settings.base = id; saveSettings(); odKey = ''; updateOrthoDate();
   if (!$('#drawer').hidden) renderDrawer();
 }
 
@@ -434,6 +444,12 @@ function folderPath(pm) {
   while (p) { if (p.localName === 'Folder') { const n = childText(p, 'name'); if (n) parts.unshift(n); } p = p.parentElement; }
   return parts.join(' › ');
 }
+function polyArea(c) { // área en m² (proyección local, válida para obras)
+  if (c.length < 3) return 0;
+  const lat0 = c.reduce((s2, p) => s2 + p[0], 0) / c.length, k = Math.cos(lat0 * Math.PI / 180) * 111320, m = 111320;
+  let a = 0; for (let i = 0; i < c.length; i++) { const p = c[i], q = c[(i + 1) % c.length]; a += (p[1] * k) * (q[0] * m) - (q[1] * k) * (p[0] * m); }
+  return Math.abs(a) / 2;
+}
 function lineLength(c) { let s = 0; for (let i = 1; i < c.length; i++) s += L.latLng(c[i - 1]).distanceTo(c[i]); return s; }
 function centroid(c) {
   let n = c.length; if (n > 1 && c[0][0] === c[n - 1][0] && c[0][1] === c[n - 1][1]) n--;
@@ -459,13 +475,13 @@ function parseKML(text) {
     const inline = Array.from(pm.children).find(c => c.localName === 'Style');
     const style = Object.assign({}, styles[(childText(pm, 'styleUrl') || '').replace(/^.*#/, '#')] || {}, inline ? readStyle(inline) : {});
     const attrs = [];
-    byTag(pm, 'Data').forEach(d => attrs.push([d.getAttribute('displayName') || d.getAttribute('name') || '', firstText(d, 'value')]));
-    byTag(pm, 'SimpleData').forEach(d => attrs.push([d.getAttribute('name') || '', d.textContent.trim()]));
+    byTag(pm, 'Data').forEach(d => attrs.push([d.getAttribute('displayName') || d.getAttribute('name') || '', firstText(d, 'value'), d.getAttribute('name') || '']));
+    byTag(pm, 'SimpleData').forEach(d => attrs.push([d.getAttribute('name') || '', d.textContent.trim(), d.getAttribute('name') || '']));
     const lines = parts.filter(p => p.t === 'ln');
     const type = lines.length ? 'ln' : parts.some(p => p.t === 'pg') ? 'pg' : 'pt';
-    const f = { name: childText(pm, 'name') || 'Elemento ' + (i + 1), folder: folderPath(pm), desc: htmlToText(childText(pm, 'description')), attrs, parts, type, style };
+    const f = { pm: i, name: childText(pm, 'name') || 'Elemento ' + (i + 1), folder: folderPath(pm), desc: htmlToText(childText(pm, 'description')), attrs, parts, type, style };
     if (type === 'ln') { f.start = lines[0].c[0]; const last = lines[lines.length - 1].c; f.end = last[last.length - 1]; f.length = lines.reduce((s, l) => s + lineLength(l.c), 0); }
-    else if (type === 'pg') { const c = parts.find(p => p.t === 'pg').c; f.start = centroid(c); f.length = lineLength(c); }
+    else if (type === 'pg') { const c = parts.find(p => p.t === 'pg').c; f.start = centroid(c); f.length = lineLength(c); f.area = parts.filter(p => p.t === 'pg').reduce((s2, p) => s2 + polyArea(p.c), 0); }
     else f.start = parts[0].c[0];
     out.push(f);
   });
@@ -491,6 +507,7 @@ function pointGroup(id) {
 function layerVisible(id) {
   if (id === 'notes') return settings.notesVisible !== false;
   if (id === 'acts') return settings.actsVisible !== false;
+  if (id === 'res') return settings.resVisible !== false;
   const e = layers.get(id); return !!(e && e.rec.visible);
 }
 
@@ -567,7 +584,31 @@ function drawPK() {
     }
   }
 }
-let pkT; map.on('moveend', () => { clearTimeout(pkT); pkT = setTimeout(() => { drawPK(); drawActs(); drawWidths(); }, 60); });
+let pkT; map.on('moveend', () => { clearTimeout(pkT); pkT = setTimeout(() => { drawPK(); drawActs(); drawWidths(); }, 60); clearTimeout(odT); odT = setTimeout(updateOrthoDate, 900); });
+/* Fecha de vuelo de la ortofoto PNOA en el centro del mapa (capa OI.MosaicElement del IGN) */
+let odT, odKey = '';
+async function updateOrthoDate() {
+  const el = $('#orthoDate'); if (!el) return;
+  if (!['pnoa', 'pnoaSolo'].includes(settings.base) || map.getZoom() < 11) { el.hidden = true; return; }
+  const c = map.getCenter(), key = `${c.lat.toFixed(3)},${c.lng.toFixed(3)}`;
+  if (key === odKey) return; odKey = key;
+  try {
+    const txt = await httpGetText(featureInfoUrl({ url: 'https://www.ign.es/wms-inspire/pnoa-ma', layers: 'OI.MosaicElement' }, c, 'text/html'));
+    const info = parseOrthoInfo(txt);
+    el.textContent = 'Ortofoto PNOA · ' + (info || 'fecha no disponible en esta zona');
+  } catch (e) { el.textContent = 'Ortofoto PNOA · máxima actualidad'; }
+  el.hidden = false;
+}
+function parseOrthoInfo(html) {
+  const t = htmlToText(html || '');
+  let m, date = '';
+  if ((m = /(\d{4})[-/](\d{2})[-/](\d{2})/.exec(t))) date = `${m[3]}/${m[2]}/${m[1]}`;
+  else if ((m = /(\d{1,2})[-/](\d{1,2})[-/](\d{4})/.exec(t))) date = `${m[1].padStart(2, '0')}/${m[2].padStart(2, '0')}/${m[3]}`;
+  else if ((m = /(?:fecha|vuelo|a[ñn]o|date|year)[^\d]{0,20}((?:19|20)\d{2})/i.exec(t))) date = m[1];
+  if (!date) return '';
+  const r = /(?:resoluci[oó]n|resolution|gsd)[^\d]{0,15}(\d+(?:[.,]\d+)?)\s*(cm|m)?/i.exec(t);
+  return 'vuelo ' + date + (r ? ` · ${r[1].replace('.', ',')} ${r[2] || 'm'}/píxel` : '');
+}
 
 function buildKml(entry) {
   const { rec } = entry;
@@ -583,7 +624,7 @@ function buildKml(entry) {
       else lyr = L.circleMarker(p.c[0], { radius: 7, color: '#fff', weight: 2, opacity: op, fillColor: st.icon || rec.color, fillOpacity: op });
       lyr.on('click', e => {
         L.DomEvent.stop(e);
-        if (drawing && !drawing.gps) return addDrawPt(L.latLng(e && e.latlng ? e.latlng : e)); if (slopePick || actPick || widthPick) return slopePickPoint(e.latlng);
+        if (drawing && !drawing.gps) return addDrawPt(L.latLng(e && e.latlng ? e.latlng : e)); if (slopePick || actPick || widthPick || offPick || calcPick) return slopePickPoint(e.latlng);
         if (measure) return addMeasurePt(e.latlng);
         featureSheet(f, e.latlng, rec);
       });
@@ -596,8 +637,8 @@ function buildKml(entry) {
 function buildRaster(entry) {
   const r = entry.rec, common = { pane: 'rasters', opacity: r.opacity ?? 1, maxZoom: 21, attribution: r.attribution || '' };
   entry.tile = r.kind === 'wmts'
-    ? L.tileLayer(r.url, { ...common, maxNativeZoom: r.maxNative || 19 })
-    : L.tileLayer.wms(r.url, { ...common, layers: r.layers, format: 'image/png', transparent: true, version: r.version || '1.1.1' });
+    ? tiles(r.url, { ...common, maxNativeZoom: r.maxNative || 19 })
+    : new CachedWMS(r.url, { ...common, layers: r.layers, format: 'image/png', transparent: true, version: r.version || '1.1.1' });
   let errors = 0, warned = false;
   entry.tile.on('tileerror', () => {
     if (++errors >= 6 && !warned && navigator.onLine !== false) { warned = true; toast(`El servicio «${r.name}» no responde ahora mismo. Prueba más tarde o quita la capa.`, 6000); }
@@ -636,6 +677,7 @@ function applyOrder() {
 async function setLayerVisible(id, on) {
   setTimeout(() => { drawPK(); drawActs(); drawWidths(); }, 0);
   if (id === 'acts') { settings.actsVisible = on; saveSettings(); drawActs(); return; }
+  if (id === 'res') { settings.resVisible = on; saveSettings(); on ? resLayer.addTo(map) : map.removeLayer(resLayer); return; }
   if (id === 'notes') { settings.notesVisible = on; saveSettings(); on ? pointGroup('notes').addTo(map) : map.removeLayer(pointGroup('notes')); return; }
   const e = layers.get(id); if (!e) return;
   e.rec.visible = on;
@@ -643,13 +685,12 @@ async function setLayerVisible(id, on) {
   applyOrder();
   await DB.put('layers', e.rec);
 }
-async function moveLayer(id, dir) {
-  const me = layers.get(id); const list = orderedLayers().filter(e => folderOf(e.rec) === folderOf(me.rec)); const i = list.findIndex(e => e.rec.id === id); const j = i + dir;
-  if (i < 0 || j < 0 || j >= list.length) return;
-  const a = list[i].rec, b = list[j].rec;
-  [a.order, b.order] = [b.order || 0, a.order || 0];
-  if (a.order === b.order) a.order += dir < 0 ? 1 : -1;
-  await DB.put('layers', a); await DB.put('layers', b);
+async function moveLayer(id, dir) { return groupMove([id], dir); }
+async function groupMove(ids, dir) {
+  const list = orderedLayers(), sel = new Set(ids), n = list.length;
+  if (dir < 0) { for (let i = 1; i < n; i++) if (sel.has(list[i].rec.id) && !sel.has(list[i - 1].rec.id)) [list[i - 1], list[i]] = [list[i], list[i - 1]]; }
+  else { for (let i = n - 2; i >= 0; i--) if (sel.has(list[i].rec.id) && !sel.has(list[i + 1].rec.id)) [list[i + 1], list[i]] = [list[i], list[i + 1]]; }
+  for (let i = 0; i < n; i++) { const r = list[i].rec, o = n - i; if (r.order !== o) { r.order = o; await DB.put('layers', r); } }
   applyOrder(); renderDrawer();
 }
 function layerBounds(id) {
@@ -697,6 +738,8 @@ function featureSheet(f, ll, rec) {
   acts += `<button class="btn" data-a="note">${ICON.note}Anotar aquí</button><button class="btn" data-a="fit">Encuadrar</button>`;
   if (f.type === 'ln') acts += `<button class="btn go full" data-a="newact">${ICON.road}Nueva actuación en esta traza</button><button class="btn pri" data-a="slope">${ICON.slope}Pendiente</button><button class="btn pri" data-a="width">${ICON.width}Anchos</button>`;
   acts += `<button class="btn" data-a="copy">${ICON.copy}Copiar coordenadas</button><button class="btn" data-a="measure">${ICON.ruler}Medir desde aquí</button>`;
+  if (f.type === 'ln') acts += `<button class="btn" data-a="reverse">${ICON.swap}Invertir sentido</button>`;
+  acts += `<button class="btn" data-a="props">${ICON.info}Propiedades de la capa</button>`;
 
   let coords = '';
   const pkTap = f.type === 'ln' ? pkAt(f, ll) : null;
@@ -726,6 +769,47 @@ function featureSheet(f, ll, rec) {
   if (wb) wb.onclick = () => widthSheet(rec, f);
   const na = b.querySelector('[data-a=newact]');
   if (na) na.onclick = () => { const d = pkAt(f, ll).d; openActEditor({ rec, f, d0: d, d1: d }); };
+  const rv = b.querySelector('[data-a=reverse]');
+  if (rv) rv.onclick = () => reverseTrace(rec, f);
+  b.querySelector('[data-a=props]').onclick = () => layerProps(rec.id);
+}
+
+/* ---------------- Invertir el sentido de una traza ----------------
+   Invierte el orden de los vértices en el KML; los PK pasan a contarse desde el otro extremo.
+   Las actuaciones y los anchos de esa traza se recalculan (y el margen izquierdo pasa a ser el derecho). */
+function reverseKmlPlacemark(text, pmIndex) {
+  const doc = new DOMParser().parseFromString(text, 'application/xml');
+  const pm = byTag(doc, 'Placemark')[pmIndex]; if (!pm) throw new Error('No se encuentra el elemento en el KML');
+  const lines = [...byTag(pm, 'LineString'), ...byTag(pm, 'Track')];
+  byTag(pm, 'LineString').forEach(ls => { const c = byTag(ls, 'coordinates')[0]; if (c) c.textContent = c.textContent.trim().split(/\s+/).reverse().join(' '); });
+  byTag(pm, 'Track').forEach(tr => { const cs = byTag(tr, 'coord'), ws = byTag(tr, 'when'); const cv = cs.map(n => n.textContent).reverse(); cs.forEach((n, i) => { n.textContent = cv[i]; }); const wv = ws.map(n => n.textContent).reverse(); ws.forEach((n, i) => { n.textContent = wv[i]; }); });
+  if (lines.length > 1) { const parent = lines[0].parentNode; if (lines.every(l => l.parentNode === parent)) { const anchor = lines[lines.length - 1].nextSibling; lines.slice().reverse().forEach(l => parent.insertBefore(l, anchor)); } }
+  return new XMLSerializer().serializeToString(doc);
+}
+async function reverseTrace(rec, f) {
+  const e = layers.get(rec.id), fi = e.feats.indexOf(f), L0 = f.length;
+  const relActs = [...acts.values()].filter(a => a.layerId === rec.id && a.featIdx === fi);
+  const wd = rec.widths && rec.widths[fi];
+  if (!confirm(`¿Invertir el sentido de «${f.name}»? El inicio pasa a ser el final y los PK se cuentan desde el otro extremo.${relActs.length ? ` Se recalcularán ${relActs.length} actuaciones (el margen izquierdo pasa a ser el derecho).` : ''}${wd ? ' También se recalcularán sus anchos.' : ''}`)) return;
+  try { rec.text = reverseKmlPlacemark(rec.text, f.pm); } catch (err) { toast('No se pudo invertir: ' + err.message, 6000); return; }
+  if (wd) {
+    const segs = widthSegments(wd, f);
+    const pts = wd.mode === 'changes'
+      ? segs.map(sg => ({ d: +(L0 - sg.b).toFixed(2), w: sg.wa })).sort((a, b) => a.d - b.d)
+      : (wd.points || []).map(p => ({ d: +(L0 - p.d).toFixed(2), w: p.w })).sort((a, b) => a.d - b.d);
+    rec.widths[fi] = { ...wd, points: pts, updated: Date.now() };
+  }
+  await DB.put('layers', rec);
+  rebuildLayer(rec.id);
+  const nf = layers.get(rec.id).feats[fi];
+  for (const a of relActs) {
+    const d0 = Math.max(0, L0 - a.d1), d1 = Math.min(nf.length, L0 - a.d0);
+    Object.assign(a, { d0, d1, side: a.side === 'izq' ? 'der' : a.side === 'der' ? 'izq' : a.side, coords: segmentCoords(nf, d0, d1), updated: Date.now() });
+    await DB.put('acts', a);
+  }
+  drawActs(); drawWidths(); drawPK(); closeSheet();
+  toast(`Sentido invertido: «${nf.name}» empieza ahora en el antiguo final.`, 5000);
+  featureSheet(nf, L.latLng(nf.start[0], nf.start[1]), rec);
 }
 
 /* ---------------- Importación de ficheros ---------------- */
@@ -1002,8 +1086,9 @@ function importMenu() {
       <button class="btn full" data-a="photos">${ICON.gallery}Fotos (con GPS o con marca de agua)</button>
       <button class="btn full" data-a="service">${ICON.wms}Capa de un servicio (WMS)</button>
       <button class="btn full" data-a="obra">${ICON.folder}Obra completa (paquete .zip)</button>
-      <button class="btn" data-a="drawtap">${ICON.pen}Dibujar traza nueva</button>
+      <button class="btn" data-a="drawtap">${ICON.pen}Dibujar traza</button>
       <button class="btn" data-a="drawgps">${ICON.locate}Grabar traza con GPS</button>
+      <button class="btn full" data-a="drawpts">${ICON.pin}Crear KML de puntos (tocando el mapa o con GPS)</button>
     </div>
     <p class="hint">Las fotos se sitúan solas si la cámara guardó la ubicación. ${NATIVE ? '' : 'En Android, si llegan sin posición, elígelas desde «Archivos» y no desde la galería.'}</p>`);
   b.querySelector('[data-a=kml]').onclick = () => { closeSheet(); $('#inKml').click(); };
@@ -1012,6 +1097,7 @@ function importMenu() {
   b.querySelector('[data-a=obra]').onclick = () => { closeSheet(); $('#inObra').click(); };
   b.querySelector('[data-a=drawtap]').onclick = () => { closeSheet(); startDrawing(false); };
   b.querySelector('[data-a=drawgps]').onclick = () => { closeSheet(); startDrawing(true); };
+  b.querySelector('[data-a=drawpts]').onclick = () => { closeSheet(); startDrawing('points'); };
 }
 let catalogQuery = '', catalogOpen = 'energia';
 function serviceMenu() {
@@ -1095,7 +1181,7 @@ let longFired = 0;
 })();
 
 function pointMenu(ll) {
-  if (drawing && !drawing.gps) return addDrawPt(L.latLng(ll)); if (slopePick || actPick || widthPick) return slopePickPoint(ll);
+  if (drawing && !drawing.gps) return addDrawPt(L.latLng(ll)); if (slopePick || actPick || widthPick || offPick || calcPick) return slopePickPoint(ll);
   if (measure) return addMeasurePt(ll);
   const queryable = orderedLayers().filter(e => e.rec.visible && e.tile && e.rec.kind === 'wms' && e.rec.info);
   const b = openSheet(`<h2>Punto seleccionado</h2><p class="sub">Pulsación larga${distFromMe(ll.lat, ll.lng)}</p>
@@ -1107,6 +1193,8 @@ function pointMenu(ll) {
       <button class="btn" data-a="copy">${ICON.copy}Copiar coordenadas</button>
       <button class="btn" data-a="measure">${ICON.ruler}Medir desde aquí</button>
       <button class="btn full" data-a="actnear">${ICON.road}Actuación en la traza más cercana</button>
+      <button class="btn" data-a="resadd">${ICON.pin}Añadir recurso aquí</button>
+      <button class="btn" data-a="route">${ICON.road}Distancia por carretera</button>
       <a class="btn full" href="${viewUrl(ll.lat, ll.lng)}" target="_blank" rel="noopener">Ver en Google Maps</a>
     </div>
     ${queryable.length ? `<div class="afec"><h3 class="sh">Afecciones en este punto</h3><div id="afecList"><p class="hint">Consultando ${queryable.length} capas…</p></div></div>` : ''}`);
@@ -1116,6 +1204,8 @@ function pointMenu(ll) {
   b.querySelector('[data-a=photo]').onclick = () => { const at = { lat: ll.lat, lng: ll.lng, src: 'mapa' }; capture('inPhoto', files => { openEditor(at); addMedia(files); }); };
   b.querySelector('[data-a=copy]').onclick = () => copyText(`${fmtLL(ll.lat, ll.lng)}\n${fmtUTM(ll.lat, ll.lng)}`);
   b.querySelector('[data-a=measure]').onclick = () => { closeSheet(); startMeasure(ll); };
+  b.querySelector('[data-a=resadd]').onclick = () => resourceEditor({ lat: ll.lat, lng: ll.lng });
+  b.querySelector('[data-a=route]').onclick = () => { calcState.b = { lat: ll.lat, lng: ll.lng, label: 'punto elegido' }; calcSheet('route'); };
   b.querySelector('[data-a=actnear]').onclick = () => {
     const n = nearestTrace(ll); if (!n) { toast('No hay ninguna traza KML visible. Importa o muestra el KML del camino.'); return; }
     if (n.off > 100) toast(`La traza más cercana («${n.f.name}») está a ${Math.round(n.off)} m.`, 5000);
@@ -1269,7 +1359,7 @@ function drawNote(n) {
   let m = noteMarkers.get(n.id);
   if (!m) {
     m = L.marker([n.lat, n.lng], { icon: pinIcon(noteType(n), n.dir) }).addTo(g);
-    m.on('click', e => { L.DomEvent.stop(e); if (drawing && !drawing.gps) return addDrawPt(L.latLng(e && e.latlng ? e.latlng : e)); if (slopePick || actPick || widthPick) return slopePickPoint(e.latlng); if (measure) return addMeasurePt(e.latlng); viewNote(n.id); });
+    m.on('click', e => { L.DomEvent.stop(e); if (drawing && !drawing.gps) return addDrawPt(L.latLng(e && e.latlng ? e.latlng : e)); if (slopePick || actPick || widthPick || offPick || calcPick) return slopePickPoint(e.latlng); if (measure) return addMeasurePt(e.latlng); viewNote(n.id); });
     noteMarkers.set(n.id, m);
   } else { m.setLatLng([n.lat, n.lng]).setIcon(pinIcon(noteType(n), n.dir)); }
 }
@@ -1609,7 +1699,7 @@ var slopePickPoint = function (ll) {
   slopePick = null; $('#pickBar').hidden = true;
   slopeSheet(sp.f, sp.rec, a, c, { source: sp.source, autorun: true });
 };
-$('#pickCancel').onclick = () => { slopePick = null; $('#pickBar').hidden = true; slopeHL.clearLayers(); if (actPick) { actPick = null; renderActEditor(); } if (widthPick) { widthPick = null; renderWidthSheet(); } };
+$('#pickCancel').onclick = () => { offPick = false; calcPick = null; slopePick = null; $('#pickBar').hidden = true; slopeHL.clearLayers(); if (actPick) { actPick = null; renderActEditor(); } if (widthPick) { widthPick = null; renderWidthSheet(); } };
 
 const fmtPct = v => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(2).replace('.', ',') + ' %';
 const fmtZ = z => z.toFixed(2).replace('.', ',') + ' m';
@@ -1652,8 +1742,43 @@ async function computeSlope(f, rec, d0, d1, source) {
     </table>
     ${profileSVG(prof)}
     <p class="hint">Cotas: ${esc(res.label)}. Pendiente media = desnivel entre extremos ÷ longitud en planta.</p>
-    <div class="acts"><button class="btn full" data-a="copyres">${ICON.copy}Copiar resultados</button></div>`;
+    <div class="acts"><button class="btn full" data-a="copyres">${ICON.copy}Copiar resultados</button></div>
+    <h3 class="sh">Tramos por pendiente</h3>
+    <div class="pkrow"><div class="field"><label for="slLe">Pendiente ≤ (%)</label><input type="text" id="slLe" inputmode="decimal" placeholder="p. ej. 2"></div>
+      <div class="field"><label for="slGe">Pendiente ≥ (%)</label><input type="text" id="slGe" inputmode="decimal" placeholder="p. ej. 8"></div></div>
+    <div class="field row"><label class="opt grow" style="padding:0"><input type="checkbox" id="slAbs" checked>En valor absoluto (subidas y bajadas)</label><label for="slMin" class="grow" style="text-align:right">Tramo mínimo (m)</label><input type="text" id="slMin" inputmode="decimal" value="20" style="max-width:70px"></div>
+    <div class="acts"><button class="btn full" data-a="ranges">${ICON.slope}Buscar tramos</button></div>
+    <div id="slRanges"></div>`;
   box.querySelector('[data-a=copyres]').onclick = () => copyText(text);
+  box.querySelector('[data-a=ranges]').onclick = () => slopeRanges(f, prof);
+}
+// Clasifica la traza en tramos que cumplen pendiente ≤ X o ≥ Y (pendiente suavizada en ventanas de 20 m)
+function slopeRanges(f, prof) {
+  const le = parseNum($('#slLe').value), ge = parseNum($('#slGe').value), abs = $('#slAbs').checked, minL = Math.max(0, parseNum($('#slMin').value) || 0);
+  if (!isFinite(le) && !isFinite(ge)) { toast('Escribe al menos uno de los dos límites.'); return; }
+  const zAt = d => { for (let i = 1; i < prof.length; i++) if (prof[i].d >= d) { const a = prof[i - 1], b = prof[i]; return a.z + (b.z - a.z) * (d - a.d) / ((b.d - a.d) || 1); } return prof[prof.length - 1].z; };
+  const d0 = prof[0].d, d1 = prof[prof.length - 1].d, W = 20, st = Math.max(2, Math.min(5, (d1 - d0) / 500));
+  const cells = [];
+  for (let d = d0; d < d1; d += st) {
+    const e = Math.min(d1, d + st), m = (d + e) / 2, a = Math.max(d0, m - W / 2), b = Math.min(d1, m + W / 2);
+    let sl = b > a ? (zAt(b) - zAt(a)) / (b - a) * 100 : 0; const v = abs ? Math.abs(sl) : sl;
+    cells.push({ a: d, b: e, v });
+  }
+  const runs = test => {
+    const out = []; let cur = null;
+    cells.forEach(c => { if (test(c.v)) { if (cur && Math.abs(cur.b - c.a) < 0.01) cur.b = c.b; else { cur = { a: c.a, b: c.b }; out.push(cur); } } else cur = null; });
+    return out.filter(r => r.b - r.a >= minL).map(r => ({ ...r, s: (zAt(r.b) - zAt(r.a)) / (r.b - r.a) * 100 }));
+  };
+  const lo = isFinite(le) ? runs(v => v <= le) : [], hi = isFinite(ge) ? runs(v => v >= ge) : [];
+  slopeHL.clearLayers(); showSlopeSegment(f, d0, d1);
+  const draw = (list, color) => list.forEach(r => L.polyline(segmentCoords(f, r.a, r.b), { renderer: hlRenderer, color, weight: 9, opacity: 0.9, interactive: false }).addTo(slopeHL));
+  draw(lo, '#2f9e44'); draw(hi, '#e03131');
+  const tot = l => l.reduce((s2, r) => s2 + r.b - r.a, 0), L0 = d1 - d0;
+  const table = (list, label, color) => list.length ? `<p class="rhead"><span class="dot" style="background:${color}"></span><b>${label}</b> · ${list.length} tramo${list.length === 1 ? '' : 's'} · ${fmtLen(tot(list))} (${(tot(list) / L0 * 100).toFixed(1).replace('.', ',')} % del tramo)</p>
+    <table class="attrs">${list.map(r => `<tr><td>PK ${fmtPK(r.a)} – ${fmtPK(r.b)}</td><td>${fmtLen(r.b - r.a)} · ${fmtPct(r.s)}</td></tr>`).join('')}</table>` : `<p class="hint">${label}: ningún tramo de al menos ${minL} m.</p>`;
+  const sym = abs ? '|pendiente|' : 'pendiente';
+  $('#slRanges').innerHTML = (isFinite(le) ? table(lo, `${sym} ≤ ${String(le).replace('.', ',')} %`, '#2f9e44') : '') + (isFinite(ge) ? table(hi, `${sym} ≥ ${String(ge).replace('.', ',')} %`, '#e03131') : '')
+    + '<p class="hint">Los tramos se marcan en el mapa: verde para ≤ y rojo para ≥.</p>';
 }
 function profileSVG(prof) {
   const W = 360, H = 170, pl = 46, pr = 10, pt = 10, pb = 26;
@@ -1729,7 +1854,7 @@ function drawActs() {
         const ll = offsetLatLngs(c.length > 1 ? c : a.coords, px);
         lyr = L.circleMarker(ll[Math.floor(ll.length / 2)] || L.latLng(a.coords[0]), { radius: 7, color: '#fff', weight: 2, fillColor: col, fillOpacity: 1 });
       }
-      lyr.on('click', e => { L.DomEvent.stop(e); if (drawing && !drawing.gps) return addDrawPt(L.latLng(e && e.latlng ? e.latlng : e)); if (slopePick || actPick || widthPick) return slopePickPoint(e.latlng); if (measure) return addMeasurePt(e.latlng); viewAct(a.id); });
+      lyr.on('click', e => { L.DomEvent.stop(e); if (drawing && !drawing.gps) return addDrawPt(L.latLng(e && e.latlng ? e.latlng : e)); if (slopePick || actPick || widthPick || offPick || calcPick) return slopePickPoint(e.latlng); if (measure) return addMeasurePt(e.latlng); viewAct(a.id); });
       lyr.addTo(actsLayer);
     });
     if (z >= 17) {
@@ -2019,6 +2144,8 @@ async function exportObraPackage(id) {
   Z.file('datos/actuaciones.geojson', fc(actFeats));
   const wx = widthsExport(lays.filter(r => (r.type || 'kml') === 'kml' && r.widths));
   if (wx.rows > 1) { Z.file('datos/anchos.csv', wx.csv); Z.file('datos/anchos_superficie.geojson', fc(wx.polys)); }
+  const resFC = [...resources.values()].map(r => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [r.lng, r.lat] }, properties: { id: r.id, tipo: r.type, nombre: r.name, empresa: r.company, telefono: r.phone, direccion: r.address, materiales: r.materials, notas: r.notes } }));
+  if (resFC.length) Z.file('datos/recursos.geojson', fc(resFC));
   Z.file('datos/actuaciones.csv', actsCSV(ats.sort((a, b) => (a.traceName || '').localeCompare(b.traceName || '') || a.d0 - b.d0)));
   Z.file('obra.json', JSON.stringify({ formato: 'OBRA-GIS', version: 1, app_version: APP_VERSION, exportado: new Date().toISOString(),
     obra: { id: o.id, nombre: o.name, descripcion: o.desc || '', creada: new Date(o.created).toISOString() },
@@ -2031,6 +2158,7 @@ async function exportObraPackage(id) {
     'datos/fotos_importadas.geojson  Fotos situadas por sus coordenadas GPS',
     'datos/actuaciones.geojson    Actuaciones sobre las trazas (líneas o puntos) con tipo, margen y PK',
     'datos/actuaciones.csv        Listado de actuaciones para Excel',
+    'datos/recursos.geojson       Plantas, canteras y demás recursos (comunes a todas las obras)',
     'datos/anchos.csv             Anchos del camino por tramos (PK, ancho, longitud, superficie)',
     'datos/anchos_superficie.geojson  Plataforma del camino con su ancho (polígonos, con superficie en m²)',
     'multimedia/                  Fotos, vídeos y notas de voz, enlazados desde los GeoJSON (campo multimedia)', '',
@@ -2092,6 +2220,11 @@ async function importObraPackage(file, zipIn) {
     const coords = g.type === 'LineString' ? g.coordinates.map(c => [c[1], c[0]]) : [[g.coordinates[1], g.coordinates[0]]];
     await DB.put('acts', { id: uid(), obraId, layerId: idMap[p.capa_id] || null, featIdx: p.elemento, traceName: p.traza, layerName: p.capa, d0: p.pk_inicio_m, d1: p.pk_fin_m,
       type: p.tipo, side: p.margen_cod || 'izq', text: p.descripcion, created: Date.parse(p.fecha) || Date.now(), coords, media: await readMedia(p.multimedia) }); nA++;
+  }
+  for (const ft of await readFC('datos/recursos.geojson')) { // recursos comunes: se añaden los que no existan
+    const p = ft.properties; if (!p.id || resources.has(p.id)) continue;
+    const r = { id: p.id, type: p.tipo, name: p.nombre, company: p.empresa, phone: p.telefono, address: p.direccion, materials: p.materiales, notes: p.notas, lat: ft.geometry.coordinates[1], lng: ft.geometry.coordinates[0], created: Date.now() };
+    await DB.put('resources', r); resources.set(r.id, r); drawResource(r);
   }
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
   await loadObra(obraId, true);
@@ -2304,6 +2437,8 @@ function widthResultsHtml(st, d, f) {
 }
 var slopePickPoint2 = slopePickPoint;
 slopePickPoint = function (ll) {
+  if (offPick) return offlinePickAt(L.latLng(ll));
+  if (calcPick) return calcPickPoint(L.latLng(ll));
   if (!widthPick) return slopePickPoint2(ll);
   widthPick = null; $('#pickBar').hidden = true;
   const ctx = wCtx(); const r = pkAt(ctx.f, L.latLng(ll));
@@ -2331,54 +2466,360 @@ function widthsExport(recs) {
 
 /* ---------------- Dibujar o grabar una traza nueva ---------------- */
 let drawing = null;
-function startDrawing(gps) {
+// modo: false = línea tocando el mapa · true = línea grabada con GPS · 'points' = puntos
+function startDrawing(mode) {
   if (drawing) endDrawing(false);
-  drawing = { gps, pts: [], line: L.polyline([], { renderer: hlRenderer, color: '#ff6b00', weight: 4, interactive: false }).addTo(map), dots: L.layerGroup().addTo(map) };
-  $('#drawBar').hidden = false; updateDrawBar();
+  const gps = mode === true, points = mode === 'points';
+  drawing = { gps, points, pts: [], line: L.polyline([], { renderer: hlRenderer, color: '#ff6b00', weight: 4, interactive: false }).addTo(map), dots: L.layerGroup().addTo(map) };
+  $('#drawBar').hidden = false; $('#drawGps').hidden = !points; updateDrawBar();
   if (gps) { if (!startWatch()) { endDrawing(false); return; } if (lastPos && Date.now() - lastPos.t < 10000) drawGpsPoint(lastPos); toast('Grabando: camina por el eje del camino. Se añade un punto cada 5 m.', 5000); }
+  else if (points) toast('Toca el mapa para añadir puntos, o pulsa «Aquí» para añadir tu posición GPS.', 5000);
   else toast('Toca el mapa para ir añadiendo los vértices de la traza.', 4000);
 }
 function addDrawPt(ll) {
   if (!drawing) return;
   drawing.pts.push(L.latLng(ll.lat, ll.lng));
-  drawing.line.setLatLngs(drawing.pts);
-  if (!drawing.gps) L.circleMarker(ll, { renderer: hlRenderer, radius: 5, color: '#fff', weight: 2, fillColor: '#ff6b00', fillOpacity: 1, interactive: false }).addTo(drawing.dots);
+  if (!drawing.points) drawing.line.setLatLngs(drawing.pts);
+  if (drawing.points) L.marker(ll, { interactive: false, icon: L.divIcon({ className: 'dp-label', html: `<span>P${drawing.pts.length}</span>`, iconSize: [0, 0] }) }).addTo(drawing.dots);
+  else if (!drawing.gps) L.circleMarker(ll, { renderer: hlRenderer, radius: 5, color: '#fff', weight: 2, fillColor: '#ff6b00', fillOpacity: 1, interactive: false }).addTo(drawing.dots);
   updateDrawBar();
 }
 function drawGpsPoint(p) {
-  if (!drawing || (p.acc && p.acc > 25)) return;
+  if (!drawing || !drawing.gps || (p.acc && p.acc > 25)) return;
   const ll = L.latLng(p.lat, p.lng), last = drawing.pts[drawing.pts.length - 1];
   if (!last || last.distanceTo(ll) >= 5) { addDrawPt(ll); map.panTo(ll, { animate: true }); }
 }
 function updateDrawBar() {
-  let len = 0; const p = drawing.pts; for (let i = 1; i < p.length; i++) len += p[i - 1].distanceTo(p[i]);
+  const p = drawing.pts;
+  if (drawing.points) { $('#drawText').textContent = `Puntos · ${p.length}`; return; }
+  let len = 0; for (let i = 1; i < p.length; i++) len += p[i - 1].distanceTo(p[i]);
   $('#drawText').textContent = `${drawing.gps ? 'Grabando con GPS' : 'Dibujando'} · ${p.length} puntos · ${fmtLen(len)}`;
+}
+async function saveKmlLayer(name, text, extra = {}) {
+  const nk = [...layers.values()].filter(e => typeOf(e.rec) === 'kml').length;
+  const rec = { id: uid(), obraId: settings.activeObra, type: 'kml', name, text, color: PALETTE[nk % PALETTE.length], visible: true, opacity: 1, order: nextOrder(), created: Date.now(), ...extra };
+  await DB.put('layers', rec);
+  const e = registerLayer(rec); drawPK(); drawActs();
+  return e;
 }
 function endDrawing(save) {
   if (!drawing) return;
-  const pts = drawing.pts;
+  const pts = drawing.pts, points = drawing.points;
   map.removeLayer(drawing.line); map.removeLayer(drawing.dots); $('#drawBar').hidden = true;
   drawing = null;
   if (!save) return;
-  if (pts.length < 2) { toast('La traza necesita al menos dos puntos.'); return; }
-  const b = openSheet(`<h2>Guardar traza</h2><p class="sub">${pts.length} puntos</p>
-    <div class="field"><input type="text" id="trName" placeholder="Nombre (p. ej. Camino de servicio C-3)" value="Traza ${new Date().toLocaleDateString('es-ES')}"></div>
+  if (!points && pts.length < 2) { toast('La traza necesita al menos dos puntos.'); return; }
+  if (points && !pts.length) { toast('No has añadido ningún punto.'); return; }
+  const b = openSheet(`<h2>Guardar ${points ? 'puntos' : 'traza'}</h2><p class="sub">${pts.length} puntos</p>
+    <div class="field"><input type="text" id="trName" placeholder="${points ? 'Nombre (p. ej. Arquetas a revisar)' : 'Nombre (p. ej. Camino de servicio C-3)'}" value="${points ? 'Puntos' : 'Traza'} ${new Date().toLocaleDateString('es-ES')}"></div>
+    ${points ? `<div class="field"><label>Nombres de los puntos (opcional, uno por línea)</label><textarea id="ptNames" rows="4" placeholder="${pts.map((p, i) => 'P' + (i + 1)).join('\n')}"></textarea></div>` : ''}
     <div class="acts"><button class="btn pri full" data-a="ok">Guardar como capa KML de la obra</button><button class="btn full" data-a="no">Descartar</button></div>`);
   b.querySelector('[data-a=no]').onclick = closeSheet;
   b.querySelector('[data-a=ok]').onclick = async () => {
-    const name = $('#trName').value.trim() || 'Traza nueva';
-    const text = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>${xml(name)}</name>\n<Placemark><name>${xml(name)}</name><LineString><tessellate>1</tessellate><coordinates>${pts.map(p => `${p.lng.toFixed(7)},${p.lat.toFixed(7)},0`).join(' ')}</coordinates></LineString></Placemark>\n</Document></kml>`;
-    const nk = [...layers.values()].filter(e => typeOf(e.rec) === 'kml').length;
-    const rec = { id: uid(), obraId: settings.activeObra, type: 'kml', name, text, color: PALETTE[nk % PALETTE.length], visible: true, opacity: 1, order: nextOrder(), created: Date.now(), drawn: true };
-    await DB.put('layers', rec);
-    const e = registerLayer(rec); drawPK();
-    closeSheet(); toast(`Traza «${name}» guardada en la obra.`);
-    const f = e.feats[0]; featureSheet(f, L.latLng(f.start[0], f.start[1]), rec);
+    const name = $('#trName').value.trim() || (points ? 'Puntos' : 'Traza nueva');
+    let body;
+    if (points) {
+      const names = ($('#ptNames').value || '').split('\n').map(x => x.trim());
+      body = pts.map((p, i) => `<Placemark><name>${xml(names[i] || 'P' + (i + 1))}</name><Point><coordinates>${p.lng.toFixed(7)},${p.lat.toFixed(7)},0</coordinates></Point></Placemark>`).join('\n');
+    } else body = `<Placemark><name>${xml(name)}</name><LineString><tessellate>1</tessellate><coordinates>${pts.map(p => `${p.lng.toFixed(7)},${p.lat.toFixed(7)},0`).join(' ')}</coordinates></LineString></Placemark>`;
+    const text = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>${xml(name)}</name>\n${body}\n</Document></kml>`;
+    const e = await saveKmlLayer(name, text, { drawn: true });
+    closeSheet(); toast(`«${name}» guardada en la obra.`);
+    if (!points) { const f = e.feats[0]; featureSheet(f, L.latLng(f.start[0], f.start[1]), e.rec); }
+    else map.fitBounds(e.group.getBounds().pad(0.3), { maxZoom: 18 });
   };
 }
+$('#drawGps').onclick = async () => { if (!drawing) return; try { const p = await getPos(); addDrawPt(L.latLng(p.lat, p.lng)); map.panTo([p.lat, p.lng]); toast(`Punto P${drawing.pts.length} en tu posición (±${Math.round(p.acc || 0)} m)`); } catch (e) { toast(geoErr(e), 6000); } };
 $('#drawUndo').onclick = () => { if (!drawing || !drawing.pts.length) return; drawing.pts.pop(); drawing.line.setLatLngs(drawing.pts); const ds = drawing.dots.getLayers(); if (ds.length) drawing.dots.removeLayer(ds[ds.length - 1]); updateDrawBar(); };
 $('#drawEnd').onclick = () => endDrawing(true);
 $('#drawCancel').onclick = () => endDrawing(false);
+
+/* ---------------- Distancia por carretera (OSRM sobre OpenStreetMap) ---------------- */
+const routeLayer = L.layerGroup().addTo(map);
+async function roadRoute(a, b) {
+  const q = `${a.lng.toFixed(6)},${a.lat.toFixed(6)};${b.lng.toFixed(6)},${b.lat.toFixed(6)}?overview=full&geometries=geojson`;
+  for (const [base, src] of [['https://routing.openstreetmap.de/routed-car/route/v1/driving/', 'OpenStreetMap (OSRM · FOSSGIS)'], ['https://router.project-osrm.org/route/v1/driving/', 'OpenStreetMap (OSRM)']]) {
+    try { const j = JSON.parse(await httpGetText(base + q)); if (j.code === 'Ok' && j.routes && j.routes[0]) { const r = j.routes[0]; return { dist: r.distance, dur: r.duration, coords: r.geometry.coordinates.map(c => [c[1], c[0]]), src }; } } catch (e) { /* siguiente servidor */ }
+  }
+  throw new Error('El servicio de rutas no responde');
+}
+const fmtDur = s => s >= 3600 ? `${Math.floor(s / 3600)} h ${Math.round(s % 3600 / 60)} min` : `${Math.max(1, Math.round(s / 60))} min`;
+function drawRoute(r, a, b) {
+  routeLayer.clearLayers();
+  L.polyline(r.coords, { renderer: hlRenderer, color: '#1c7ed6', weight: 6, opacity: 0.85, interactive: false }).addTo(routeLayer);
+  [[a, 'A'], [b, 'B']].forEach(([p, t]) => L.circleMarker([p.lat, p.lng], { renderer: hlRenderer, radius: 8, color: '#fff', weight: 3, fillColor: '#1c7ed6', fillOpacity: 1, interactive: false }).bindTooltip(t, { permanent: true, direction: 'top', offset: [0, -8] }).addTo(routeLayer));
+}
+function obraCenter() {
+  const pts = []; layers.forEach(e => { if (e.group) { const bb = e.group.getBounds(); if (bb.isValid()) pts.push(bb.getCenter()); } });
+  return pts.length ? L.latLngBounds(pts).getCenter() : null;
+}
+function refPoint() {
+  if (lastPos && Date.now() - lastPos.t < 120000) return { lat: lastPos.lat, lng: lastPos.lng, label: 'tu posición' };
+  const c = obraCenter(); if (c) return { lat: c.lat, lng: c.lng, label: 'el centro de la obra' };
+  const m = map.getCenter(); return { lat: m.lat, lng: m.lng, label: 'el centro del mapa' };
+}
+
+/* ---------------- Calculadora ---------------- */
+let calcPick = null; const calcState = { a: null, b: null, s1: null, s2: null };
+function calcSheet(focus) {
+  const st = calcState, P = p => p ? `${esc(p.label || fmtLL(p.lat, p.lng))}` : '—';
+  const b = openSheet(`<h2>${ICON.calc} Calculadora</h2><p class="sub">Distancias, áreas, pendientes y coordenadas</p>
+    <div class="ccard"><h3>Medir en el mapa</h3><div class="row"><button class="mini" data-c="dist">${ICON.ruler}Distancia</button><button class="mini" data-c="area">Área y perímetro</button></div></div>
+    <div class="ccard ${focus === 'route' ? 'hl' : ''}"><h3>Distancia por carretera</h3>
+      <div class="cpair"><span>A · ${P(st.a)}</span><div class="row"><button class="mini" data-c="aMe">Mi posición</button><button class="mini" data-c="aObra">Centro de la obra</button><button class="mini" data-c="aMap">Tocar mapa</button></div></div>
+      <div class="cpair"><span>B · ${P(st.b)}</span><div class="row"><button class="mini" data-c="bMap">Tocar mapa</button><button class="mini" data-c="bRes">Un recurso</button></div></div>
+      <div class="row"><button class="mini pri" data-c="route">Calcular ruta</button>${st.a && st.b ? `<a class="mini" href="https://www.google.com/maps/dir/?api=1&origin=${st.a.lat.toFixed(6)},${st.a.lng.toFixed(6)}&destination=${st.b.lat.toFixed(6)},${st.b.lng.toFixed(6)}&travelmode=driving" target="_blank" rel="noopener">Ver en Google Maps</a>` : ''}</div>
+      <div id="cRoute"></div></div>
+    <div class="ccard"><h3>Pendiente entre dos puntos</h3><p class="hint">Toca dos puntos del mapa; la cota se toma del MDT05 del IGN.</p>
+      <div class="row"><button class="mini" data-c="slope2">Elegir los dos puntos</button></div><div id="cSlope"></div></div>
+    <div class="ccard"><h3>Conversor de pendientes</h3>
+      <div class="pkrow"><div class="field"><label for="cvDz">Desnivel (m)</label><input id="cvDz" inputmode="decimal" type="text"></div><div class="field"><label for="cvL">Longitud en planta (m)</label><input id="cvL" inputmode="decimal" type="text"></div></div>
+      <div class="pkrow"><div class="field"><label for="cvP">Pendiente (%)</label><input id="cvP" inputmode="decimal" type="text"></div><div class="field"><label for="cvT">Talud H:V (1 vertical)</label><input id="cvT" inputmode="decimal" type="text" placeholder="p. ej. 1,5"></div></div>
+      <p class="cout" id="cvOut">Escribe desnivel y longitud, una pendiente o un talud.</p></div>
+    <div class="ccard"><h3>Coordenadas</h3>
+      <div class="field"><input id="coIn" type="text" placeholder="37.6123, -2.9154 · o UTM: 30 507302 4162826"></div>
+      <div class="row"><button class="mini" data-c="coGo">Convertir y ver en el mapa</button></div><p class="cout" id="coOut"></p></div>`);
+  const pick = (mode, text) => { calcPick = mode; closeSheet(); $('#pickText').textContent = text; $('#pickBar').hidden = false; };
+  const on = (k, fn) => { const el = b.querySelector(`[data-c=${k}]`); if (el) el.onclick = fn; };
+  on('dist', () => { closeSheet(); startMeasure(); });
+  on('area', () => { closeSheet(); startMeasure(null, true); toast('Toca los vértices del contorno. El área se cierra sola.', 4000); });
+  on('aMe', async () => { try { const p = await getPos(); st.a = { lat: p.lat, lng: p.lng, label: 'tu posición' }; calcSheet('route'); } catch (e) { toast(geoErr(e), 6000); } });
+  on('aObra', () => { const c = obraCenter(); if (!c) { toast('La obra activa no tiene capas.'); return; } st.a = { lat: c.lat, lng: c.lng, label: 'centro de la obra' }; calcSheet('route'); });
+  on('aMap', () => pick('routeA', 'Toca el punto de salida (A)'));
+  on('bMap', () => pick('routeB', 'Toca el punto de llegada (B)'));
+  on('bRes', () => resourceList({ pickFor: 'routeB' }));
+  on('route', async () => {
+    if (!st.a || !st.b) { toast('Elige los puntos A y B.'); return; }
+    $('#cRoute').innerHTML = '<p class="hint">Calculando la ruta…</p>';
+    try {
+      const r = await roadRoute(st.a, st.b); drawRoute(r, st.a, st.b);
+      const straight = L.latLng(st.a).distanceTo(st.b);
+      $('#cRoute').innerHTML = `<div class="slope-main"><span>${fmtLen(r.dist)}</span><small>por carretera · ${fmtDur(r.dur)} en coche · en línea recta ${fmtLen(straight)}</small></div><p class="hint">Red viaria: ${r.src}. Tiempo orientativo.</p>`;
+      map.fitBounds(L.latLngBounds(r.coords).pad(0.15));
+    } catch (e) { $('#cRoute').innerHTML = `<p class="hint">${esc(e.message)}. Usa «Ver en Google Maps».</p>`; }
+  });
+  on('slope2', () => { st.s1 = st.s2 = null; pick('slope2', 'Toca el primer punto'); });
+  if (st.s1 && st.s2) calcSlope2();
+  const cv = () => {
+    const dz = parseNum($('#cvDz').value), Lp = parseNum($('#cvL').value), pc = parseNum($('#cvP').value), ta = parseNum($('#cvT').value);
+    let p = NaN; if (isFinite(dz) && Lp > 0) p = dz / Lp * 100; else if (isFinite(pc)) p = pc; else if (ta > 0) p = 100 / ta;
+    if (!isFinite(p)) { $('#cvOut').textContent = 'Escribe desnivel y longitud, una pendiente o un talud.'; return; }
+    const deg = Math.atan(p / 100) * 180 / Math.PI, n = v => v.toFixed(2).replace('.', ',');
+    $('#cvOut').innerHTML = `<b>${n(p)} %</b> · ${n(p * 10)} ‰ · ${n(deg)}° · talud ${p ? n(100 / Math.abs(p)) : '∞'}H:1V${isFinite(dz) && Lp > 0 ? ` · longitud real ${n(Math.hypot(dz, Lp))} m` : ''}`;
+  };
+  ['cvDz', 'cvL', 'cvP', 'cvT'].forEach(id => $('#' + id).oninput = cv);
+  on('coGo', () => {
+    const t = $('#coIn').value.trim(); let ll = null;
+    const u = /^(2[7-9]|3[01])\D+(\d{6}(?:[.,]\d+)?)\D+(\d{7}(?:[.,]\d+)?)$/.exec(t);
+    if (u) ll = fromUTM(+u[1], parseNum(u[2]), parseNum(u[3]));
+    else { const p = parseWatermark(t); if (p.lat != null) ll = { lat: p.lat, lng: p.lng }; else { const m = /^\s*(-?\d{1,2}[.,]\d+)\s*[,; ]\s*(-?\d{1,3}[.,]\d+)\s*$/.exec(t); if (m) ll = { lat: parseNum(m[1]), lng: parseNum(m[2]) }; } }
+    if (!ll) { $('#coOut').textContent = 'No entiendo esas coordenadas. Ejemplos: 37.6123, -2.9154 · 37°36\'44"N 2°54\'55"W · 30 507302 4162826'; return; }
+    $('#coOut').innerHTML = `${fmtLL(ll.lat, ll.lng)}<br>${fmtUTM(ll.lat, ll.lng)}<br><a href="${navUrl(ll.lat, ll.lng)}" target="_blank" rel="noopener">Llévame aquí</a>`;
+    map.setView([ll.lat, ll.lng], 17); routeLayer.clearLayers();
+    L.circleMarker([ll.lat, ll.lng], { renderer: hlRenderer, radius: 9, color: '#fff', weight: 3, fillColor: '#e8590c', fillOpacity: 1, interactive: false }).addTo(routeLayer);
+  });
+}
+function calcPickPoint(ll) {
+  const mode = calcPick; calcPick = null; $('#pickBar').hidden = true;
+  const p = { lat: ll.lat, lng: ll.lng, label: fmtLL(ll.lat, ll.lng) };
+  if (mode === 'routeA') { calcState.a = p; return calcSheet('route'); }
+  if (mode === 'routeB') { calcState.b = p; return calcSheet('route'); }
+  if (mode === 'slope2') {
+    if (!calcState.s1) { calcState.s1 = p; L.circleMarker(ll, { renderer: hlRenderer, radius: 7, color: '#fff', weight: 3, fillColor: '#ff6b00', fillOpacity: 1, interactive: false }).addTo(routeLayer); calcPick = 'slope2'; $('#pickText').textContent = 'Toca el segundo punto'; $('#pickBar').hidden = false; return; }
+    calcState.s2 = p; return calcSheet();
+  }
+}
+async function calcSlope2() {
+  const box = $('#cSlope'), a = calcState.s1, b = calcState.s2; if (!box) return;
+  routeLayer.clearLayers(); L.polyline([a, b], { renderer: hlRenderer, color: '#ff6b00', weight: 4, dashArray: '6 5', interactive: false }).addTo(routeLayer);
+  box.innerHTML = '<p class="hint">Consultando cotas…</p>';
+  let z, src = 'MDT05 del IGN';
+  try { z = await demIGN([a, b]); } catch (e) { try { z = await demGlobal([a, b]); src = 'modelo global de 90 m (orientativo)'; } catch (e2) { box.innerHTML = '<p class="hint">No se pudieron obtener las cotas. Comprueba la conexión.</p>'; return; } }
+  const d = L.latLng(a).distanceTo(b), dz = z[1] - z[0], p = dz / d * 100;
+  box.innerHTML = `<div class="slope-main"><span>${fmtPct(p)}</span><small>${(Math.atan(p / 100) * 180 / Math.PI).toFixed(2).replace('.', ',')}° · desnivel ${(dz >= 0 ? '+' : '−') + fmtZ(Math.abs(dz))} en ${fmtLen(d)}</small></div><p class="hint">Cota A ${fmtZ(z[0])} · cota B ${fmtZ(z[1])} · ${src}</p>`;
+}
+
+/* ---------------- Recursos: plantas de RCD, hormigón, canteras, aglomerado… (comunes a todas las obras) ---------------- */
+const RES_TYPES = [['Planta de RCD', '#6d4c41', 'R'], ['Planta de hormigón', '#607d8b', 'H'], ['Cantera de zahorras y áridos', '#b08d3c', 'Z'], ['Cantera de escollera', '#795548', 'E'],
+  ['Planta de aglomerado', '#263238', 'A'], ['Vertedero o gestor de tierras', '#8d6e63', 'V'], ['Préstamo de tierras', '#a1887f', 'P'], ['Almacén o suministros', '#1565c0', 'S'], ['Otro', '#455a64', 'O']];
+const resources = new Map(), resMarkers = new Map(), resLayer = L.layerGroup();
+const RES_KEYS = [[/rcd|reciclaj|residu/i, 0], [/hormig/i, 1], [/zahorr|[áa]rido|grava/i, 2], [/escoller|piedra|cantera/i, 3], [/aglomer|asfalt|mbc/i, 4], [/vertedero|gestor|tierras/i, 5], [/pr[ée]stamo/i, 6], [/almac|suminist/i, 7]];
+function resTypeFromText(v) { v = String(v || '').trim(); const ex = RES_TYPES.find(x => x[0].toLowerCase() === v.toLowerCase()); if (ex) return ex[0]; const k = RES_KEYS.find(([re]) => re.test(v)); return RES_TYPES[k ? k[1] : RES_TYPES.length - 1][0]; }
+const resType = t => RES_TYPES.find(x => x[0] === t) || RES_TYPES[RES_TYPES.length - 1];
+const resIcon = t => { const [, c, l] = resType(t); return L.divIcon({ className: '', html: `<div class="resmk" style="--c:${c}"><span>${l}</span></div>`, iconSize: [26, 26], iconAnchor: [13, 13] }); };
+function drawResource(r) {
+  let m = resMarkers.get(r.id);
+  if (!m) { m = L.marker([r.lat, r.lng], { icon: resIcon(r.type) }).addTo(resLayer); m.on('click', e => { L.DomEvent.stop(e); viewResource(r.id); }); resMarkers.set(r.id, m); }
+  else m.setLatLng([r.lat, r.lng]).setIcon(resIcon(r.type));
+}
+async function loadResources() {
+  for (const r of await DB.all('resources')) { resources.set(r.id, r); drawResource(r); }
+  if (settings.resVisible !== false) resLayer.addTo(map);
+}
+let resDraft = null, resMarkerDraft = null;
+function resourceEditor(o) {
+  resDraft = o.id ? { ...o } : { id: uid(), type: RES_TYPES[0][0], name: '', company: '', phone: '', address: '', materials: '', notes: '', lat: o.lat, lng: o.lng, created: Date.now() };
+  const d = resDraft;
+  const b = openSheet(`<h2>${resources.has(d.id) ? 'Editar recurso' : 'Nuevo recurso'}</h2><p class="sub">${fmtLL(d.lat, d.lng)} · arrastra el marcador para corregir</p>
+    <div class="field"><label for="rType">Tipo</label><select id="rType">${RES_TYPES.map(([t]) => `<option ${t === d.type ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></div>
+    <div class="field"><input type="text" id="rName" placeholder="Nombre (p. ej. Planta RCD Baza)" value="${esc(d.name)}"></div>
+    <div class="field"><input type="text" id="rComp" placeholder="Empresa" value="${esc(d.company)}"></div>
+    <div class="pkrow"><div class="field"><input type="tel" id="rPhone" placeholder="Teléfono" value="${esc(d.phone)}"></div><div class="field"><input type="text" id="rAddr" placeholder="Dirección o paraje" value="${esc(d.address)}"></div></div>
+    <div class="field"><input type="text" id="rMat" placeholder="Materiales, precios, horario…" value="${esc(d.materials)}"></div>
+    <div class="field"><textarea id="rNotes" rows="2" placeholder="Observaciones">${esc(d.notes)}</textarea></div>
+    <div class="row"><button class="mini" data-a="gps">Usar mi posición</button></div>
+    <div class="acts"><button class="btn pri full" data-a="save">Guardar recurso</button>${resources.has(d.id) ? '<button class="btn del full" data-a="del">Eliminar recurso</button>' : ''}</div>`);
+  resMarkerDraft = L.marker([d.lat, d.lng], { draggable: true, icon: resIcon(d.type), zIndexOffset: 2000 }).addTo(map);
+  resMarkerDraft.on('dragend', () => { const ll = resMarkerDraft.getLatLng(); d.lat = ll.lat; d.lng = ll.lng; b.querySelector('.sub').textContent = fmtLL(d.lat, d.lng) + ' · arrastra el marcador para corregir'; });
+  onSheetClose(() => { if (resMarkerDraft) { map.removeLayer(resMarkerDraft); resMarkerDraft = null; } });
+  $('#rType').onchange = () => resMarkerDraft.setIcon(resIcon($('#rType').value));
+  b.querySelector('[data-a=gps]').onclick = async () => { try { const p = await getPos(); d.lat = p.lat; d.lng = p.lng; resMarkerDraft.setLatLng([p.lat, p.lng]); map.panTo([p.lat, p.lng]); } catch (e) { toast(geoErr(e), 6000); } };
+  b.querySelector('[data-a=save]').onclick = async () => {
+    Object.assign(d, { type: $('#rType').value, name: $('#rName').value.trim() || $('#rType').value, company: $('#rComp').value.trim(), phone: $('#rPhone').value.trim(), address: $('#rAddr').value.trim(), materials: $('#rMat').value.trim(), notes: $('#rNotes').value.trim(), updated: Date.now() });
+    await DB.put('resources', d); resources.set(d.id, d); drawResource(d);
+    if (!layerVisible('res')) setLayerVisible('res', true);
+    closeSheet(); toast(`Recurso «${d.name}» guardado`);
+  };
+  const del = b.querySelector('[data-a=del]');
+  if (del) del.onclick = async () => { if (!confirm(`¿Eliminar «${d.name}»?`)) return; await DB.del('resources', d.id); resources.delete(d.id); const m = resMarkers.get(d.id); if (m) { resLayer.removeLayer(m); resMarkers.delete(d.id); } closeSheet(); toast('Recurso eliminado'); };
+}
+function viewResource(id) {
+  const r = resources.get(id); if (!r) return;
+  const [, col] = resType(r.type), ref = refPoint();
+  const b = openSheet(`<h2><span class="dot" style="background:${col}"></span>${esc(r.name)}</h2><p class="sub">${esc(r.type)}${r.company ? ' · ' + esc(r.company) : ''}</p>
+    <table class="attrs">${[['Teléfono', r.phone ? `<a href="tel:${esc(r.phone.replace(/\s/g, ''))}">${esc(r.phone)}</a>` : ''], ['Dirección', esc(r.address)], ['Materiales', esc(r.materials)], ['Observaciones', esc(r.notes)], ['Coordenadas', fmtLL(r.lat, r.lng) + '<br>' + fmtUTM(r.lat, r.lng)], ['En línea recta', `${fmtLen(L.latLng(ref).distanceTo([r.lat, r.lng]))} desde ${ref.label}`]].filter(x => x[1]).map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('')}</table>
+    <div id="rRoute"></div>
+    <div class="acts">${goBtn(r.lat, r.lng, 'Llévame aquí', 'full')}
+      <button class="btn" data-a="road">${ICON.road}Distancia por carretera</button><button class="btn" data-a="edit">Editar</button></div>`);
+  b.querySelector('[data-a=edit]').onclick = () => resourceEditor(r);
+  b.querySelector('[data-a=road]').onclick = async () => {
+    const box = $('#rRoute'); box.innerHTML = '<p class="hint">Calculando la ruta…</p>';
+    try { const rt = await roadRoute(ref, r); drawRoute(rt, ref, r); r.lastRoad = { dist: rt.dist, from: ref.label, t: Date.now() };
+      box.innerHTML = `<div class="slope-main"><span>${fmtLen(rt.dist)}</span><small>por carretera desde ${esc(ref.label)} · ${fmtDur(rt.dur)}</small></div>`;
+      map.fitBounds(L.latLngBounds(rt.coords).pad(0.15)); }
+    catch (e) { box.innerHTML = `<p class="hint">${esc(e.message)}.</p>`; }
+  };
+}
+function resourceList(opt = {}) {
+  const ref = refPoint(), filt = settings.resFilter || '';
+  const list = [...resources.values()].filter(r => !filt || r.type === filt).map(r => ({ r, d: L.latLng(ref).distanceTo([r.lat, r.lng]) })).sort((a, b) => a.d - b.d);
+  const b = openSheet(`<h2>${ICON.pin} Recursos</h2><p class="sub">Comunes a todas las obras · distancias desde ${esc(ref.label)}</p>
+    <div class="chips"><button class="chip ${!filt ? 'on' : ''}" data-rf="" style="--c:var(--accent)" type="button">Todos (${resources.size})</button>${RES_TYPES.map(([t, c]) => { const n = [...resources.values()].filter(r => r.type === t).length; return n ? `<button class="chip ${filt === t ? 'on' : ''}" data-rf="${esc(t)}" style="--c:${c}" type="button">${esc(t)} (${n})</button>` : ''; }).join('')}</div>
+    ${list.length ? `<div class="wmlist">${list.map(({ r, d }) => `<div class="nrow" data-r="${r.id}"><span class="dot" style="background:${resType(r.type)[1]}"></span><span class="t"><b>${esc(r.name)}</b><small>${esc(r.type)} · ${fmtLen(d)} en línea recta${r._road ? ` · <b>${fmtLen(r._road)} por carretera</b>` : ''}</small></span></div>`).join('')}</div>`
+      : '<p class="empty">No hay recursos todavía. Mantén pulsado en el mapa y elige «Añadir recurso aquí», o importa un CSV.</p>'}
+    <div class="acts">
+      ${opt.pickFor ? '' : '<button class="btn pri" data-a="new">Nuevo en el centro del mapa</button>'}
+      ${list.length ? `<button class="btn" data-a="road">${ICON.road}Por carretera (10 más cercanos)</button>` : ''}
+      <button class="btn" data-a="imp">Importar CSV</button><button class="btn" data-a="exp" ${resources.size ? '' : 'disabled'}>Exportar CSV</button>
+    </div>
+    <p class="hint">CSV con columnas: tipo; nombre; empresa; telefono; direccion; materiales; notas; lat; lon. La distancia por carretera usa la red de OpenStreetMap.</p>
+    <input type="file" id="inRes" accept=".csv,text/csv,text/plain" hidden>`);
+  b.querySelectorAll('[data-rf]').forEach(c => c.onclick = () => { settings.resFilter = c.dataset.rf; saveSettings(); resourceList(opt); });
+  b.querySelectorAll('[data-r]').forEach(row => row.onclick = () => {
+    const r = resources.get(row.dataset.r);
+    if (opt.pickFor === 'routeB') { calcState.b = { lat: r.lat, lng: r.lng, label: r.name }; return calcSheet('route'); }
+    map.setView([r.lat, r.lng], Math.max(map.getZoom(), 14)); viewResource(r.id);
+  });
+  const nb = b.querySelector('[data-a=new]'); if (nb) nb.onclick = () => { const c = map.getCenter(); resourceEditor({ lat: c.lat, lng: c.lng }); };
+  const rb = b.querySelector('[data-a=road]');
+  if (rb) rb.onclick = async () => {
+    const top = list.slice(0, 10); rb.disabled = true;
+    for (let i = 0; i < top.length; i++) {
+      rb.textContent = `Calculando ${i + 1} de ${top.length}…`;
+      try { const rt = await roadRoute(ref, top[i].r); top[i].r._road = rt.dist; } catch (e) { /* sigue */ }
+      await new Promise(res => setTimeout(res, 1100)); // el servidor público admite 1 consulta por segundo
+    }
+    list.sort((a, b2) => (a.r._road ?? 1e12) - (b2.r._road ?? 1e12));
+    [...resources.values()].forEach(r => { if (!top.some(t => t.r === r)) delete r._road; });
+    resourceList(opt);
+  };
+  b.querySelector('[data-a=imp]').onclick = () => $('#inRes').click();
+  $('#inRes').onchange = async ev => {
+    const f = ev.target.files[0]; if (!f) return;
+    const rows = parseCSV(await f.text()); if (rows.length < 2) { toast('El CSV está vacío.'); return; }
+    const h = rows[0].map(x => x.trim().toLowerCase()), col = k => h.findIndex(x => x.startsWith(k));
+    const ci = { tipo: col('tipo'), nombre: col('nombre'), empresa: col('empresa'), tel: col('tel'), dir: col('direc'), mat: col('mater'), notas: col('nota'), lat: col('lat'), lon: [col('lon'), col('lng')].find(i => i >= 0) ?? -1 };
+    if (ci.lat < 0 || ci.lon < 0) { toast('El CSV necesita columnas «lat» y «lon».', 6000); return; }
+    let n = 0;
+    for (const r of rows.slice(1)) {
+      const lat = parseNum(r[ci.lat]), lng = parseNum(r[ci.lon]); if (!isFinite(lat) || !isFinite(lng)) continue;
+      const t = ci.tipo >= 0 ? resTypeFromText(r[ci.tipo]) : 'Otro';
+      const g = i => (i >= 0 ? (r[i] || '').trim() : '');
+      const rec = { id: uid(), type: t, name: g(ci.nombre) || t, company: g(ci.empresa), phone: g(ci.tel), address: g(ci.dir), materials: g(ci.mat), notes: g(ci.notas), lat, lng, created: Date.now() };
+      await DB.put('resources', rec); resources.set(rec.id, rec); drawResource(rec); n++;
+    }
+    if (!layerVisible('res')) setLayerVisible('res', true);
+    toast(`${n} recursos importados.`); resourceList(opt);
+  };
+  b.querySelector('[data-a=exp]').onclick = async () => {
+    const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`, n = v => String(v).replace('.', ',');
+    const rows = [['tipo', 'nombre', 'empresa', 'telefono', 'direccion', 'materiales', 'notas', 'lat', 'lon']].concat([...resources.values()].map(r => [r.type, r.name, r.company, r.phone, r.address, r.materials, r.notes, n(r.lat.toFixed(6)), n(r.lng.toFixed(6))]));
+    try { await saveBlob(new Blob(['\ufeff' + rows.map(r => r.map(q).join(';')).join('\r\n')], { type: 'text/csv' }), 'recursos_OBRA-GIS.csv'); } catch (e) { /* cancelado */ }
+  };
+}
+
+/* ---------------- Licencia de uso ----------------
+   La app consulta licencia.json publicado junto a la web (GitHub Pages). Si el autor pone "activa": false,
+   la app queda bloqueada salvo para exportar las obras. Sin conexión se permite trabajar DIAS_GRACIA días
+   desde la última comprobación correcta. */
+const LICENSE_URL = 'https://celtis-eng.github.io/OBRAGIS/licencia.json';
+const EULA_VERSION = '1';
+const EULA_TEXT = `<p><b>OBRA-GIS · Licencia de uso gratuita</b></p>
+<p>El autor concede una licencia personal, gratuita, no exclusiva, intransferible y revocable para usar OBRA-GIS como herramienta de apoyo en trabajos de campo.</p>
+<ul><li>La app se ofrece «tal cual», sin garantía. Las mediciones, pendientes, distancias, afecciones y coordenadas son orientativas y deben comprobarse con medios topográficos y fuentes oficiales antes de tomar decisiones de proyecto u obra.</li>
+<li>Los datos que introduces (obras, capas, fotos, anotaciones) se guardan en tu dispositivo. Eres responsable de sus copias de seguridad; usa «Exportar obra» con regularidad.</li>
+<li>Los mapas y servicios de terceros (IGN, Junta de Andalucía, MITECO, Catastro, OpenStreetMap…) se rigen por sus propias licencias y condiciones.</li>
+<li>El autor puede modificar estas condiciones, pasar la app a un modelo de pago o retirarla. En ese caso la app avisará y <b>siempre te permitirá exportar tus obras</b> antes de bloquearse.</li>
+<li>No está permitido redistribuir, vender ni modificar la app sin permiso del autor.</li></ul>`;
+let licState = { status: 'ok', msg: '' };
+function semverLess(a, b) { const p = v => String(v || '0').split('.').map(n => parseInt(n, 10) || 0); const x = p(a), y = p(b); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0); } return false; }
+async function checkLicense() {
+  const urls = location.protocol.startsWith('http') && !NATIVE && /github\.io$/.test(location.hostname) ? ['licencia.json'] : [LICENSE_URL];
+  let lic = null;
+  for (const u of urls) { try { lic = JSON.parse(await httpGetText(u + (u.includes('?') ? '&' : '?') + 't=' + Date.now())); break; } catch (e) { /* sin conexión */ } }
+  const now = Date.now();
+  if (lic) {
+    settings.license = { ...lic, checked: now }; saveSettings();
+    if (lic.activa === false) licState = { status: 'off', msg: lic.mensaje || 'El autor ha desactivado esta versión de OBRA-GIS.' };
+    else if (lic.version_minima && semverLess(APP_VERSION, lic.version_minima)) licState = { status: 'old', msg: lic.mensaje_version || `Esta versión (${APP_VERSION}) ya no está admitida. Actualiza a la ${lic.version_minima} o posterior.` };
+    else licState = { status: 'ok', msg: lic.aviso || '' };
+  } else {
+    const last = settings.license && settings.license.checked, days = (settings.license && settings.license.dias_sin_conexion) || 60;
+    if (!last) { settings.license = { checked: now, firstOffline: true }; saveSettings(); licState = { status: 'ok', msg: '' }; }
+    else if (now - last > days * 864e5) licState = { status: 'expired', msg: `La licencia no se ha podido comprobar en ${days} días. Conéctate a internet y pulsa «Reintentar».` };
+    else licState = { status: settings.license.activa === false ? 'off' : 'ok', msg: settings.license.mensaje || '' };
+  }
+  applyLicense();
+  if (licState.status === 'ok' && licState.msg && settings.licNotice !== licState.msg) { settings.licNotice = licState.msg; saveSettings(); toast(licState.msg, 8000); }
+}
+function applyLicense() {
+  let ov = $('#licBlock');
+  if (licState.status === 'ok') { if (ov) ov.remove(); return; }
+  if (!ov) { ov = document.createElement('div'); ov.id = 'licBlock'; ov.className = 'licblock'; document.body.appendChild(ov); }
+  const url = settings.license && settings.license.url;
+  ov.innerHTML = `<div class="licbox"><h2>OBRA-GIS no está disponible</h2><p>${esc(licState.msg)}</p>
+    <p class="hint">Tus datos siguen en este dispositivo. Exporta tus obras para no perderlas.</p>
+    <div class="acts"><button class="btn pri full" data-l="exp">Exportar mis obras</button><button class="btn" data-l="retry">Reintentar</button>${url ? `<a class="btn" href="${esc(url)}" target="_blank" rel="noopener">Más información</a>` : ''}</div></div>`;
+  ov.querySelector('[data-l=exp]').onclick = async () => { for (const id of obras.keys()) { try { await exportObraPackage(id); } catch (e) { /* cancelado */ } } };
+  ov.querySelector('[data-l=retry]').onclick = () => checkLicense();
+}
+function eulaSheet(first) {
+  const b = openSheet(`<h2>Licencia de uso</h2><div class="eula">${EULA_TEXT}</div>
+    <div class="acts">${first ? '<button class="btn pri full" data-a="ok">Acepto las condiciones</button>' : '<button class="btn full" data-a="ok">Cerrar</button>'}</div>`);
+  b.querySelector('[data-a=ok]').onclick = () => { if (first) { settings.eulaAccepted = EULA_VERSION; settings.eulaDate = Date.now(); saveSettings(); } closeSheet(); };
+  if (first) onSheetClose(() => { if (settings.eulaAccepted !== EULA_VERSION) setTimeout(() => eulaSheet(true), 50); });
+}
+function licenseSheet() {
+  const l = settings.license || {}, st = { ok: 'Activa', off: 'Desactivada por el autor', old: 'Versión no admitida', expired: 'Sin comprobar (caducada)' }[licState.status];
+  const b = openSheet(`<h2>Licencia</h2><p class="sub">OBRA-GIS ${APP_VERSION} · ${APP_DATE}</p>
+    <table class="attrs"><tr><td>Estado</td><td>${st}</td></tr><tr><td>Tipo</td><td>${esc(l.tipo || 'Gratuita')}</td></tr>
+    <tr><td>Última comprobación</td><td>${l.checked && !l.firstOffline ? new Date(l.checked).toLocaleString('es-ES') : 'pendiente (sin conexión)'}</td></tr>
+    <tr><td>Uso sin conexión</td><td>hasta ${l.dias_sin_conexion || 60} días sin comprobar</td></tr>
+    <tr><td>Condiciones aceptadas</td><td>${settings.eulaDate ? new Date(settings.eulaDate).toLocaleDateString('es-ES') : '—'}</td></tr></table>
+    <div class="acts"><button class="btn" data-a="eula">Ver condiciones</button><button class="btn" data-a="chk">Comprobar ahora</button></div>`);
+  b.querySelector('[data-a=eula]').onclick = () => eulaSheet(false);
+  b.querySelector('[data-a=chk]').onclick = async () => { await checkLicense(); toast('Licencia: ' + ({ ok: 'activa', off: 'desactivada', old: 'versión no admitida', expired: 'sin comprobar' }[licState.status])); licenseSheet(); };
+}
 
 /* ---------------- Novedades por versión ---------------- */
 function newsSheet() {
@@ -2389,9 +2830,9 @@ function newsSheet() {
 /* ---------------- Medición ---------------- */
 let measure = null;
 const mDot = ll => L.circleMarker(ll, { renderer: hlRenderer, radius: 6, color: '#1f1a00', weight: 2, fillColor: '#ffd43b', fillOpacity: 1, interactive: false });
-function startMeasure(ll) {
+function startMeasure(ll, area = false) {
   if (measure) endMeasure();
-  measure = { pts: [], line: L.polyline([], { renderer: hlRenderer, color: '#ffd43b', weight: 4, dashArray: '8 6', interactive: false }).addTo(map), marks: L.layerGroup().addTo(map) };
+  measure = { area, pts: [], line: (area ? L.polygon([], { renderer: hlRenderer, color: '#ffd43b', weight: 3, dashArray: '8 6', fillOpacity: 0.15, interactive: false }) : L.polyline([], { renderer: hlRenderer, color: '#ffd43b', weight: 4, dashArray: '8 6', interactive: false })).addTo(map), marks: L.layerGroup().addTo(map) };
   $('#measureBar').hidden = false;
   if (ll) addMeasurePt(ll); else updateMeasure();
 }
@@ -2403,10 +2844,14 @@ function addMeasurePt(ll) {
 function updateMeasure() {
   const p = measure.pts; let d = 0;
   for (let i = 1; i < p.length; i++) d += p[i - 1].distanceTo(p[i]);
-  $('#mText').textContent = p.length < 2 ? 'Toca el mapa para añadir puntos' : `Distancia: ${fmtLen(d)} · ${p.length} puntos`;
+  if (measure.area) {
+    if (p.length < 3) { $('#mText').textContent = 'Área: toca al menos 3 puntos del contorno'; return; }
+    const per = d + p[p.length - 1].distanceTo(p[0]), a = polyArea(p.map(q => [q.lat, q.lng]));
+    $('#mText').textContent = `Área: ${fmtArea(a)} (${(a / 10000).toFixed(4).replace('.', ',')} ha) · perímetro ${fmtLen(per)}`;
+  } else $('#mText').textContent = p.length < 2 ? 'Toca el mapa para añadir puntos' : `Distancia: ${fmtLen(d)} · ${p.length} puntos`;
 }
 function endMeasure() { if (!measure) return; map.removeLayer(measure.line); map.removeLayer(measure.marks); measure = null; $('#measureBar').hidden = true; }
-map.on('click', e => { if (drawing && !drawing.gps) return addDrawPt(L.latLng(e && e.latlng ? e.latlng : e)); if (slopePick || actPick || widthPick) return slopePickPoint(e.latlng); if (measure) addMeasurePt(e.latlng); });
+map.on('click', e => { if (drawing && !drawing.gps) return addDrawPt(L.latLng(e && e.latlng ? e.latlng : e)); if (slopePick || actPick || widthPick || offPick || calcPick) return slopePickPoint(e.latlng); if (measure) addMeasurePt(e.latlng); });
 $('#mUndo').onclick = () => {
   if (!measure || !measure.pts.length) return;
   measure.pts.pop(); measure.marks.clearLayers();
@@ -2475,44 +2920,156 @@ function tileRange(b, z) {
   const y = lat => { const r = lat * Math.PI / 180; return Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n); };
   return { x0: x(b.getWest()), x1: x(b.getEast()), y0: y(b.getNorth()), y1: y(b.getSouth()) };
 }
-async function cacheArea() {
-  if (!('caches' in window)) { toast('Este dispositivo no permite guardar mapas sin conexión.'); return; }
-  const b = map.getBounds(), z0 = Math.max(12, map.getZoom()), urls = [];
-  for (let z = z0; z <= Math.min(z0 + 3, 19); z++) {
+async function cacheArea() { offlineSheet(); }
+
+/* ---------------- Mapas sin conexión ----------------
+   Descarga la ortofoto PNOA (y opcionalmente los rótulos y las capas de servicios visibles) de una zona:
+   la vista actual, un municipio buscado por nombre o el municipio del punto que se toque en el mapa.
+   Los límites municipales se obtienen de OpenStreetMap (Nominatim). */
+const NOMINATIM = 'https://nominatim.openstreetmap.org';
+let offZone = null, offCancel = false, offPick = false;
+function pointInRing(lat, lng, ring) { let ins = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const yi = ring[i][1], xi = ring[i][0], yj = ring[j][1], xj = ring[j][0]; if (((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) ins = !ins; } return ins; }
+function inGeom(lat, lng, g) {
+  if (!g) return true;
+  const polys = g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
+  return polys.some(p => pointInRing(lat, lng, p[0]) && !p.slice(1).some(h => pointInRing(lat, lng, h)));
+}
+function tile2lat(y, z) { const n = Math.PI - 2 * Math.PI * y / 2 ** z; return 180 / Math.PI * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n))); }
+function tile2lng(x, z) { return x / 2 ** z * 360 - 180; }
+function zoneTiles(zone, zMax) {
+  const out = [], b = zone.bounds;
+  for (let z = 10; z <= zMax; z++) {
     const r = tileRange(b, z);
     for (let x = r.x0; x <= r.x1; x++) for (let y = r.y0; y <= r.y1; y++) {
-      urls.push(URL_PNOA.replace('{z}', z).replace('{x}', x).replace('{y}', y));
-      if (z <= 18) urls.push(URL_LABELS.replace('{z}', z).replace('{x}', x).replace('{y}', y));
+      if (zone.geom) {
+        const la0 = tile2lat(y + 1, z), la1 = tile2lat(y, z), lo0 = tile2lng(x, z), lo1 = tile2lng(x + 1, z);
+        const pts = [[(la0 + la1) / 2, (lo0 + lo1) / 2], [la0, lo0], [la0, lo1], [la1, lo0], [la1, lo1]];
+        if (!pts.some(([a, c]) => inGeom(a, c, zone.geom))) continue;
+      }
+      out.push({ x, y, z });
     }
   }
-  if (urls.length > 4000) { toast(`La zona visible necesita ${urls.length} imágenes. Acerca el mapa y vuelve a intentarlo.`, 6000); return; }
-  if (!confirm(`Se descargarán ${urls.length} imágenes de ortofoto PNOA (unos ${Math.round(urls.length * 0.025)} MB) para usarlas sin cobertura. ¿Continuar?`)) return;
-  const cache = await caches.open('tiles-v1');
-  let done = 0, ok = 0; const queue = urls.slice();
-  async function worker() {
-    while (queue.length) {
-      const u = queue.shift();
-      try {
-        if (!(await cache.match(u))) { const r = await fetch(u, { mode: 'cors' }); if (r.ok) { await cache.put(u, r); ok++; } }
-        else ok++;
-      } catch (e) { /* servidor sin CORS o sin red */ }
-      done++;
-      if (done % 40 === 0) toast(`Guardando zona… ${done}/${urls.length}`, 2000);
-    }
-  }
-  await Promise.all(Array.from({ length: 6 }, worker));
-  toast(ok ? `Zona guardada: ${ok} de ${urls.length} imágenes disponibles sin conexión.` : 'No se pudo guardar la zona. Comprueba la conexión.', 7000);
+  return out;
 }
-
+function zoneUrls(zone, opts) {
+  const urls = [], tl = zoneTiles(zone, opts.zMax);
+  const wmsLayers = opts.wms ? [...layers.values()].filter(e => e.rec.visible && e.tile) : [];
+  tl.forEach(t => {
+    const sub = u => u.replace('{z}', t.z).replace('{x}', t.x).replace('{y}', t.y);
+    urls.push(sub(URL_PNOA));
+    if (opts.labels && t.z <= 18) urls.push(sub(URL_LABELS));
+    if (t.z <= Math.min(opts.zMax, 17)) wmsLayers.forEach(e => { try { urls.push(e.tile.getTileUrl(L.point(t.x, t.y).set ? t : Object.assign(L.point(t.x, t.y), { z: t.z }))); } catch (_) {} });
+  });
+  return urls;
+}
+async function fetchTileBlob(u) {
+  const H = Plug('CapacitorHttp');
+  if (NATIVE && H) { const r = await H.get({ url: u, responseType: 'blob', connectTimeout: 15000, readTimeout: 15000 }); if (r.status >= 400) throw new Error('HTTP ' + r.status); const ct = (r.headers && (r.headers['Content-Type'] || r.headers['content-type'])) || (/png/i.test(u) ? 'image/png' : 'image/jpeg'); return b64ToBlob(r.data, ct); }
+  const r = await fetch(u, { mode: 'cors' }); if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob();
+}
+async function offlineSheet() {
+  const zones = (await DB.get('kv', 'zones').catch(() => null)) || [];
+  const z = offZone;
+  const b = openSheet(`<h2>Mapas sin conexión</h2><p class="sub">Descarga la ortofoto de una zona para trabajar sin cobertura</p>
+    <div class="seg three"><button type="button" data-zmode="view" class="${!z || z.kind === 'view' ? 'on' : ''}">Vista actual</button><button type="button" data-zmode="search" class="${z && z.kind === 'search' ? 'on' : ''}">Municipio</button><button type="button" data-zmode="tap" class="${z && z.kind === 'tap' ? 'on' : ''}">Tocar mapa</button></div>
+    <div id="zSel">${z ? `<p class="zsel"><b>${esc(z.name)}</b>${z.geom ? ' · límite municipal' : ''}</p>` : '<p class="hint">Se descargará la zona que ves ahora en pantalla.</p>'}</div>
+    <div id="zSearch" ${z && z.kind === 'search' ? '' : 'hidden'} class="field row"><input type="text" id="zQ" placeholder="Municipio (p. ej. Cuevas del Campo, Granada)"><button class="mini" data-a="find">Buscar</button></div>
+    <div id="zRes"></div>
+    <div class="field row"><label for="zMax" class="grow">Detalle máximo</label><select id="zMax" style="max-width:180px">
+      <option value="15">Bajo (5 m/píxel)</option><option value="16">Medio (2,4 m/píxel)</option><option value="17" selected>Alto (1,2 m/píxel)</option><option value="18">Muy alto (0,6 m/píxel)</option><option value="19">Máximo (0,3 m/píxel)</option></select></div>
+    <label class="opt"><input type="checkbox" id="zLab" checked>Incluir carreteras y nombres</label>
+    <label class="opt"><input type="checkbox" id="zWms">Incluir las capas de servicios visibles ahora (hasta detalle alto)</label>
+    <p class="hint" id="zEst"></p>
+    <div class="progress" id="zProg" hidden><div></div><span></span></div>
+    <div class="acts"><button class="btn pri full" data-a="dl">Descargar</button><button class="btn full" data-a="stop" hidden>Detener</button></div>
+    <h3 class="sh">Zonas descargadas</h3>
+    ${zones.length ? zones.map(zz => `<div class="nrow"><span class="t"><b>${esc(zz.name)}</b><small>${fmtDate(zz.created)} · ${zz.count} imágenes · ${(zz.bytes / 1048576).toFixed(0)} MB · detalle ${zz.zMax}</small></span><button class="mini del" data-zdel="${zz.id}">Borrar</button></div>`).join('') : '<p class="empty">Ninguna todavía.</p>'}
+    <p class="hint">Las capas KML, anotaciones, fotos y actuaciones ya están siempre en el móvil y funcionan sin conexión.</p>`);
+  const est = () => {
+    const zone = offZone || { kind: 'view', name: 'Vista actual', bounds: map.getBounds() };
+    const opts = { zMax: +$('#zMax').value, labels: $('#zLab').checked, wms: $('#zWms').checked };
+    const n = zoneUrls(zone, opts).length, mb = Math.round(n * 0.022);
+    $('#zEst').textContent = n > 40000 ? `Son ${thousands(n)} imágenes (unos ${thousands(mb)} MB): demasiadas. Baja el detalle máximo o elige una zona más pequeña.` : `${thousands(n)} imágenes · unos ${thousands(mb)} MB`;
+    return { zone, opts, n };
+  };
+  est();
+  ['zMax', 'zLab', 'zWms'].forEach(id => $('#' + id).onchange = est);
+  b.querySelectorAll('[data-zmode]').forEach(bt => bt.onclick = () => {
+    const m = bt.dataset.zmode;
+    if (m === 'view') { offZone = null; offlineSheet(); }
+    if (m === 'search') { offZone = { kind: 'search', name: 'Busca un municipio', bounds: map.getBounds() }; offlineSheet(); }
+    if (m === 'tap') { closeSheet(); offPick = true; $('#pickText').textContent = 'Toca un punto del municipio que quieres descargar'; $('#pickBar').hidden = false; }
+  });
+  const fb = b.querySelector('[data-a=find]');
+  if (fb) fb.onclick = async () => {
+    const q = $('#zQ').value.trim(); if (!q) return;
+    $('#zRes').innerHTML = '<p class="hint">Buscando…</p>';
+    try {
+      const res = JSON.parse(await httpGetText(`${NOMINATIM}/search?q=${encodeURIComponent(q)}&countrycodes=es&format=jsonv2&polygon_geojson=1&limit=6`));
+      const ok = res.filter(r => r.geojson && /Polygon/.test(r.geojson.type));
+      $('#zRes').innerHTML = ok.length ? ok.map((r, i) => `<button class="crow" data-zr="${i}" type="button"><span>${esc(r.display_name)}</span><small>${esc(r.addresstype || r.type || '')}</small></button>`).join('') : '<p class="hint">No se ha encontrado ningún municipio con ese nombre.</p>';
+      $('#zRes').querySelectorAll('[data-zr]').forEach(bt => bt.onclick = () => { const r = ok[+bt.dataset.zr]; setOffZone('search', r.display_name.split(',').slice(0, 2).join(','), r.geojson); offlineSheet(); });
+    } catch (e) { $('#zRes').innerHTML = '<p class="hint">No se pudo buscar. Comprueba la conexión.</p>'; }
+  };
+  b.querySelectorAll('[data-zdel]').forEach(bt => bt.onclick = async () => {
+    const list = (await DB.get('kv', 'zones')) || [], zz = list.find(x => x.id === bt.dataset.zdel);
+    if (!zz || !confirm(`¿Borrar la zona «${zz.name}» del móvil?`)) return;
+    const urls = (await DB.get('kv', 'zone:' + zz.id)) || [], keep = new Set();
+    for (const o of list.filter(x => x.id !== zz.id)) ((await DB.get('kv', 'zone:' + o.id)) || []).forEach(u => keep.add(u));
+    const cache = await caches.open('tiles-v1'); for (const u of urls) if (!keep.has(u)) await cache.delete(u);
+    await DB.put('kv', list.filter(x => x.id !== zz.id), 'zones'); await DB.del('kv', 'zone:' + zz.id);
+    toast('Zona borrada'); offlineSheet();
+  });
+  b.querySelector('[data-a=stop]').onclick = () => { offCancel = true; };
+  b.querySelector('[data-a=dl]').onclick = async () => {
+    if (!('caches' in window)) { toast('Este dispositivo no permite guardar mapas sin conexión.'); return; }
+    const { zone, opts, n } = est();
+    if (zone.kind === 'search' && !zone.geom) { toast('Busca y elige primero el municipio.'); return; }
+    if (n > 40000) { toast('Demasiadas imágenes: baja el detalle máximo.'); return; }
+    const urls = zoneUrls(zone, opts), cache = await caches.open('tiles-v1'), prog = $('#zProg');
+    prog.hidden = false; b.querySelector('[data-a=dl]').hidden = true; b.querySelector('[data-a=stop]').hidden = false;
+    let done = 0, ok = 0, bytes = 0, fail = 0; offCancel = false; const queue = urls.slice();
+    const upd = () => { const p = prog.querySelector('div'), t = prog.querySelector('span'); if (p) p.style.width = (done / urls.length * 100).toFixed(1) + '%'; if (t) t.textContent = `${thousands(done)} / ${thousands(urls.length)} · ${(bytes / 1048576).toFixed(0)} MB`; };
+    async function worker() {
+      while (queue.length && !offCancel) {
+        const u = queue.shift();
+        try { const hit = await cache.match(u); if (hit) { ok++; } else { const bl = await fetchTileBlob(u); await cache.put(u, new Response(bl, { headers: { 'Content-Type': bl.type || 'image/jpeg' } })); bytes += bl.size; ok++; } } catch (e) { fail++; }
+        done++; if (done % 20 === 0) upd();
+      }
+    }
+    await Promise.all(Array.from({ length: 6 }, worker)); upd();
+    const list = (await DB.get('kv', 'zones').catch(() => null)) || [], id = uid();
+    list.push({ id, name: zone.name, created: Date.now(), count: ok, bytes, zMax: opts.zMax });
+    await DB.put('kv', urls.slice(0, done), 'zone:' + id); await DB.put('kv', list, 'zones');
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+    toast(offCancel ? `Descarga detenida: ${ok} imágenes guardadas.` : `Zona «${zone.name}» lista sin conexión: ${ok} imágenes${fail ? ` (${fail} no se pudieron bajar)` : ''}.`, 7000);
+    offZone = null; offlineSheet();
+  };
+}
+function setOffZone(kind, name, geojson) {
+  const coords = []; (function walk(c) { if (typeof c[0] === 'number') coords.push([c[1], c[0]]); else c.forEach(walk); })(geojson.coordinates);
+  offZone = { kind, name, geom: geojson, bounds: L.latLngBounds(coords) };
+  if (geojson) { slopeHL.clearLayers(); L.geoJSON(geojson, { renderer: hlRenderer, style: { color: '#ff6b00', weight: 3, fillOpacity: 0.08 }, interactive: false }).addTo(slopeHL); map.fitBounds(offZone.bounds.pad(0.05)); setTimeout(() => slopeHL.clearLayers(), 8000); }
+}
+async function offlinePickAt(ll) {
+  offPick = false; $('#pickBar').hidden = true;
+  toast('Buscando el municipio…', 4000);
+  try {
+    const r = JSON.parse(await httpGetText(`${NOMINATIM}/reverse?lat=${ll.lat.toFixed(6)}&lon=${ll.lng.toFixed(6)}&zoom=10&format=jsonv2&polygon_geojson=1`));
+    if (!r.geojson || !/Polygon/.test(r.geojson.type)) throw new Error('sin límite');
+    setOffZone('tap', r.name || (r.display_name || '').split(',')[0], r.geojson);
+  } catch (e) { toast('No se ha encontrado el municipio de ese punto. Prueba con «Municipio» o «Vista actual».', 6000); }
+  offlineSheet();
+}
 /* ---------------- Panel lateral con el gestor de capas ---------------- */
 let openLayerId = null, folderIds = new Map();
 function openDrawer() { renderDrawer(); $('#drawer').hidden = false; $('#scrim').hidden = false; }
 function closeDrawer() { $('#drawer').hidden = true; $('#scrim').hidden = true; }
 
 function layerRow(id, name, sub, swatch, opts) {
-  const vis = layerVisible(id), open = openLayerId === id;
-  return `<div class="lyr ${open ? 'open' : ''}">
-    <div class="lrow"><input type="checkbox" data-vis="${id}" ${vis ? 'checked' : ''} aria-label="Mostrar ${esc(name)}">
+  const sel = selMode && layers.has(id), vis = sel ? selIds.has(id) : layerVisible(id), open = openLayerId === id && !selMode;
+  return `<div class="lyr ${open ? 'open' : ''} ${sel && selIds.has(id) ? 'picked' : ''}">
+    <div class="lrow" style="--dep:${opts.depth || 0}"><input type="checkbox" class="${sel ? 'selbox' : ''}" data-vis="${id}" ${vis ? 'checked' : ''} aria-label="${sel ? 'Seleccionar' : 'Mostrar'} ${esc(name)}">
       ${swatch}<button class="nm" data-open="${id}" type="button">${esc(name)}<small>${esc(sub)}</small></button>
       ${opts.move ? `<button class="mini ic" data-up="${id}" aria-label="Subir">${ICON.up}</button><button class="mini ic" data-down="${id}" aria-label="Bajar">${ICON.down}</button>` : ''}
     </div>
@@ -2525,7 +3082,7 @@ function layerOptions(e) {
   if (t !== 'photos') h += `<label class="rng">Opacidad<input type="range" min="10" max="100" step="5" value="${Math.round((r.opacity ?? 1) * 100)}" data-op="${id}"></label>`;
   if (t === 'kml') h += `<label class="rng">Color<input type="color" value="${r.color}" data-col="${id}"></label>`;
   h += `<div class="field row"><input type="text" value="${esc(r.name)}" data-name="${id}" aria-label="Nombre de la capa"><button class="mini" data-rename="${id}">Renombrar</button></div>`;
-  h += `<div class="row">${t !== 'wms' ? `<button class="mini" data-zoom="${id}">Encuadrar</button>` : ''}${t === 'photos' ? `<button class="mini" data-sharephotos="${id}">Compartir fotos con GPS</button>` : ''}<button class="mini del" data-dell="${id}">Eliminar capa</button></div>`;
+  h += `<div class="row"><button class="mini" data-props="${id}">${ICON.info}Propiedades</button>${t === 'kml' ? `<button class="mini" data-attr="${id}">${ICON.table}Tabla</button>` : ''}${t !== 'wms' ? `<button class="mini" data-zoom="${id}">Encuadrar</button>` : ''}${t === 'photos' ? `<button class="mini" data-sharephotos="${id}">Compartir fotos con GPS</button>` : ''}<button class="mini del" data-dell="${id}">Eliminar capa</button></div>`;
   h += `<div class="field row"><input type="text" list="folderList" value="${esc(folderOf(r))}" data-folder="${id}" aria-label="Carpeta de la capa"><button class="mini" data-movefolder="${id}">Mover a carpeta</button></div>`;
   if (t === 'wms' && r.kind !== 'wmts') h += `<div class="legend"><img src="${esc(legendUrl(r))}" alt="Leyenda de ${esc(r.name)}" onerror="this.parentNode.remove()"></div>`;
   if (t === 'wms') h += `<p class="hint">${esc(r.url)}${r.layers ? ' · ' + esc(r.layers) : ''}${r.cover ? ' · cobertura: ' + esc(r.cover) : ''}</p>`;
@@ -2541,6 +3098,24 @@ function layerSub(e) {
 }
 const DEFAULT_FOLDER = { kml: 'Trazas y KML', wms: 'Servicios y afecciones', photos: 'Fotos importadas' };
 const folderOf = rec => (rec.folder || '').trim() || DEFAULT_FOLDER[typeOf(rec)] || 'Capas';
+// Árbol de carpetas: la ruta de carpeta usa «/» (p. ej. «Proyecto/Tramo 1»). Las carpetas vacías se guardan en la obra.
+let selMode = false; const selIds = new Set();
+function buildTree(entries) {
+  const root = { name: '', path: '', folders: new Map(), layers: [] };
+  const ensure = path => {
+    const parts = String(path || '').split('/').map(x => x.trim()).filter(Boolean);
+    let node = root, acc = '';
+    for (const p of parts) { acc = acc ? acc + '/' + p : p; if (!node.folders.has(p)) node.folders.set(p, { name: p, path: acc, folders: new Map(), layers: [] }); node = node.folders.get(p); }
+    return node;
+  };
+  const o = obras.get(settings.activeObra); (o && o.folders || []).forEach(ensure);
+  entries.forEach(e => ensure(folderOf(e.rec)).layers.push(e));
+  return root;
+}
+const treeLayers = node => [...node.layers, ...[...node.folders.values()].flatMap(treeLayers)];
+function layerSwatch(e) {
+  return isPointLayer(e.rec) ? `<span class="sw pin-sw photo"></span>` : typeOf(e.rec) === 'kml' ? `<span class="sw" style="background:${e.rec.color}"></span>` : `<span class="sw ic">${ICON.wms}</span>`;
+}
 async function renderDrawer() {
   const d = $('#drawer');
   const scroll = d.scrollTop;
@@ -2550,41 +3125,54 @@ async function renderDrawer() {
   let storage = '';
   try { const e = await navigator.storage.estimate(); storage = `${(e.usage / 1048576).toFixed(1).replace('.', ',')} MB usados en el dispositivo`; } catch (e) {}
   const obra = obras.get(settings.activeObra);
+  [...selIds].forEach(id => { if (!layers.has(id)) selIds.delete(id); });
 
-  // Árbol: obra → carpetas → capas. «Datos de campo» siempre arriba.
   const fieldRows = layerRow('acts', 'Actuaciones en trazas', `${acts.size} actuaciones`, `<span class="sw" style="background:linear-gradient(90deg,#8d6e63,#1e88e5,#00acc1)"></span>`,
     { move: false, body: `<div class="row"><button class="mini" data-actlist>Ver listado</button></div>` })
     + layerRow('notes', 'Mis anotaciones', `${own.length} anotaciones`, `<span class="sw pin-sw note"></span>`,
-    { move: false, body: `<div class="row"><button class="mini" data-zoom="notes">Encuadrar</button></div>` });
-  const folders = new Map();
-  [...ordered, ...photoLayers].forEach(e => { const k = folderOf(e.rec); if (!folders.has(k)) folders.set(k, []); folders.get(k).push(e); });
-  const folderHtml = (name, rows, ids, count) => {
-    const closed = settings.collapsed && settings.collapsed[name];
+    { move: false, body: `<div class="row"><button class="mini" data-zoom="notes">Encuadrar</button></div>` })
+    + layerRow('res', 'Recursos (todas las obras)', `${resources.size} plantas, canteras…`, `<span class="sw res-sw"></span>`,
+    { move: false, body: `<div class="row"><button class="mini" data-reslist>Ver y editar</button></div>` });
+  folderIds = new Map([['Datos de campo', ['acts', 'notes', 'res']]]);
+  const folderHead = (key, name, path, ids, count, depth, extra = '') => {
+    const closed = settings.collapsed && settings.collapsed[key];
     const anyVis = ids.some(id => layerVisible(id));
-    return `<div class="folder ${closed ? '' : 'open'}">
-      <div class="fhead"><input type="checkbox" data-fvis="${esc(name)}" ${anyVis ? 'checked' : ''} aria-label="Mostrar carpeta ${esc(name)}">
-        <button class="fname" data-fold="${esc(name)}" type="button"><span class="caret">${closed ? ICON.right : ICON.down}</span>${ICON.folder}<span class="ft">${esc(name)}</span><small>${count}</small></button></div>
-      ${closed ? '' : `<div class="fbody">${rows}</div>`}
-    </div>`;
+    return `<div class="fhead" style="--dep:${depth}"><input type="checkbox" data-fvis="${esc(key)}" ${anyVis ? 'checked' : ''} aria-label="Mostrar carpeta ${esc(name)}">
+      <button class="fname" data-fold="${esc(key)}" ${path ? `data-fpress="${esc(path)}"` : ''} type="button"><span class="caret">${closed ? ICON.right : ICON.down}</span>${ICON.folder}<span class="ft">${esc(name)}</span><small>${count}</small></button>${extra}</div>`;
   };
-  folderIds = new Map([['Datos de campo', ['acts', 'notes']]]);
-  let tree = folderHtml('Datos de campo', fieldRows, ['acts', 'notes'], 2);
-  for (const [name, list] of folders) {
-    folderIds.set(name, list.map(e => e.rec.id));
-    const movable = list.filter(e => !isPointLayer(e.rec)).length > 1;
-    const rows = list.map(e => layerRow(e.rec.id, e.rec.name, layerSub(e),
-      isPointLayer(e.rec) ? `<span class="sw pin-sw photo"></span>` : typeOf(e.rec) === 'kml' ? `<span class="sw" style="background:${e.rec.color}"></span>` : `<span class="sw ic">${ICON.wms}</span>`,
-      { move: movable && !isPointLayer(e.rec), body: layerOptions(e) })).join('');
-    tree += folderHtml(name, rows, list.map(e => e.rec.id), list.length);
-  }
-  const folderNames = [...new Set([...folders.keys(), ...Object.values(DEFAULT_FOLDER), 'Proyecto', 'Replanteo', 'Afecciones'])];
+  const renderNode = (node, depth) => {
+    let h = '';
+    for (const fnode of node.folders.values()) {
+      const all = treeLayers(fnode), key = 'f:' + fnode.path, closed = settings.collapsed && settings.collapsed[key];
+      folderIds.set(key, all.map(e => e.rec.id));
+      h += `<div class="folder ${closed ? '' : 'open'}">${folderHead(key, fnode.name, fnode.path, all.map(e => e.rec.id), all.length, depth, `<button class="mini ic" data-fmenu="${esc(fnode.path)}" aria-label="Opciones de la carpeta">${ICON.dots}</button>`)}
+        ${closed ? '' : `<div class="fbody">${renderNode(fnode, depth + 1)}${fnode.layers.map(e => layerRow(e.rec.id, e.rec.name, layerSub(e), layerSwatch(e), { move: !isPointLayer(e.rec) && !selMode, depth: depth + 1, body: layerOptions(e) })).join('')}${!fnode.layers.length && !fnode.folders.size ? '<p class="empty fe">Carpeta vacía. Mueve capas aquí desde sus opciones o seleccionándolas.</p>' : ''}</div>`}
+      </div>`;
+    }
+    return h;
+  };
+  const tree = buildTree([...ordered, ...photoLayers]);
+  const looseRows = tree.layers.map(e => layerRow(e.rec.id, e.rec.name, layerSub(e), layerSwatch(e), { move: !isPointLayer(e.rec) && !selMode, depth: 0, body: layerOptions(e) })).join('');
+  const treeHtml = `<div class="folder ${settings.collapsed && settings.collapsed['Datos de campo'] ? '' : 'open'}">${folderHead('Datos de campo', 'Datos de campo', '', ['acts', 'notes', 'res'], 3, 0)}${settings.collapsed && settings.collapsed['Datos de campo'] ? '' : `<div class="fbody">${fieldRows}</div>`}</div>` + renderNode(tree, 0) + looseRows;
+  const allPaths = []; (function walk(n) { n.folders.forEach(f => { allPaths.push(f.path); walk(f); }); })(tree);
+  const folderNames = [...new Set([...allPaths, ...Object.values(DEFAULT_FOLDER), 'Proyecto', 'Replanteo', 'Afecciones'])];
+  const nSel = selIds.size, selKml = [...selIds].filter(id => typeOf(layers.get(id).rec) === 'kml').length;
 
   d.innerHTML = `<div class="dhead"><h2>OBRA-GIS</h2><button class="mini ic" id="dClose" aria-label="Cerrar">${ICON.close}</button></div>
     <button class="obra-card" data-t="obras" type="button"><small>Obra activa</small><b>${esc(obra ? obra.name : '—')}</b><span>${obras.size} obra${obras.size === 1 ? '' : 's'} · Cambiar, crear o compartir</span></button>
-    <h3>Capas de la obra</h3>
-    <div class="tree">${tree}</div>
+    ${selMode ? `<div class="selbar"><div class="selhead"><b>${nSel} capa${nSel === 1 ? '' : 's'} seleccionada${nSel === 1 ? '' : 's'}</b><button class="mini" data-s="all">Todas</button><button class="mini" data-s="cancel">Cancelar</button></div>
+      <div class="selacts">
+        <button class="mini" data-s="show" ${nSel ? '' : 'disabled'}>Mostrar</button><button class="mini" data-s="hide" ${nSel ? '' : 'disabled'}>Ocultar</button>
+        <button class="mini ic" data-s="up" aria-label="Subir" ${nSel ? '' : 'disabled'}>${ICON.up}</button><button class="mini ic" data-s="down" aria-label="Bajar" ${nSel ? '' : 'disabled'}>${ICON.down}</button>
+        <button class="mini" data-s="folder" ${nSel ? '' : 'disabled'}>${ICON.folder}Agrupar en carpeta</button>
+        <button class="mini" data-s="union" ${selKml >= 2 ? '' : 'disabled'}>Unir KML</button>
+        <button class="mini" data-s="export" ${nSel ? '' : 'disabled'}>Exportar / compartir</button>
+        <button class="mini del" data-s="del" ${nSel ? '' : 'disabled'}>Eliminar</button>
+      </div></div>` : ''}
+    <div class="treehead"><h3>Capas de la obra</h3><button class="mini" data-t="newfolder">${ICON.folder}Nueva carpeta</button>${selMode ? '' : '<button class="mini" data-t="selmode">Seleccionar</button>'}</div>
+    <div class="tree ${selMode ? 'selecting' : ''}">${treeHtml}</div>
     <datalist id="folderList">${folderNames.map(n => `<option value="${esc(n)}">`).join('')}</datalist>
-    ${ordered.length > 1 ? '<p class="hint">Dentro de cada carpeta, las capas de arriba se dibujan encima. Las capas KML quedan siempre sobre las de imagen.</p>' : ''}
+    <p class="hint">${selMode ? 'Toca las capas para marcarlas. Mantén pulsada una carpeta para marcar todo su contenido.' : 'Mantén pulsada una capa para seleccionar varias (exportar, agrupar, unir, ordenar). Las KML se dibujan siempre sobre las de imagen.'}</p>
     <div class="acts"><button class="btn pri full" data-t="add">${ICON.plus}Añadir capa</button></div>
     <h3>Mapa base</h3>
     ${Object.entries(BASES).map(([id, b]) => `<label class="opt"><input type="radio" name="base" value="${id}" ${settings.base === id ? 'checked' : ''}>${esc(b.name)}</label>`).join('')}
@@ -2594,29 +3182,41 @@ async function renderDrawer() {
       : '<p class="empty">Mantén pulsado en el mapa o usa el botón naranja para crear la primera.</p>'}
     <h3>Herramientas</h3>
     <div class="acts">
+      <button class="btn" data-t="calc">${ICON.calc}Calculadora</button>
+      <button class="btn" data-t="reslist">${ICON.pin}Recursos</button>
       <button class="btn full" data-t="actlist">${ICON.road}Listado de actuaciones (${acts.size})</button>
       <button class="btn" data-t="csv">Actuaciones a Excel (CSV)</button>
       <button class="btn" data-t="export">Exportar KMZ</button>
       <button class="btn" data-t="measure">${ICON.ruler}Medir</button>
-      <button class="btn full" data-t="cache">Guardar zona visible sin conexión</button>
+      <button class="btn" data-t="offline">Mapas sin conexión</button>
     </div>
     <h3>Ajustes</h3>
     <div class="field"><label for="selTravel">Indicaciones de Google Maps</label>
       <select id="selTravel"><option value="driving">En coche</option><option value="walking">A pie</option></select></div>
     <label class="opt"><input type="checkbox" id="chkPK" ${settings.pk ? 'checked' : ''}>Marcas de PK cada 100 m en las trazas (al acercar el mapa)</label>
     <label class="opt"><input type="checkbox" id="chkStamp" ${settings.stamp ? 'checked' : ''}>Sellar fecha y coordenadas en las fotos que hago</label>
-    <div class="field"><label for="gKey">Clave de Google (API Map Tiles)</label>
-      <input type="password" id="gKey" autocomplete="off" placeholder="AIza…" value="${esc(settings.googleKey)}">
-      <button class="mini" id="gKeySave" type="button">Guardar clave</button>
-      <p class="hint">Solo hace falta para el fondo Google híbrido. La ortofoto PNOA del IGN funciona sin clave.</p></div>
-    <div class="version"><span>OBRA-GIS <b>v${APP_VERSION}</b> · ${NATIVE ? 'app Android' : 'versión web'}</span><button class="mini" data-t="news" type="button">Novedades</button></div>
+    <div class="version"><span>OBRA-GIS <b>v${APP_VERSION}</b> · ${NATIVE ? 'app Android' : 'versión web'}</span><button class="mini" data-t="news" type="button">Novedades</button><button class="mini" data-t="lic" type="button">Licencia</button></div>
     <p class="hint">${storage}</p>`;
   d.scrollTop = scroll;
 
   $('#dClose').onclick = closeDrawer;
   d.querySelectorAll('input[name=base]').forEach(r => r.onchange = () => setBase(r.value));
-  d.querySelectorAll('[data-vis]').forEach(c => c.onchange = () => setLayerVisible(c.dataset.vis, c.checked));
-  d.querySelectorAll('[data-open]').forEach(bt => bt.onclick = () => { openLayerId = openLayerId === bt.dataset.open ? null : bt.dataset.open; renderDrawer(); });
+  d.querySelectorAll('[data-vis]').forEach(c => c.onchange = () => {
+    if (selMode && layers.has(c.dataset.vis)) { c.checked ? selIds.add(c.dataset.vis) : selIds.delete(c.dataset.vis); renderDrawer(); return; }
+    setLayerVisible(c.dataset.vis, c.checked);
+  });
+  d.querySelectorAll('[data-open]').forEach(bt => {
+    bt.onclick = () => {
+      const id = bt.dataset.open;
+      if (Date.now() - longPressAt < 700) return;
+      if (selMode) { if (layers.has(id)) { selIds.has(id) ? selIds.delete(id) : selIds.add(id); renderDrawer(); } return; }
+      openLayerId = openLayerId === id ? null : id; renderDrawer();
+    };
+    if (layers.has(bt.dataset.open)) onLongPress(bt, () => { selMode = true; selIds.add(bt.dataset.open); openLayerId = null; renderDrawer(); if (navigator.vibrate) navigator.vibrate(30); });
+  });
+  d.querySelectorAll('[data-fpress]').forEach(bt => onLongPress(bt, () => {
+    const key = 'f:' + bt.dataset.fpress; selMode = true; (folderIds.get(key) || []).forEach(id => selIds.add(id)); renderDrawer(); if (navigator.vibrate) navigator.vibrate(30);
+  }));
   d.querySelectorAll('[data-up]').forEach(bt => bt.onclick = () => moveLayer(bt.dataset.up, -1));
   d.querySelectorAll('[data-down]').forEach(bt => bt.onclick = () => moveLayer(bt.dataset.down, 1));
   d.querySelectorAll('[data-zoom]').forEach(bt => bt.onclick = () => {
@@ -2625,6 +3225,8 @@ async function renderDrawer() {
     closeDrawer(); zoomToLayer(id);
   });
   d.querySelectorAll('[data-dell]').forEach(bt => bt.onclick = () => deleteLayer(bt.dataset.dell));
+  d.querySelectorAll('[data-props]').forEach(bt => bt.onclick = () => { closeDrawer(); layerProps(bt.dataset.props); });
+  d.querySelectorAll('[data-attr]').forEach(bt => bt.onclick = () => { closeDrawer(); attrTable(bt.dataset.attr); });
   d.querySelectorAll('[data-op]').forEach(r => {
     r.oninput = () => {
       const e = layers.get(r.dataset.op), v = +r.value / 100;
@@ -2647,24 +3249,308 @@ async function renderDrawer() {
   d.querySelector('[data-t=obras]').onclick = () => { closeDrawer(); obrasSheet(); };
   d.querySelectorAll('[data-sharephotos]').forEach(bt => bt.onclick = () => { const id = bt.dataset.sharephotos; sharePhotos([...notes.values()].filter(n => n.layerId === id), layers.get(id).rec.name); });
   d.querySelector('[data-t=news]').onclick = () => { closeDrawer(); newsSheet(); };
-  d.querySelectorAll('[data-fold]').forEach(bt => bt.onclick = () => { settings.collapsed = settings.collapsed || {}; settings.collapsed[bt.dataset.fold] = !settings.collapsed[bt.dataset.fold]; saveSettings(); renderDrawer(); });
+  d.querySelector('[data-t=lic]').onclick = () => { closeDrawer(); licenseSheet(); };
+  d.querySelectorAll('[data-fold]').forEach(bt => bt.onclick = () => { if (Date.now() - longPressAt < 700) return; settings.collapsed = settings.collapsed || {}; settings.collapsed[bt.dataset.fold] = !settings.collapsed[bt.dataset.fold]; saveSettings(); renderDrawer(); });
   d.querySelectorAll('[data-fvis]').forEach(c => c.onchange = async () => { for (const id of folderIds.get(c.dataset.fvis) || []) await setLayerVisible(id, c.checked); renderDrawer(); });
+  d.querySelectorAll('[data-fmenu]').forEach(bt => bt.onclick = () => folderMenu(bt.dataset.fmenu));
   d.querySelectorAll('[data-movefolder]').forEach(bt => bt.onclick = async () => {
-    const id = bt.dataset.movefolder, v = d.querySelector(`[data-folder="${id}"]`).value.trim();
-    await updateLayer(id, { folder: v }); settings.collapsed[v] = false; renderDrawer(); toast(v ? `Capa movida a «${v}»` : 'Capa devuelta a su carpeta por defecto');
+    const id = bt.dataset.movefolder, v = d.querySelector(`[data-folder="${id}"]`).value.trim().replace(/\s*\/\s*/g, '/');
+    await updateLayer(id, { folder: v }); settings.collapsed['f:' + v] = false; renderDrawer(); toast(v ? `Capa movida a «${v}»` : 'Capa devuelta a su carpeta por defecto');
   });
+  d.querySelector('[data-t=newfolder]').onclick = () => newFolderSheet('');
+  const sm = d.querySelector('[data-t=selmode]'); if (sm) sm.onclick = () => { selMode = true; openLayerId = null; renderDrawer(); };
+  d.querySelectorAll('[data-s]').forEach(bt => bt.onclick = () => selectionAction(bt.dataset.s));
   d.querySelector('[data-t=export]').onclick = exportKMZ;
   d.querySelector('[data-t=csv]').onclick = exportActsCSV;
   d.querySelector('[data-t=actlist]').onclick = () => { closeDrawer(); actList(); };
   const al = d.querySelector('[data-actlist]'); if (al) al.onclick = () => { closeDrawer(); actList(); };
+  d.querySelectorAll('[data-reslist], [data-t=reslist]').forEach(bt => bt.onclick = () => { closeDrawer(); resourceList(); });
+  d.querySelector('[data-t=calc]').onclick = () => { closeDrawer(); calcSheet(); };
   d.querySelector('[data-t=measure]').onclick = () => { closeDrawer(); startMeasure(); };
-  d.querySelector('[data-t=cache]').onclick = () => { closeDrawer(); cacheArea(); };
+  d.querySelector('[data-t=offline]').onclick = () => { closeDrawer(); offlineSheet(); };
   const sel = $('#selTravel'); sel.value = settings.travel; sel.onchange = () => { settings.travel = sel.value; saveSettings(); };
   $('#chkStamp').onchange = e => { settings.stamp = e.target.checked; saveSettings(); };
   $('#chkPK').onchange = e => { settings.pk = e.target.checked; saveSettings(); drawPK(); };
-  $('#gKeySave').onclick = () => { settings.googleKey = $('#gKey').value.trim(); googleCache = null; saveSettings(); toast('Clave guardada'); if (settings.base === 'google') setBase('google'); };
+}
+let longPressAt = 0;
+function onLongPress(el, fn) {
+  let t = null, sx = 0, sy = 0;
+  const clear = () => { if (t) { clearTimeout(t); t = null; } };
+  el.addEventListener('touchstart', e => { const p = e.touches[0]; sx = p.clientX; sy = p.clientY; clear(); t = setTimeout(() => { t = null; longPressAt = Date.now(); fn(); }, 550); }, { passive: true });
+  el.addEventListener('touchmove', e => { const p = e.touches[0]; if (Math.hypot(p.clientX - sx, p.clientY - sy) > 10) clear(); }, { passive: true });
+  el.addEventListener('touchend', clear, { passive: true });
+  el.addEventListener('contextmenu', e => { e.preventDefault(); longPressAt = Date.now(); fn(); }); // clic derecho en el ordenador
+}
+async function saveObraFolders(list) {
+  const o = obras.get(settings.activeObra); if (!o) return;
+  o.folders = [...new Set(list.filter(Boolean))].sort(); await DB.put('obras', o);
+}
+function newFolderSheet(parent) {
+  const b = openSheet(`<h2>Nueva carpeta</h2><p class="sub">${parent ? 'Dentro de «' + esc(parent) + '»' : 'En la raíz de la obra'}</p>
+    <div class="field"><input type="text" id="nfName" placeholder="Nombre (p. ej. Tramo 1)"></div>
+    <p class="hint">Puedes crear varios niveles a la vez separándolos con «/», por ejemplo «Proyecto/Tramo 1/Drenaje».</p>
+    <div class="acts"><button class="btn pri full" data-a="ok">Crear carpeta</button></div>`);
+  b.querySelector('[data-a=ok]').onclick = async () => {
+    const n = $('#nfName').value.trim().replace(/\s*\/\s*/g, '/').replace(/^\/|\/$/g, ''); if (!n) { toast('Escribe el nombre de la carpeta.'); return; }
+    const path = parent ? parent + '/' + n : n, o = obras.get(settings.activeObra);
+    await saveObraFolders([...(o.folders || []), path]); closeSheet(); openDrawer(); toast(`Carpeta «${path}» creada`);
+  };
+}
+function folderMenu(path) {
+  const all = [...layers.values()].filter(e => folderOf(e.rec) === path || folderOf(e.rec).startsWith(path + '/'));
+  const b = openSheet(`<h2>${ICON.folder} ${esc(path.split('/').pop())}</h2><p class="sub">${esc(path)} · ${all.length} capas</p>
+    <div class="field row"><input type="text" id="fRen" value="${esc(path.split('/').pop())}" aria-label="Nombre de la carpeta"><button class="mini" data-a="ren">Renombrar</button></div>
+    <div class="acts">
+      <button class="btn" data-a="sub">${ICON.folder}Nueva subcarpeta</button>
+      <button class="btn" data-a="sel">Seleccionar sus capas</button>
+      <button class="btn del full" data-a="del">Eliminar carpeta (las capas pasan a la carpeta superior)</button>
+    </div>`);
+  b.querySelector('[data-a=sub]').onclick = () => newFolderSheet(path);
+  b.querySelector('[data-a=sel]').onclick = () => { closeSheet(); selMode = true; all.forEach(e => selIds.add(e.rec.id)); openDrawer(); };
+  b.querySelector('[data-a=ren]').onclick = async () => {
+    const nn = $('#fRen').value.trim().replace(/\//g, '-'); if (!nn) return;
+    const np = path.split('/').slice(0, -1).concat(nn).join('/'), swap = p => p === path ? np : p.startsWith(path + '/') ? np + p.slice(path.length) : p;
+    for (const e of all) await updateLayer(e.rec.id, { folder: swap(folderOf(e.rec)) });
+    const o = obras.get(settings.activeObra); await saveObraFolders((o.folders || []).map(swap));
+    closeSheet(); openDrawer(); toast('Carpeta renombrada');
+  };
+  b.querySelector('[data-a=del]').onclick = async () => {
+    const parent = path.split('/').slice(0, -1).join('/'), swap = p => p === path ? parent : p.startsWith(path + '/') ? (parent ? parent + '/' : '') + p.slice(path.length + 1) : p;
+    for (const e of all) await updateLayer(e.rec.id, { folder: swap(folderOf(e.rec)) });
+    const o = obras.get(settings.activeObra); await saveObraFolders((o.folders || []).filter(p => p !== path).map(swap));
+    closeSheet(); openDrawer(); toast('Carpeta eliminada');
+  };
+}
+async function selectionAction(act) {
+  const ids = [...selIds].filter(id => layers.has(id)), ents = ids.map(id => layers.get(id));
+  if (act === 'cancel') { selMode = false; selIds.clear(); return renderDrawer(); }
+  if (act === 'all') { layers.forEach((e, id) => selIds.add(id)); return renderDrawer(); }
+  if (!ids.length) return;
+  if (act === 'show' || act === 'hide') { for (const id of ids) await setLayerVisible(id, act === 'show'); return renderDrawer(); }
+  if (act === 'up' || act === 'down') return groupMove(ids.filter(id => !isPointLayer(layers.get(id).rec)), act === 'up' ? -1 : 1);
+  if (act === 'del') {
+    if (!confirm(`¿Quitar ${ids.length} capas de la obra? Las fotos importadas de esas capas también se borrarán.`)) return;
+    for (const id of ids) { const e = layers.get(id); map.removeLayer(mapLayerOf(e)); for (const n of [...notes.values()].filter(n => n.layerId === id)) { await DB.del('notes', n.id); notes.delete(n.id); removeNoteMarker(n.id); } layers.delete(id); await DB.del('layers', id); }
+    selIds.clear(); selMode = false; drawPK(); drawActs(); drawWidths(); renderDrawer(); return toast('Capas eliminadas');
+  }
+  if (act === 'folder') {
+    closeDrawer();
+    const tree = buildTree([...layers.values()]); const paths = []; (function walk(n) { n.folders.forEach(f => { paths.push(f.path); walk(f); }); })(tree);
+    const b = openSheet(`<h2>Agrupar en carpeta</h2><p class="sub">${ids.length} capas</p>
+      <div class="field"><input type="text" id="gFolder" list="gFolders" placeholder="Carpeta (p. ej. Proyecto/Tramo 1)"><datalist id="gFolders">${paths.map(p => `<option value="${esc(p)}">`).join('')}</datalist></div>
+      <div class="chips">${paths.map(p => `<button class="chip" data-p="${esc(p)}" style="--c:var(--accent)" type="button">${esc(p)}</button>`).join('')}</div>
+      <div class="acts"><button class="btn pri full" data-a="ok">Mover a esta carpeta</button><button class="btn full" data-a="root">Sacar de las carpetas (carpeta por defecto)</button></div>`);
+    b.querySelectorAll('[data-p]').forEach(c => c.onclick = () => { $('#gFolder').value = c.dataset.p; });
+    const go = async v => { for (const id of ids) await updateLayer(id, { folder: v }); if (v) { const o = obras.get(settings.activeObra); await saveObraFolders([...(o.folders || []), v]); settings.collapsed['f:' + v] = false; } selMode = false; selIds.clear(); closeSheet(); openDrawer(); toast(v ? `${ids.length} capas en «${v}»` : 'Capas devueltas a su carpeta por defecto'); };
+    b.querySelector('[data-a=ok]').onclick = () => { const v = $('#gFolder').value.trim().replace(/\s*\/\s*/g, '/').replace(/^\/|\/$/g, ''); if (!v) { toast('Escribe o elige una carpeta.'); return; } go(v); };
+    b.querySelector('[data-a=root]').onclick = () => go('');
+    return;
+  }
+  if (act === 'union') { closeDrawer(); return unionSheet(ents.filter(e => typeOf(e.rec) === 'kml')); }
+  if (act === 'export') return exportLayersKMZ(ents);
 }
 
+/* ---------------- Unir varios KML en uno ----------------
+   Cada KML de origen pasa a una carpeta del KML nuevo. Se conservan estilos (con prefijo para no chocar),
+   atributos (ExtendedData), descripciones y la estructura de carpetas interna. */
+const KML_NS = 'http://www.opengis.net/kml/2.2';
+function unionKmlText(recs, name) {
+  const out = document.implementation.createDocument(KML_NS, 'kml', null);
+  const D = out.createElementNS(KML_NS, 'Document'); out.documentElement.appendChild(D);
+  const nm = out.createElementNS(KML_NS, 'name'); nm.textContent = name; D.appendChild(nm);
+  recs.forEach((r, i) => {
+    const src = new DOMParser().parseFromString(r.text, 'application/xml'), pre = 'u' + (i + 1) + '_';
+    [...byTag(src, 'Style'), ...byTag(src, 'StyleMap'), ...byTag(src, 'Schema')].forEach(st => { const id = st.getAttribute('id'); if (id) st.setAttribute('id', pre + id); });
+    byTag(src, 'styleUrl').forEach(u => { const t = u.textContent.trim(); if (t.includes('#') && !/^https?:/.test(t)) u.textContent = '#' + pre + t.replace(/^.*#/, ''); });
+    byTag(src, 'SchemaData').forEach(sd => { const t = sd.getAttribute('schemaUrl'); if (t) sd.setAttribute('schemaUrl', '#' + pre + t.replace(/^.*#/, '')); });
+    const srcDoc = byTag(src, 'Document')[0] || src.documentElement;
+    const F = out.createElementNS(KML_NS, 'Folder'), fn = out.createElementNS(KML_NS, 'name'); fn.textContent = r.name; F.appendChild(fn);
+    [...srcDoc.children].forEach(ch => {
+      if (['Style', 'StyleMap', 'Schema'].includes(ch.localName)) D.insertBefore(out.importNode(ch, true), D.children[1] || null);
+      else if (!['name', 'open', 'visibility', 'LookAt', 'Camera'].includes(ch.localName)) F.appendChild(out.importNode(ch, true));
+    });
+    // estilos definidos en carpetas internas siguen funcionando: se dejan donde estaban
+    D.appendChild(F);
+  });
+  return '<?xml version="1.0" encoding="UTF-8"?>\n' + new XMLSerializer().serializeToString(out);
+}
+function unionSheet(ents) {
+  if (ents.length < 2) { toast('Selecciona al menos dos capas KML.'); return; }
+  const total = ents.reduce((s2, e) => s2 + e.feats.length, 0);
+  const b = openSheet(`<h2>Unir KML</h2><p class="sub">${ents.length} capas · ${total} elementos</p>
+    <ul class="ulist">${ents.map(e => `<li>${esc(e.rec.name)} <small>(${e.feats.length})</small></li>`).join('')}</ul>
+    <div class="field"><input type="text" id="unName" value="${esc(ents.map(e => e.rec.name).join(' + ').slice(0, 60))}" aria-label="Nombre del KML unido"></div>
+    <label class="opt"><input type="checkbox" id="unDel">Quitar las capas originales (sus actuaciones y anchos pasan a la capa unida)</label>
+    <div class="acts"><button class="btn pri full" data-a="ok">Crear KML unido</button></div>
+    <p class="hint">Cada KML original queda como una carpeta dentro del nuevo, con sus estilos, atributos y descripciones.</p>`);
+  b.querySelector('[data-a=ok]').onclick = async () => {
+    const name = $('#unName').value.trim() || 'KML unido', del = $('#unDel').checked;
+    const recs = ents.map(e => e.rec), text = unionKmlText(recs, name);
+    const ne = await saveKmlLayer(name, text, { folder: ents[0].rec.folder || '' });
+    if (ne.feats.length !== total) toast(`Aviso: el KML unido tiene ${ne.feats.length} elementos y los originales sumaban ${total}.`, 7000);
+    if (del) {
+      let off = 0; const widths = {};
+      for (const e of ents) {
+        for (const a of [...acts.values()].filter(a => a.layerId === e.rec.id)) { a.layerId = ne.rec.id; a.featIdx = off + a.featIdx; a.layerName = name; await DB.put('acts', a); }
+        Object.entries(e.rec.widths || {}).forEach(([fi, w]) => { widths[off + +fi] = w; });
+        off += e.feats.length;
+        map.removeLayer(mapLayerOf(e)); layers.delete(e.rec.id); await DB.del('layers', e.rec.id);
+      }
+      if (Object.keys(widths).length) { ne.rec.widths = widths; await DB.put('layers', ne.rec); }
+    }
+    selMode = false; selIds.clear(); closeSheet(); drawActs(); drawWidths(); drawPK();
+    map.fitBounds(ne.group.getBounds().pad(0.1), { maxZoom: 17 });
+    toast(`KML unido «${name}» creado con ${ne.feats.length} elementos.`, 5000);
+  };
+}
+async function exportLayersKMZ(ents) {
+  const kmls = ents.filter(e => typeOf(e.rec) === 'kml'), photos = ents.filter(e => isPointLayer(e.rec)), wms = ents.filter(e => typeOf(e.rec) === 'wms');
+  if (!kmls.length && !photos.length) { toast('Las capas de servicios (WMS) no se pueden exportar: son imágenes de un servidor. Selecciona capas KML o de fotos.', 6000); return; }
+  toast('Preparando KMZ…', 8000);
+  const zip = new JSZip(); const name = ents.length === 1 ? ents[0].rec.name : `capas_${new Date().toISOString().slice(0, 10)}`;
+  let text = kmls.length ? unionKmlText(kmls.map(e => e.rec), name) : `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="${KML_NS}"><Document><name>${xml(name)}</name></Document></kml>`;
+  if (photos.length) {
+    let extra = '';
+    photos.forEach(e => {
+      extra += `<Folder><name>${xml(e.rec.name)}</name>`;
+      [...notes.values()].filter(n => n.layerId === e.rec.id).forEach(n => {
+        let html = `<p>${esc(fmtDate(n.created))}<br>${esc(fmtLL(n.lat, n.lng))}</p>`;
+        (n.media || []).forEach((m, i) => { const fnm = `files/${n.id}_${i + 1}.${extFor(m)}`; zip.file(fnm, m.blob); html += `<p><img src="${fnm}" width="480"></p>`; });
+        extra += `<Placemark><name>${xml(n.title)}</name><description>${cdata(html)}</description><Point><coordinates>${n.lng.toFixed(7)},${n.lat.toFixed(7)},0</coordinates></Point></Placemark>`;
+      });
+      extra += '</Folder>';
+    });
+    text = text.replace(/<\/Document>\s*<\/kml>\s*$/, extra + '</Document></kml>');
+  }
+  zip.file('doc.kml', text);
+  const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.google-earth.kmz' });
+  try { await saveBlob(blob, safeName(name) + '.kmz'); toast(`Exportadas ${kmls.length + photos.length} capas${wms.length ? ' (las de servicios WMS no se exportan)' : ''}.`, 5000); }
+  catch (e) { if (!/cancel/i.test(e.message || '')) toast('No se pudo exportar: ' + (e.message || e), 6000); }
+}
+
+/* ---------------- Propiedades de una capa ---------------- */
+function layerProps(id) {
+  const e = layers.get(id); if (!e) return;
+  const r = e.rec, t = typeOf(r);
+  let rows = [['Nombre', esc(r.name)], ['Tipo', { kml: 'KML (vectorial)', wms: 'Servicio de imagen (' + (r.kind === 'wmts' ? 'WMTS' : 'WMS') + ')', photos: 'Fotos con GPS' }[t]], ['Carpeta', esc(folderOf(r))], ['Añadida', fmtDate(r.created)], ['Visible', r.visible ? 'Sí' : 'No']];
+  let extra = '', btns = '';
+  if (t === 'kml') {
+    const f = e.feats, ln = f.filter(x => x.type === 'ln'), pg = f.filter(x => x.type === 'pg'), pt = f.filter(x => x.type === 'pt');
+    const keys = new Set(); f.forEach(x => x.attrs.forEach(a => keys.add(a[0])));
+    const b = e.group.getBounds(), c = b.getCenter();
+    const la = [...acts.values()].filter(a => a.layerId === id), wcount = Object.keys(r.widths || {}).length;
+    rows = rows.concat([
+      ['Elementos', `${f.length}: ${ln.length} líneas · ${pg.length} polígonos · ${pt.length} puntos`],
+      ln.length ? ['Longitud total de líneas', fmtLen(ln.reduce((s2, x) => s2 + x.length, 0))] : null,
+      pg.length ? ['Superficie de polígonos', fmtArea(pg.reduce((s2, x) => s2 + (x.area || 0), 0))] : null,
+      ['Campos de atributos', keys.size ? esc([...keys].join(', ')) : 'Ninguno'],
+      ['Centro', `${fmtLL(c.lat, c.lng)}<br>${fmtUTM(c.lat, c.lng)}`],
+      ['Extensión', `${fmtLen(b.getSouthWest().distanceTo(b.getSouthEast()))} × ${fmtLen(b.getSouthWest().distanceTo(b.getNorthWest()))}`],
+      ['Actuaciones', la.length ? `${la.length} · ${fmtLen(la.reduce((s2, a) => s2 + a.d1 - a.d0, 0))}` : 'Ninguna'],
+      ['Trazas con anchos', wcount ? String(wcount) : 'Ninguna'],
+      ['Origen', r.drawn ? 'Dibujada o grabada en la app' : 'Importada'],
+    ].filter(Boolean));
+    extra = ln.length ? `<h3 class="sh">Trazas</h3><div class="wtable">${ln.map(x => `<div class="wrow pick" data-f="${f.indexOf(x)}"><span>${esc(x.name)}</span><small>${fmtLen(x.length)}</small></div>`).join('')}</div>` : '';
+    btns = `<button class="btn pri full" data-a="attr">${ICON.table}Tabla de atributos y hoja de cálculo</button>
+      <button class="btn" data-a="kml">Exportar KML</button><button class="btn" data-a="zoom">Encuadrar</button>`;
+  } else if (t === 'wms') {
+    rows = rows.concat([['Servicio', `<span class="brk">${esc(r.url)}</span>`], ['Capa(s)', esc(r.layers || '—')], ['Cobertura', esc(r.cover || '—')], ['Atribución', esc(r.attribution || '—')], ['Opacidad', Math.round((r.opacity ?? 1) * 100) + ' %'], ['Consulta de datos en un punto', r.info ? 'Sí' : 'No']]);
+    extra = r.kind !== 'wmts' ? `<div class="legend"><img src="${esc(legendUrl(r))}" alt="Leyenda" onerror="this.parentNode.remove()"></div>` : '';
+    btns = `<a class="btn full" href="${esc(r.url)}?SERVICE=WMS&REQUEST=GetCapabilities" target="_blank" rel="noopener">Ver la ficha técnica del servicio</a>`;
+  } else {
+    const ns = [...notes.values()].filter(n => n.layerId === id), dates = ns.map(n => n.created).sort();
+    rows = rows.concat([['Fotos', String(ns.length)], ['Situadas por GPS de la foto', String(ns.filter(n => n.src === 'exif').length)], ['Situadas por marca de agua', String(ns.filter(n => n.src === 'marca').length)], dates.length ? ['Fechas', `${fmtDate(dates[0])} – ${fmtDate(dates[dates.length - 1])}`] : null].filter(Boolean));
+    btns = `<button class="btn full" data-a="share">${ICON.photo}Compartir fotos con GPS</button><button class="btn" data-a="zoom">Encuadrar</button>`;
+  }
+  const b = openSheet(`<h2>${ICON.info} Propiedades</h2><p class="sub">${esc(r.name)}</p>
+    <table class="attrs">${rows.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('')}</table>${extra}
+    <div class="acts">${btns}</div>`);
+  const q = s2 => b.querySelector(`[data-a=${s2}]`);
+  if (q('attr')) q('attr').onclick = () => attrTable(id);
+  if (q('zoom')) q('zoom').onclick = () => { closeSheet(); zoomToLayer(id); };
+  if (q('share')) q('share').onclick = () => sharePhotos([...notes.values()].filter(n => n.layerId === id), r.name);
+  if (q('kml')) q('kml').onclick = () => saveBlob(new Blob([r.text], { type: 'application/vnd.google-earth.kml+xml' }), safeName(r.name) + '.kml').catch(() => {});
+  b.querySelectorAll('[data-f]').forEach(row => row.onclick = () => { const f = e.feats[+row.dataset.f]; map.fitBounds(L.latLngBounds(f.parts.flatMap(p => p.c)).pad(0.2), { maxZoom: 18 }); featureSheet(f, L.latLng(f.start[0], f.start[1]), r); });
+}
+
+/* ---------------- Tabla de atributos y hoja de cálculo asociada ----------------
+   Exporta los elementos del KML a CSV (Excel, LibreOffice Calc, Google Sheets) y vuelve a leer los cambios:
+   se emparejan por la columna «id»; las columnas nuevas se convierten en atributos (ExtendedData) del KML. */
+const FIXED_COLS = ['id', 'nombre', 'tipo', 'carpeta', 'longitud_m', 'superficie_m2', 'lat', 'lon'];
+function attrKeys(feats) { const k = []; feats.forEach(f => f.attrs.forEach(a => { const key = a[2] || a[0]; if (key && !k.includes(key)) k.push(key); })); return k; }
+function attrTable(id) {
+  const e = layers.get(id); if (!e || typeOf(e.rec) !== 'kml') return;
+  const feats = e.feats, keys = attrKeys(feats);
+  const val = (f, k) => { const a = f.attrs.find(x => (x[2] || x[0]) === k); return a ? a[1] : ''; };
+  const b = openSheet(`<h2>${ICON.table} Tabla de atributos</h2><p class="sub">${esc(e.rec.name)} · ${feats.length} elementos · ${keys.length} campos</p>
+    <div class="ttable"><table><thead><tr><th>id</th><th>Nombre</th><th>Tipo</th><th>Long./sup.</th>${keys.map(k => `<th>${esc(k)}</th>`).join('')}</tr></thead>
+    <tbody>${feats.map((f, i) => `<tr data-i="${i}"><td>${i + 1}</td><td>${esc(f.name)}</td><td>${{ ln: 'Línea', pg: 'Polígono', pt: 'Punto' }[f.type]}</td><td>${f.type === 'ln' ? fmtLen(f.length) : f.type === 'pg' ? fmtArea(f.area || 0) : ''}</td>${keys.map(k => `<td>${esc(val(f, k))}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
+    <div class="acts">
+      <button class="btn pri" data-a="csv">Abrir en hoja de cálculo (CSV)</button>
+      <button class="btn" data-a="imp">Cargar cambios desde CSV</button>
+    </div>
+    <p class="hint">Exporta la tabla, edítala en Excel, LibreOffice Calc o Google Sheets (puedes añadir columnas) y vuelve a cargarla aquí: los cambios de nombre y de atributos se guardan en el KML. No cambies la columna «id».</p>
+    <input type="file" id="inCsv" accept=".csv,text/csv,text/plain" hidden>`);
+  b.querySelectorAll('tr[data-i]').forEach(tr => tr.onclick = () => { const f = feats[+tr.dataset.i]; map.fitBounds(L.latLngBounds(f.parts.flatMap(p => p.c)).pad(0.3), { maxZoom: 18 }); featureSheet(f, L.latLng(f.start[0], f.start[1]), e.rec); });
+  b.querySelector('[data-a=csv]').onclick = async () => {
+    const q = v => `"${String(v ?? '').replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`, n = v => String(v).replace('.', ',');
+    const rows = [[...FIXED_COLS, ...keys]].concat(feats.map((f, i) => [i + 1, f.name, { ln: 'linea', pg: 'poligono', pt: 'punto' }[f.type], f.folder, f.type === 'ln' ? n(f.length.toFixed(2)) : '', f.type === 'pg' ? n((f.area || 0).toFixed(2)) : '', n(f.start[0].toFixed(7)), n(f.start[1].toFixed(7)), ...keys.map(k => val(f, k))]));
+    try { await saveBlob(new Blob(['﻿' + rows.map(r => r.map(q).join(';')).join('\r\n')], { type: 'text/csv' }), `atributos_${safeName(e.rec.name)}.csv`); } catch (er) { if (!/cancel/i.test(er.message || '')) toast('No se pudo exportar.'); }
+  };
+  b.querySelector('[data-a=imp]').onclick = () => $('#inCsv').click();
+  $('#inCsv').onchange = async ev => { const f = ev.target.files[0]; if (f) await importAttrCsv(e, await f.text()); };
+}
+function parseCSV(text) {
+  text = text.replace(/^﻿/, '');
+  const first = text.split(/\r?\n/)[0] || '', delim = (first.match(/;/g) || []).length >= (first.match(/,/g) || []).length ? ';' : (first.includes('\t') ? '\t' : ',');
+  const rows = []; let row = [], cur = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += c; }
+    else if (c === '"') q = true;
+    else if (c === delim) { row.push(cur); cur = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(cur); rows.push(row); row = []; cur = ''; }
+    else cur += c;
+  }
+  if (cur || row.length) { row.push(cur); rows.push(row); }
+  return rows.filter(r => r.some(x => x.trim() !== ''));
+}
+async function importAttrCsv(e, text) {
+  const rows = parseCSV(text); if (rows.length < 2) { toast('El CSV está vacío.'); return; }
+  const head = rows[0].map(h => h.trim()), iId = head.findIndex(h => h.toLowerCase() === 'id'), iName = head.findIndex(h => h.toLowerCase() === 'nombre');
+  if (iId < 0) { toast('El CSV no tiene la columna «id». Exporta primero la tabla desde la app.', 6000); return; }
+  const attrCols = head.map((h, i) => [h, i]).filter(([h]) => h && !FIXED_COLS.includes(h.toLowerCase()));
+  const doc = new DOMParser().parseFromString(e.rec.text, 'application/xml'), pms = byTag(doc, 'Placemark');
+  let changed = 0;
+  for (const r of rows.slice(1)) {
+    const idx = parseInt(r[iId], 10) - 1, f = e.feats[idx]; if (!f) continue;
+    const pm = pms[f.pm]; if (!pm) continue;
+    if (iName >= 0 && r[iName] != null && r[iName].trim() && r[iName].trim() !== f.name) {
+      let nmEl = [...pm.children].find(c => c.localName === 'name');
+      if (!nmEl) { nmEl = doc.createElementNS(KML_NS, 'name'); pm.insertBefore(nmEl, pm.firstChild); }
+      nmEl.textContent = r[iName].trim(); changed++;
+    }
+    for (const [h, i] of attrCols) {
+      const v = (r[i] ?? '').trim();
+      const sd = byTag(pm, 'SimpleData').find(x => x.getAttribute('name') === h);
+      if (sd) { if (sd.textContent !== v) { sd.textContent = v; changed++; } continue; }
+      let dEl = byTag(pm, 'Data').find(x => x.getAttribute('name') === h);
+      if (!dEl) {
+        if (!v) continue;
+        let ed = [...pm.children].find(c => c.localName === 'ExtendedData');
+        if (!ed) { ed = doc.createElementNS(KML_NS, 'ExtendedData'); const geom = [...pm.children].find(c => ['Point', 'LineString', 'Polygon', 'MultiGeometry', 'Track', 'MultiTrack'].includes(c.localName)); pm.insertBefore(ed, geom || null); }
+        dEl = doc.createElementNS(KML_NS, 'Data'); dEl.setAttribute('name', h); dEl.appendChild(doc.createElementNS(KML_NS, 'value')); ed.appendChild(dEl);
+      }
+      const vEl = byTag(dEl, 'value')[0] || dEl.appendChild(doc.createElementNS(KML_NS, 'value'));
+      if (vEl.textContent !== v) { vEl.textContent = v; changed++; }
+    }
+  }
+  if (!changed) { toast('No hay cambios respecto al KML.'); return; }
+  e.rec.text = new XMLSerializer().serializeToString(doc);
+  await DB.put('layers', e.rec); rebuildLayer(e.rec.id);
+  toast(`${changed} cambios guardados en «${e.rec.name}».`, 5000);
+  attrTable(e.rec.id);
+}
 /* ---------------- Botones principales ---------------- */
 $('#btnMenu').innerHTML = ICON.layers;
 $('#fabLocate').innerHTML = ICON.locate;
@@ -2768,6 +3654,7 @@ function nativeInbox() { // app nativa: «Abrir con» y «Compartir»
     }
     if (!obras.get(settings.activeObra)) settings.activeObra = [...obras.keys()][0];
     await loadObra(settings.activeObra);
+    await loadResources();
     const cat = CATALOG.find(c => c.name === 'Parcelas de Catastro');
     if (settings.catastro && ![...layers.values()].some(e => e.rec.url === cat.url)) { settings.catastro = false; saveSettings(); addService(cat, true); } // versión anterior
   } catch (e) { toast('No se pudieron leer los datos guardados: ' + e.message, 7000); }
@@ -2779,9 +3666,11 @@ function nativeInbox() { // app nativa: «Abrir con» y «Compartir»
       handleIncoming(await Promise.all(params.files.map(h => h.getFile())));
     });
   }
+  if (settings.eulaAccepted !== EULA_VERSION) eulaSheet(true);
+  checkLicense(); setInterval(checkLicense, 6 * 3600e3);
   if (new URLSearchParams(location.search).has('shared')) { history.replaceState(null, '', './'); receiveShared(); }
   drawPK();
   if (settings.lastVersion && settings.lastVersion !== APP_VERSION) { toast(`OBRA-GIS actualizada a la versión ${APP_VERSION}. Novedades en Capas → Novedades.`, 7000); }
   if (settings.lastVersion !== APP_VERSION) { settings.lastVersion = APP_VERSION; saveSettings(); }
-  else if (!layers.size && !notes.size) toast('Pulsa Importar para abrir un KML, un KMZ o fotos con GPS. Mantén pulsado en el mapa para ver las opciones de un punto.', 8000);
+  else if (!layers.size && !notes.size && settings.eulaAccepted) toast('Pulsa Importar para abrir un KML, un KMZ o fotos con GPS. Mantén pulsado en el mapa para ver las opciones de un punto.', 8000);
 })();

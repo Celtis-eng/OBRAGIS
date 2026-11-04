@@ -1,0 +1,24 @@
+OBRA-GIS · LICENCIA DE USO GRATUITA
+Versión de las condiciones: 1 (noviembre de 2026)
+
+1. El autor concede una licencia personal, gratuita, no exclusiva, intransferible y
+   revocable para usar OBRA-GIS como herramienta de apoyo en trabajos de campo.
+
+2. La app se ofrece "tal cual", sin garantía de ningún tipo. Mediciones, pendientes,
+   distancias, afecciones y coordenadas son orientativas y deben comprobarse con medios
+   topográficos y fuentes oficiales antes de tomar decisiones de proyecto u obra.
+
+3. Los datos que introduce el usuario se guardan en su dispositivo. El usuario es
+   responsable de sus copias de seguridad.
+
+4. Los mapas y servicios de terceros (IGN, Junta de Andalucía, MITECO, Catastro,
+   OpenStreetMap y otros) se rigen por sus propias licencias y condiciones.
+
+5. El autor puede modificar estas condiciones, pasar la app a un modelo de pago o
+   retirarla. En ese caso la app avisará y siempre permitirá exportar las obras
+   antes de bloquearse.
+
+6. No está permitido redistribuir, vender ni modificar la app sin permiso del autor.
+
+Nota: texto orientativo redactado como punto de partida. Conviene que lo revise un
+profesional del derecho antes de distribuir la app a terceros o cobrar por ella.
