@@ -1,14 +1,16 @@
 'use strict';
-/* OBRA-GIS v1.12.0 (2026-11-04) — visor de KML/KMZ sobre ortofoto con gestor de capas, anotaciones
+/* OBRA-GIS v1.14.0 (2026-11-07) — visor de KML/KMZ sobre ortofoto con gestor de capas, anotaciones
    georreferenciadas (fotos, vídeos, notas de voz y texto), importación de fotos con GPS
    y navegación con Google Maps. Funciona como web instalable y como app nativa (Capacitor). */
 
 /* ---------------- Versión de la app ----------------
    Cambia APP_VERSION en cada entrega (también se usa como versión de la app Android).
    Formato MAYOR.MENOR.CORRECCIÓN: menor = función nueva, corrección = arreglo. */
-const APP_VERSION = '1.12.0';
-const APP_DATE = '2026-11-04';
+const APP_VERSION = '1.14.0';
+const APP_DATE = '2026-11-07';
 const CHANGELOG = [
+  ['1.14.0', '07/11/2026', 'Informe de afecciones de las trazas que elijas: recorre cada traza consultando las capas de servicios marcadas, con banda a cada lado del eje, y da las afecciones por tramos de PK con los organismos a consultar. Se exporta como informe para imprimir o PDF, CSV y KMZ, y va en el paquete de obra.'],
+  ['1.13.0', '07/11/2026', 'Calibración de los KML: distancia entre marcas de PK configurable en Ajustes para todas las trazas (5 m a 1 km u otra distancia) y, si se quiere, distinta para cada capa. Las marcas y rótulos se adaptan al zoom para no amontonarse.'],
   ['1.12.0', '04/11/2026', 'Carpetas en árbol y selección múltiple de capas (mantener pulsado): mostrar, ocultar, subir, bajar, mover a carpeta, unir, exportar y borrar. Invertir el sentido de una traza con sus PK. KML de puntos. Unión de KML sin perder información. Tabla de atributos con exportación e importación CSV (Excel/Calc). Propiedades de la capa. Capa de recursos (plantas de RCD, hormigón, canteras, aglomerado…). Calculadora: distancias, áreas, pendientes, coordenadas y distancia por carretera. Pendientes por tramos ≤/≥. Fecha de la ortofoto. Modo sin conexión por municipio o tocando el mapa. Licencia de uso. Se retira Google híbrido.'],
   ['1.11.0', '27/10/2026', 'Fotos con marca de agua: la app lee el texto de la marca (coordenadas, UTM, fecha, altitud), sitúa la foto y le vuelve a escribir los metadatos GPS. Las fotos hechas con la app llevan también GPS en sus metadatos. Compartir fotos con GPS.'],
   ['1.10.0', '27/10/2026', 'Anchos del camino: datos cada X metros o en cada cambio de ancho, ancho medio, mínimo, máximo y superficie, también por tramos. Plataforma dibujada en el mapa. Trazas nuevas dibujando en el mapa o grabando con el GPS.'],
@@ -511,11 +513,25 @@ function layerVisible(id) {
   const e = layers.get(id); return !!(e && e.rec.visible);
 }
 
-/* ---------------- PK: marcas de distancia cada 100 m en las trazas ---------------- */
-const PK_STEP = 100;
+/* ---------------- PK: marcas de distancia en las trazas (cada 100 m por defecto; configurable en general y por capa) ---------------- */
+const PK_STEP = 100, PK_STEPS = [5, 10, 20, 25, 50, 100, 200, 250, 500, 1000];
+const PK_NICE = [10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 2500, 5000, 10000, 20000, 50000];
+const pkStepOf = rec => Math.max(1, Math.round((rec && rec.pkStep) || settings.pkStep || PK_STEP));
+const fmtStep = m => m >= 1000 && m % 1000 === 0 ? `${m / 1000} km` : `${m} m`;
+function pkStepOptions(cur, withGeneral) {
+  const list = PK_STEPS.includes(cur) || !cur ? PK_STEPS : [...PK_STEPS, cur].sort((a, b) => a - b);
+  return (withGeneral ? `<option value="" ${!cur ? 'selected' : ''}>General (${fmtStep(settings.pkStep || PK_STEP)})</option>` : '')
+    + list.map(v => `<option value="${v}" ${v === cur ? 'selected' : ''}>Cada ${fmtStep(v)}</option>`).join('') + '<option value="otra">Otra distancia…</option>';
+}
+function askPkStep(sel, cur) {
+  if (sel.value !== 'otra') return sel.value === '' ? null : +sel.value;
+  const v = parseNum(prompt('Distancia entre marcas de PK, en metros (1 a 5000):', String(cur || settings.pkStep || PK_STEP)) || '');
+  if (!isFinite(v) || v < 1 || v > 5000) { toast('Distancia no válida. Escribe un número de metros entre 1 y 5000.'); return undefined; }
+  return Math.round(v);
+}
 const fmtPK = d => `${Math.floor(d / 1000)}+${String(Math.round(d % 1000)).padStart(3, '0')}`;
 function lineParts(f) { return f.parts.filter(p => p.t === 'ln'); }
-function chainage(f) {
+function chainage(f, step = PK_STEP) {
   const out = []; let acc = 0, next = 0, last = null;
   lineParts(f).forEach(p => {
     const c = p.c;
@@ -526,12 +542,12 @@ function chainage(f) {
       while (next <= acc + seg + 1e-6) {
         const t = (next - acc) / seg;
         out.push({ lat: a.lat + (b.lat - a.lat) * t, lng: a.lng + (b.lng - a.lng) * t, d: next, dx, dy });
-        next += PK_STEP;
+        next += step;
       }
       acc += seg; last = { lat: b.lat, lng: b.lng, dx, dy };
     }
   });
-  if (last && acc - (next - PK_STEP) > 15) out.push({ ...last, d: acc, end: true }); // PK final de la traza
+  if (last && acc - (next - step) > Math.min(15, step * 0.3)) out.push({ ...last, d: acc, end: true }); // PK final de la traza
   return out;
 }
 // PK del punto de la traza más cercano a una posición
@@ -559,23 +575,32 @@ const pkLayer = L.layerGroup().addTo(map);
 function drawPK() {
   pkLayer.clearLayers();
   const z = map.getZoom();
-  if (!settings.pk || z < 16) return;             // con menos zoom las marcas se amontonan: no se dibujan
-  const labelEvery = z >= 17 ? PK_STEP : 500;    // a zoom 16 solo rayas y etiqueta cada 500 m
+  if (!settings.pk || z < 12) return;
+  const mpp = 40075016.686 * Math.cos(map.getCenter().lat * Math.PI / 180) / (256 * 2 ** z); // metros por píxel
   const bounds = map.getBounds().pad(0.05);
   let n = 0;
   for (const e of layers.values()) {
     if (typeOf(e.rec) !== 'kml' || !e.rec.visible || !e.pk) continue;
+    const step = e.pkStep || PK_STEP;
+    // Solo se dibujan si las marcas quedan separadas al menos 12 px: así no se amontonan ni tapan el mapa
+    // múltiplos «redondos» de la calibración: 25 → 50, 100, 250, 500, 1000…
+    const cands = [...new Set([step, ...PK_NICE.filter(v => v % step === 0), ...[2, 5, 10, 20, 50, 100, 200].map(k => k * step)])].sort((x, y) => x - y);
+    const tickEvery = cands.find(v => v / mpp >= 12); if (!tickEvery || tickEvery / mpp > 400) continue;
+    const labelEvery = cands.find(v => v % tickEvery === 0 && v / mpp >= 60) || tickEvery;
+    const bigEvery = Math.max(1000, labelEvery * 5);
     const op = e.rec.opacity ?? 1;
     for (const m of e.pk) {
-      if (n > 800) return;
+      if (n > 1500) return;
+      const dr = Math.round(m.d);
+      if (!m.end && dr % tickEvery !== 0) continue;
       if (!bounds.contains([m.lat, m.lng])) continue;
       const p = map.latLngToLayerPoint([m.lat, m.lng]);
       const len = Math.hypot(m.dx, m.dy) || 1, nx = m.dy / len, ny = m.dx / len; // perpendicular en pantalla
-      const big = m.end || m.d % 1000 === 0, h = big ? 9 : 6;
+      const big = m.end || dr % bigEvery === 0, lab = m.end || dr % labelEvery === 0, h = big ? 9 : lab ? 6 : 4;
       const a = map.layerPointToLatLng([p.x + nx * h, p.y + ny * h]), b = map.layerPointToLatLng([p.x - nx * h, p.y - ny * h]);
       L.polyline([a, b], { renderer: pkRenderer, color: '#102018', weight: 4, opacity: 0.55 * op, interactive: false }).addTo(pkLayer);
       L.polyline([a, b], { renderer: pkRenderer, color: '#ffffff', weight: 2, opacity: op, interactive: false }).addTo(pkLayer);
-      if (m.end || Math.round(m.d) % labelEvery === 0) {
+      if (lab) {
         const at = map.layerPointToLatLng([p.x + nx * (h + 13), p.y + ny * (h + 13)]);
         L.marker(at, { interactive: false, keyboard: false, pane: 'pk',
           icon: L.divIcon({ className: 'pk-label' + (big ? ' big' : ''), html: `<span style="opacity:${op}">${fmtPK(m.d)}</span>`, iconSize: [0, 0] }) }).addTo(pkLayer);
@@ -632,7 +657,8 @@ function buildKml(entry) {
     });
   });
   entry.feats = feats; entry.group = group;
-  entry.pk = feats.filter(f => f.type === 'ln').flatMap(chainage);
+  entry.pkStep = pkStepOf(entry.rec);
+  entry.pk = feats.filter(f => f.type === 'ln').flatMap(f => chainage(f, entry.pkStep));
 }
 function buildRaster(entry) {
   const r = entry.rec, common = { pane: 'rasters', opacity: r.opacity ?? 1, maxZoom: 21, attribution: r.attribution || '' };
@@ -1238,10 +1264,12 @@ function parseInfo(text, fmt) {
   }
   const d = new DOMParser().parseFromString(text, 'text/html');
   d.querySelectorAll('script,style').forEach(n => n.remove());
-  const rows = [...d.querySelectorAll('tr')].map(tr => [...tr.children].map(td => td.textContent.trim())).filter(r => r.length >= 2 && r.some(Boolean));
+  const trs = [...d.querySelectorAll('tr')].filter(tr => tr.children.length >= 2 && [...tr.children].some(td => td.textContent.trim()));
+  const rows = trs.map(tr => [...tr.children].map(td => td.textContent.trim()));
   if (rows.length) {
-    // tablas con cabecera en la primera fila → pares campo/valor
-    if (rows[0].length > 2 && rows.length >= 2) return rows.slice(1).map(r => rows[0].map((h, i) => [h, r[i] || '']).filter(([k, v]) => v && !HIDE_KEYS.test(k)));
+    // tablas con cabecera en la primera fila (más de 2 columnas o celdas <th>) → un elemento por fila
+    const thHead = [...trs[0].children].every(c => c.tagName === 'TH');
+    if ((rows[0].length > 2 || thHead) && rows.length >= 2) return rows.slice(1).map(r => rows[0].map((h, i) => [h, r[i] || '']).filter(([k, v]) => v && !HIDE_KEYS.test(k)));
     return [rows.map(r => [r[0], r.slice(1).join(' ')]).filter(([k, v]) => v)];
   }
   const txt = (d.body.textContent || '').replace(/\s+\n/g, '\n').replace(/\n{2,}/g, '\n').trim();
@@ -2042,7 +2070,7 @@ async function clearMapData() {
 }
 async function loadObra(id, fit) {
   closeSheet(); await clearMapData();
-  settings.activeObra = id; saveSettings(); updateObraLabel();
+  settings.activeObra = id; saveSettings(); updateObraLabel(); loadAfecLast();
   const recs = (await DB.all('layers')).filter(r => r.obraId === id).sort((a, b) => a.created - b.created);
   recs.forEach((r, i) => { if (r.order == null) r.order = i + 1; if (!r.type) r.type = 'kml'; });
   for (const rec of recs) { try { registerLayer(rec); } catch (e) { console.error(e); } }
@@ -2126,7 +2154,7 @@ async function exportObraPackage(id) {
   });
   const capas = lays.map(r => {
     const c = { id: r.id, tipo: r.type || 'kml', nombre: r.name, carpeta: folderOf(r), orden: r.order || 0, visible: !!r.visible, opacidad: r.opacity ?? 1 };
-    if (c.tipo === 'kml') { c.archivo = `capas/kml/${safeName(r.name)}_${r.id}.kml`; c.color = r.color; Z.file(c.archivo, r.text); if (r.widths && Object.keys(r.widths).length) c.anchos = r.widths; }
+    if (c.tipo === 'kml') { c.archivo = `capas/kml/${safeName(r.name)}_${r.id}.kml`; c.color = r.color; Z.file(c.archivo, r.text); if (r.widths && Object.keys(r.widths).length) c.anchos = r.widths; if (r.pkStep) c.pk_cada_m = r.pkStep; }
     if (c.tipo === 'wms') Object.assign(c, { servicio: r.kind, url: r.url, capas_wms: r.layers, consulta: r.info || '', cobertura: r.cover || '', atribucion: r.attribution || '', zoom_max_nativo: r.maxNative || null });
     return c;
   });
@@ -2146,6 +2174,8 @@ async function exportObraPackage(id) {
   if (wx.rows > 1) { Z.file('datos/anchos.csv', wx.csv); Z.file('datos/anchos_superficie.geojson', fc(wx.polys)); }
   const resFC = [...resources.values()].map(r => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [r.lng, r.lat] }, properties: { id: r.id, tipo: r.type, nombre: r.name, empresa: r.company, telefono: r.phone, direccion: r.address, materiales: r.materials, notas: r.notes } }));
   if (resFC.length) Z.file('datos/recursos.geojson', fc(resFC));
+  const afr = id === settings.activeObra ? afecLast() : await DB.get('kv', 'afec:' + id).catch(() => null);
+  if (afr) { Z.file('informes/afecciones.html', afecHtml(afr)); Z.file('informes/afecciones.csv', '\ufeff' + afecCsv(afr)); Z.file('informes/afecciones.json', JSON.stringify(afr)); }
   Z.file('datos/actuaciones.csv', actsCSV(ats.sort((a, b) => (a.traceName || '').localeCompare(b.traceName || '') || a.d0 - b.d0)));
   Z.file('obra.json', JSON.stringify({ formato: 'OBRA-GIS', version: 1, app_version: APP_VERSION, exportado: new Date().toISOString(),
     obra: { id: o.id, nombre: o.name, descripcion: o.desc || '', creada: new Date(o.created).toISOString() },
@@ -2159,6 +2189,7 @@ async function exportObraPackage(id) {
     'datos/actuaciones.geojson    Actuaciones sobre las trazas (líneas o puntos) con tipo, margen y PK',
     'datos/actuaciones.csv        Listado de actuaciones para Excel',
     'datos/recursos.geojson       Plantas, canteras y demás recursos (comunes a todas las obras)',
+    'informes/afecciones.html     Último informe de afecciones (abrir en el navegador; imprimir a PDF)',
     'datos/anchos.csv             Anchos del camino por tramos (PK, ancho, longitud, superficie)',
     'datos/anchos_superficie.geojson  Plataforma del camino con su ancho (polígonos, con superficie en m²)',
     'multimedia/                  Fotos, vídeos y notas de voz, enlazados desde los GeoJSON (campo multimedia)', '',
@@ -2195,6 +2226,7 @@ async function importObraPackage(file, zipIn) {
     if (c.tipo === 'wms') Object.assign(base, { kind: c.servicio, url: c.url, layers: c.capas_wms, info: c.consulta, cover: c.cobertura, attribution: c.atribucion, maxNative: c.zoom_max_nativo || undefined });
     if (c.tipo === 'photos') base.order = 0;
     if (c.anchos) base.widths = c.anchos;
+    if (c.pk_cada_m) base.pkStep = c.pk_cada_m;
     if (DEFAULT_FOLDER[c.tipo] === c.carpeta) delete base.folder;
     await DB.put('layers', base);
   }
@@ -2221,6 +2253,8 @@ async function importObraPackage(file, zipIn) {
     await DB.put('acts', { id: uid(), obraId, layerId: idMap[p.capa_id] || null, featIdx: p.elemento, traceName: p.traza, layerName: p.capa, d0: p.pk_inicio_m, d1: p.pk_fin_m,
       type: p.tipo, side: p.margen_cod || 'izq', text: p.descripcion, created: Date.parse(p.fecha) || Date.now(), coords, media: await readMedia(p.multimedia) }); nA++;
   }
+  const afj = zip.file(pre + 'informes/afecciones.json');
+  if (afj) { try { const r = JSON.parse(await afj.async('string')); r.rows.forEach(x => { x.layerId = idMap[x.layerId] || x.layerId; }); r.targets.forEach(x => { x.layerId = idMap[x.layerId] || x.layerId; }); await DB.put('kv', r, 'afec:' + obraId); delete afecLastCache[obraId]; } catch (e) { /* informe no válido */ } }
   for (const ft of await readFC('datos/recursos.geojson')) { // recursos comunes: se añaden los que no existan
     const p = ft.properties; if (!p.id || resources.has(p.id)) continue;
     const r = { id: p.id, type: p.tipo, name: p.nombre, company: p.empresa, phone: p.telefono, address: p.direccion, materials: p.materiales, notes: p.notas, lat: ft.geometry.coordinates[1], lng: ft.geometry.coordinates[0], created: Date.now() };
@@ -2758,6 +2792,237 @@ function resourceList(opt = {}) {
   };
 }
 
+/* ---------------- Informe de afecciones ----------------
+   Recorre las trazas que elige el usuario, consulta en cada punto las capas de servicios marcadas (GetFeatureInfo)
+   con una banda de búsqueda a cada lado del eje y agrupa los resultados por elemento y tramo de PK. */
+const AFEC_ORG = [
+  [/el[ée]ctric|subestaci|transformador/i, 'Compañía eléctrica titular (distribuidora o Red Eléctrica)'],
+  [/gas(oducto)?\b|gasoducto|planta de gas/i, 'Titular de la red de gas'],
+  [/oleoducto/i, 'Exolum (antes CLH), titular del oleoducto'],
+  [/carretera|autov|autopista|v[ií]a de gran/i, 'Titular de la carretera (Ministerio, Junta de Andalucía o Diputación)'],
+  [/ferrocarril|ferroviari|tren/i, 'Adif'],
+  [/pecuari/i, 'Delegación Territorial de Medio Ambiente (Junta de Andalucía): ocupación o cruce de vía pecuaria'],
+  [/dph|cauce|inundab|flujo preferente|r[ií]o|hidrogr|policía/i, 'Organismo de cuenca (CH Guadalquivir, CH Segura o Junta en cuencas mediterráneas): autorización en DPH o zona de policía'],
+  [/conducci|canal|abastec|saneam|depuradora|embalse/i, 'Titular de la infraestructura hidráulica (ayuntamiento, comunidad de regantes o ente gestor)'],
+  [/natura|zec|zepa|lic\b|espacio|natural protegid|humedal|monte|forestal|h[áa]bitat/i, 'Delegación Territorial de Medio Ambiente (Junta de Andalucía)'],
+  [/patrimonio|bien(es)? protegid|bic\b|arqueol/i, 'Delegación Territorial de Cultura y Patrimonio Histórico'],
+  [/catastro|parcela|sigpac|recinto/i, 'Titulares de las parcelas (relación de bienes y derechos afectados)'],
+];
+const afecOrg = name => (AFEC_ORG.find(([re]) => re.test(name)) || [null, 'Revisar el organismo competente'])[1];
+const NAME_KEYS = /^(nombre|name|denominaci|toponim|matricula|c[oó]digo|codigo|refcat|referencia|cod_|id_vp|via|carretera|titular|descrip|tipo)/i;
+function afecTitle(attrs) {
+  const a = attrs.find(([k, v]) => NAME_KEYS.test(k) && String(v).trim()) || attrs.find(([, v]) => String(v).trim());
+  return a ? String(a[1]).trim().slice(0, 90) : 'Elemento';
+}
+// GetFeatureInfo con tolerancia fija en metros: imagen de 9×9 píxeles de r/3 m (3 px de tolerancia del servidor ≈ r)
+function featureInfoUrlR(rec, ll, fmt, r) {
+  const p = L.CRS.EPSG3857.project(L.latLng(ll)), k = 1 / Math.cos(ll.lat * Math.PI / 180), half = 1.5 * Math.max(3, r) * k;
+  const bbox = [p.x - half, p.y - half, p.x + half, p.y + half].map(v => v.toFixed(2)).join(','), lay = encodeURIComponent(rec.layers);
+  return `${rec.url}?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetFeatureInfo&LAYERS=${lay}&QUERY_LAYERS=${lay}&STYLES=&SRS=EPSG:3857&BBOX=${bbox}`
+    + `&WIDTH=9&HEIGHT=9&X=4&Y=4&FEATURE_COUNT=10&FORMAT=image/png&INFO_FORMAT=${encodeURIComponent(fmt)}&BUFFER=3`;
+}
+// Elementos de una capa KML como «trazas» medibles por PK (las superficies se recorren por su contorno)
+function afecTargets(e) {
+  const out = [];
+  e.feats.forEach((f, i) => {
+    if (f.type === 'ln') out.push({ f, i, kind: 'línea', len: f.length });
+    else if (f.type === 'pg') { const ring = f.parts.find(p => p.t === 'pg').c; const c = ring.concat([ring[0]]); const pf = { name: f.name, parts: [{ t: 'ln', c }], type: 'ln' }; pf.length = lineLength(c); out.push({ f: pf, i, kind: 'superficie (contorno)', len: pf.length, name: f.name }); }
+    else out.push({ f, i, kind: 'punto', len: 0, pt: f.start });
+  });
+  return out;
+}
+const afecQueryable = () => [...layers.values()].filter(e => typeOf(e.rec) === 'wms' && e.rec.kind === 'wms' && e.rec.info);
+let afecJob = null;
+function afecSheet(preIds) {
+  const kmls = [...layers.values()].filter(e => typeOf(e.rec) === 'kml' && e.feats && e.feats.length);
+  const pre = new Set(preIds && preIds.length ? preIds : kmls.filter(e => e.rec.visible).map(e => e.rec.id));
+  const svcs = afecQueryable();
+  const st = settings.afec || { step: 25, band: 10 };
+  const b = openSheet(`<h2>Informe de afecciones</h2><p class="sub">Recorre las trazas elegidas y consulta las capas de servicios marcadas</p>
+    <h3 class="sh">Trazas y elementos a revisar</h3>
+    ${kmls.length ? `<div class="chklist">${kmls.map(e => `<label class="opt"><input type="checkbox" data-ak="${e.rec.id}" ${pre.has(e.rec.id) ? 'checked' : ''}>${esc(e.rec.name)} <small>${e.feats.length} elem.</small></label>`).join('')}</div>` : '<p class="empty">La obra no tiene capas KML.</p>'}
+    <h3 class="sh">Capas de afecciones a consultar</h3>
+    ${svcs.length ? `<div class="chklist">${svcs.map(e => `<label class="opt"><input type="checkbox" data-as="${e.rec.id}" ${e.rec.visible ? 'checked' : ''}>${esc(e.rec.name)}</label>`).join('')}</div>`
+      : '<p class="empty">No hay capas de servicios consultables en la obra.</p>'}
+    <div class="row"><button class="mini" data-a="kit">${ICON.layers}Añadir kit de afecciones</button>${svcs.length ? '<button class="mini" data-a="all">Marcar todas</button>' : ''}</div>
+    <div class="pkrow"><div class="field"><label for="afStep">Consultar cada</label><select id="afStep">${[10, 25, 50, 100].map(v => `<option value="${v}" ${v === st.step ? 'selected' : ''}>${v} m</option>`).join('')}</select></div>
+      <div class="field"><label for="afBand">Banda a cada lado del eje</label><select id="afBand">${[[3, 'Solo el eje (±3 m)'], [5, '±5 m'], [10, '±10 m'], [25, '±25 m'], [50, '±50 m'], [100, '±100 m']].map(([v, t]) => `<option value="${v}" ${v === st.band ? 'selected' : ''}>${t}</option>`).join('')}</select></div></div>
+    <p class="hint" id="afEst"></p>
+    <div class="acts"><button class="btn pri full" data-a="go">Generar informe</button>${afecLast() ? '<button class="btn full" data-a="last">Ver el último informe de esta obra</button>' : ''}</div>`);
+  const chosen = () => ({ ks: [...b.querySelectorAll('[data-ak]:checked')].map(x => layers.get(x.dataset.ak)), ss: [...b.querySelectorAll('[data-as]:checked')].map(x => layers.get(x.dataset.as)), step: +$('#afStep').value, band: +$('#afBand').value });
+  const est = () => {
+    const c = chosen(); let n = 0;
+    c.ks.forEach(e => afecTargets(e).forEach(t => { n += t.pt ? 1 : Math.ceil(t.len / c.step) + 1; }));
+    const q = n * c.ss.length, sec = q / 5;
+    const eff = Math.max(c.band, c.step / 2);
+    $('#afEst').textContent = !c.ks.length || !c.ss.length ? 'Marca al menos una traza y una capa.' : `${eff > c.band ? `Banda efectiva ±${eff} m (mitad de la distancia entre consultas). ` : ''}${n} puntos × ${c.ss.length} capas = ${q} consultas · unos ${sec < 60 ? Math.max(5, Math.round(sec)) + ' s' : Math.round(sec / 60) + ' min'} con buena cobertura.${q > 6000 ? ' Es mucho: sube la distancia entre consultas o elige menos capas.' : ''}`;
+  };
+  b.querySelectorAll('input,select').forEach(x => x.onchange = est); est();
+  b.querySelector('[data-a=kit]').onclick = () => addServices(CATALOG.filter(c => AFECCIONES_KIT.includes(c.name)), 'kit de afecciones').then(() => afecSheet([...b.querySelectorAll('[data-ak]:checked')].map(x => x.dataset.ak)));
+  const all = b.querySelector('[data-a=all]'); if (all) all.onclick = () => { b.querySelectorAll('[data-as]').forEach(x => x.checked = true); est(); };
+  const last = b.querySelector('[data-a=last]'); if (last) last.onclick = () => afecResults(afecLast());
+  b.querySelector('[data-a=go]').onclick = () => {
+    const c = chosen(); if (!c.ks.length || !c.ss.length) { toast('Marca al menos una traza y una capa de afecciones.'); return; }
+    settings.afec = { step: c.step, band: c.band }; saveSettings();
+    runAfecReport(c);
+  };
+}
+const afecLastCache = {};
+const afecLast = () => afecLastCache[settings.activeObra] || null;
+async function loadAfecLast() { try { const r = await DB.get('kv', 'afec:' + settings.activeObra); if (r) afecLastCache[settings.activeObra] = r; } catch (e) { /* nada */ } }
+async function runAfecReport(c) {
+  // 1) puntos de muestreo por elemento
+  const samples = [];
+  c.ks.forEach(e => afecTargets(e).forEach(t => {
+    if (t.pt) { samples.push({ e, t, d: 0, ll: { lat: t.pt[0], lng: t.pt[1] } }); return; }
+    for (let d = 0; d < t.len; d += c.step) samples.push({ e, t, d, ll: pointAtPK(t.f, d) });
+    samples.push({ e, t, d: t.len, ll: pointAtPK(t.f, t.len) });
+  }));
+  // radio de búsqueda: la banda pedida, y nunca menos de media distancia entre consultas (para no dejar huecos en los cruces)
+  c.radius = Math.max(c.band, c.step / 2);
+  const jobs = []; samples.forEach(s => c.ss.forEach(svc => jobs.push({ s, svc })));
+  const job = afecJob = { stop: false, done: 0, total: jobs.length, fails: new Map(), dead: new Set() };
+  const b = openSheet(`<h2>Informe de afecciones</h2><p class="sub">${c.ks.length} capa(s) · ${c.ss.length} capas de afecciones · cada ${c.step} m · banda ±${c.band} m</p>
+    <div class="progress" id="afProg"><div></div><span>0 %</span></div><p class="hint" id="afMsg">Consultando los servicios…</p>
+    <div class="acts"><button class="btn full" data-a="stop">Parar y ver lo obtenido</button></div>`);
+  b.querySelector('[data-a=stop]').onclick = () => { job.stop = true; };
+  onSheetClose(() => { job.stop = true; });
+  const hits = []; const cache = new Map();
+  const upd = () => { const p = Math.round(job.done / job.total * 100), el = $('#afProg'); if (!el) return; el.firstElementChild.style.width = p + '%'; el.lastElementChild.textContent = `${p} % · ${job.done} de ${job.total}`; };
+  let qi = 0;
+  const worker = async () => {
+    while (qi < jobs.length && !job.stop) {
+      const { s, svc } = jobs[qi++], r = svc.rec;
+      if (job.dead.has(r.id)) { job.done++; continue; }
+      const fmt = r.info === 'json' ? 'application/json' : 'text/html', url = featureInfoUrlR(r, s.ll, fmt, c.radius);
+      try {
+        let feats = cache.get(url); if (!feats) { feats = parseInfo(await httpGetText(url), r.info); cache.set(url, feats); }
+        job.fails.set(r.id, 0);
+        feats.forEach(attrs => { if (attrs.length) hits.push({ s, svc, attrs, key: r.id + '|' + JSON.stringify(attrs.slice(0, 6)) }); });
+      } catch (err) {
+        const n = (job.fails.get(r.id) || 0) + 1; job.fails.set(r.id, n);
+        if (n >= 6) { job.dead.add(r.id); const m = $('#afMsg'); if (m) m.textContent = `«${r.name}» no responde: se omite.`; }
+      }
+      job.done++; if (job.done % 5 === 0) upd();
+    }
+  };
+  await Promise.all([1, 2, 3, 4].map(worker)); upd();
+  // 2) agrupar por elemento afectado y tramo continuo de PK
+  const groups = new Map();
+  hits.forEach(h => {
+    const k = h.s.e.rec.id + '#' + h.s.t.i + '#' + h.key;
+    if (!groups.has(k)) groups.set(k, { h, ds: [] });
+    groups.get(k).ds.push(h.s.d);
+  });
+  const rows = [];
+  groups.forEach(({ h, ds }) => {
+    ds = [...new Set(ds)].sort((a, b2) => a - b2);
+    let cur = null;
+    ds.forEach(d => { if (cur && d - cur.d1 <= c.step * 1.5 + 0.01) cur.d1 = d; else { cur = { d0: d, d1: d }; rows.push({ cur, h }); } });
+  });
+  const rep = {
+    v: APP_VERSION, date: Date.now(), obra: (obras.get(settings.activeObra) || {}).name || '', step: c.step, band: c.band, radius: c.radius, partial: job.stop && job.done < job.total,
+    services: c.ss.map(e => ({ id: e.rec.id, name: e.rec.name, dead: job.dead.has(e.rec.id) })),
+    targets: c.ks.flatMap(e => afecTargets(e).map(t => ({ layer: e.rec.name, layerId: e.rec.id, fi: t.i, name: t.name || t.f.name, kind: t.kind, len: t.len }))),
+    rows: rows.map(({ cur, h }) => ({ layer: h.s.e.rec.name, layerId: h.s.e.rec.id, fi: h.s.t.i, poly: h.s.t.kind.startsWith('sup'), trace: h.s.t.name || h.s.t.f.name, kind: h.s.t.kind,
+      d0: cur.d0, d1: cur.d1, len: cur.d1 - cur.d0, cross: cur.d1 - cur.d0 <= c.step + 0.01 && h.s.t.kind !== 'punto', svc: h.svc.rec.name, el: afecTitle(h.attrs), org: afecOrg(h.svc.rec.name), attrs: h.attrs.slice(0, 10).map(([k, v]) => [k, String(v).slice(0, 120)]) }))
+      .sort((a, b2) => a.layer.localeCompare(b2.layer) || a.fi - b2.fi || a.d0 - b2.d0),
+  };
+  afecLastCache[settings.activeObra] = rep;
+  DB.put('kv', rep, 'afec:' + settings.activeObra).catch(() => {});
+  afecResults(rep);
+}
+const afecHL = L.layerGroup().addTo(map);
+function afecDrawRows(rep, only) {
+  afecHL.clearLayers();
+  (only ? [only] : rep.rows).forEach(r => {
+    const e = layers.get(r.layerId); if (!e) return; const f = e.feats[r.fi]; if (!f) return;
+    const t = afecTargets(e).find(x => x.i === r.fi); if (!t) return;
+    if (t.pt) { L.circleMarker(t.pt, { renderer: hlRenderer, radius: 11, color: '#e03131', weight: 4, fill: false, interactive: false }).addTo(afecHL); return; }
+    const d0 = r.d1 - r.d0 < 2 ? Math.max(0, r.d0 - 3) : r.d0, d1 = r.d1 - r.d0 < 2 ? Math.min(t.len, r.d1 + 3) : r.d1;
+    L.polyline(segmentCoords(t.f, d0, d1), { renderer: hlRenderer, color: '#e03131', weight: 10, opacity: 0.75, interactive: false }).addTo(afecHL);
+  });
+}
+function afecResults(rep) {
+  afecDrawRows(rep);
+  const byOrg = new Map(); rep.rows.forEach(r => { if (!byOrg.has(r.org)) byOrg.set(r.org, new Set()); byOrg.get(r.org).add(r.svc); });
+  const dead = rep.services.filter(s => s.dead);
+  const tramo = r => r.kind === 'punto' ? 'en el punto' : r.cross ? `PK ${fmtPK((r.d0 + r.d1) / 2)} (cruce o afección puntual)` : `PK ${fmtPK(r.d0)} – ${fmtPK(r.d1)}`;
+  const b = openSheet(`<h2>Informe de afecciones</h2><p class="sub">${esc(rep.obra)} · ${new Date(rep.date).toLocaleString('es-ES')} · cada ${rep.step} m · banda ±${rep.radius || rep.band} m${rep.partial ? ' · <b>incompleto (parado)</b>' : ''}</p>
+    ${rep.rows.length ? `<p><b>${rep.rows.length} afecciones</b> en ${new Set(rep.rows.map(r => r.layer + r.fi)).size} de ${rep.targets.length} elemento${rep.targets.length === 1 ? '' : 's'} revisado${rep.targets.length === 1 ? '' : 's'}.</p>
+      <h3 class="sh">Organismos a consultar</h3><table class="attrs">${[...byOrg].map(([o, s]) => `<tr><td>${esc(o)}</td><td>${[...s].map(esc).join(', ')}</td></tr>`).join('')}</table>
+      <h3 class="sh">Detalle por traza</h3><div class="wmlist">${rep.rows.map((r, i) => `<div class="nrow" data-ar="${i}"><span class="dot" style="background:#e03131"></span><span class="t"><b>${esc(r.svc)}: ${esc(r.el)}</b><small>${esc(r.trace)} · ${tramo(r)}${!r.cross && r.len >= 1 ? ' · ' + fmtLen(r.len) : ''}</small></span></div>`).join('')}</div>`
+      : `<p><b>No se han encontrado afecciones</b> en las capas consultadas${dead.length ? ' que respondieron' : ''}.</p>`}
+    ${dead.length ? `<p class="hint">Sin respuesta (no revisadas): ${dead.map(s => esc(s.name)).join(', ')}.</p>` : ''}
+    <p class="hint">Resultado orientativo a partir de los servicios públicos de cartografía. No sustituye a las consultas oficiales a cada organismo ni al replanteo en campo.</p>
+    <div class="acts"><button class="btn pri full" data-a="html">Exportar informe (para imprimir o PDF)</button><button class="btn" data-a="csv">CSV para Excel</button><button class="btn" data-a="kmz">KMZ de tramos afectados</button><button class="btn" data-a="new">Nuevo informe</button></div>`);
+  onSheetClose(() => afecHL.clearLayers());
+  b.querySelectorAll('[data-ar]').forEach(el => el.onclick = () => {
+    const r = rep.rows[+el.dataset.ar]; afecDrawRows(rep, r);
+    const g = afecHL.getLayers()[0]; if (g) map.fitBounds(g.getBounds ? g.getBounds().pad(0.6) : L.latLngBounds([g.getLatLng()]).pad(0.01), { maxZoom: 18 });
+    toast(`${r.svc}: ${r.el} · ${r.trace} · ${tramo(r)}`, 5000);
+  });
+  const fname = ext => `afecciones_${safeName(rep.obra)}_${new Date(rep.date).toISOString().slice(0, 10)}.${ext}`;
+  b.querySelector('[data-a=html]').onclick = () => saveBlob(new Blob([afecHtml(rep)], { type: 'text/html' }), fname('html')).catch(() => {});
+  b.querySelector('[data-a=csv]').onclick = () => saveBlob(new Blob(['﻿' + afecCsv(rep)], { type: 'text/csv' }), fname('csv')).catch(() => {});
+  b.querySelector('[data-a=kmz]').onclick = async () => { const z = new JSZip(); z.file('doc.kml', afecKml(rep)); saveBlob(await z.generateAsync({ type: 'blob', mimeType: 'application/vnd.google-earth.kmz' }), fname('kmz')).catch(() => {}); };
+  b.querySelector('[data-a=new]').onclick = () => afecSheet([...new Set(rep.targets.map(t => t.layerId))]);
+}
+function afecCsv(rep) {
+  const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`, n = v => (Math.round(v * 10) / 10).toString().replace('.', ',');
+  const head = ['capa', 'elemento', 'tipo', 'pk_inicio', 'pk_fin', 'longitud_m', 'afeccion', 'elemento_afectado', 'organismo', 'datos'];
+  return [head.map(q).join(';')].concat(rep.rows.map(r => [r.layer, r.trace, r.kind, fmtPK(r.d0), fmtPK(r.d1), n(r.len), r.svc, r.el, r.org, r.attrs.map(([k, v]) => (k ? k + ': ' : '') + v).join(' | ')].map(q).join(';'))).join('\r\n');
+}
+function afecKml(rep) {
+  const pms = rep.rows.map(r => {
+    const e = layers.get(r.layerId), t = e && afecTargets(e).find(x => x.i === r.fi); if (!t) return '';
+    const desc = `${r.svc}: ${r.el}\n${r.trace} · PK ${fmtPK(r.d0)} – ${fmtPK(r.d1)}\nOrganismo: ${r.org}\n` + r.attrs.map(([k, v]) => (k ? k + ': ' : '') + v).join('\n');
+    const geom = t.pt ? `<Point><coordinates>${t.pt[1]},${t.pt[0]},0</coordinates></Point>`
+      : `<LineString><tessellate>1</tessellate><coordinates>${segmentCoords(t.f, r.len < 1 ? Math.max(0, r.d0 - 3) : r.d0, r.len < 1 ? Math.min(t.len, r.d1 + 3) : r.d1).map(c => `${c[1]},${c[0]},0`).join(' ')}</coordinates></LineString>`;
+    return `<Placemark><name>${xml(r.svc + ' · ' + r.el)}</name><styleUrl>#af</styleUrl><description>${xml(desc)}</description>
+<ExtendedData><Data name="capa"><value>${xml(r.layer)}</value></Data><Data name="pk_inicio"><value>${fmtPK(r.d0)}</value></Data><Data name="pk_fin"><value>${fmtPK(r.d1)}</value></Data><Data name="organismo"><value>${xml(r.org)}</value></Data></ExtendedData>${geom}</Placemark>`;
+  }).join('\n');
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="${KML_NS}"><Document><name>${xml('Afecciones ' + rep.obra)}</name>
+<Style id="af"><LineStyle><color>ff3131e0</color><width>6</width></LineStyle><IconStyle><color>ff3131e0</color></IconStyle></Style>\n${pms}\n</Document></kml>`;
+}
+// Croquis SVG de las trazas con los tramos afectados en rojo
+function afecSvg(rep) {
+  const lines = [], reds = [];
+  const ids = [...new Set(rep.targets.map(t => t.layerId))];
+  ids.forEach(id => { const e = layers.get(id); if (!e) return; afecTargets(e).forEach(t => { if (t.pt) lines.push({ pt: t.pt }); else lines.push({ c: segmentCoords(t.f, 0, t.len) }); }); });
+  rep.rows.forEach(r => { const e = layers.get(r.layerId), t = e && afecTargets(e).find(x => x.i === r.fi); if (!t) return; reds.push(t.pt ? { pt: t.pt } : { c: segmentCoords(t.f, r.len < 1 ? Math.max(0, r.d0 - 5) : r.d0, r.len < 1 ? Math.min(t.len, r.d1 + 5) : r.d1) }); });
+  const all = lines.flatMap(l => l.c || [l.pt]); if (!all.length) return '';
+  const P = c => L.CRS.EPSG3857.project(L.latLng(c[0], c[1]));
+  const ps = all.map(P), x0 = Math.min(...ps.map(p => p.x)), x1 = Math.max(...ps.map(p => p.x)), y0 = Math.min(...ps.map(p => p.y)), y1 = Math.max(...ps.map(p => p.y));
+  const W = 700, pad = 24, dx = (x1 - x0) || 1, dy = (y1 - y0) || 1, H = Math.round(Math.min(520, Math.max(170, dy / dx * (W - 2 * pad) + 2 * pad)));
+  const s = Math.min((W - 2 * pad) / dx, (H - 2 * pad) / dy);
+  const T = c => { const p = P(c); return `${(pad + (p.x - x0) * s).toFixed(1)},${(H - pad - (p.y - y0) * s).toFixed(1)}`; };
+  const draw = (l, col, w) => l.pt ? `<circle cx="${T(l.pt).split(',')[0]}" cy="${T(l.pt).split(',')[1]}" r="${w}" fill="${col}"/>` : `<polyline points="${l.c.map(T).join(' ')}" fill="none" stroke="${col}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/>`;
+  const kc = 1 / Math.cos(all[0][0] * Math.PI / 180); // metros reales → metros de la proyección
+  const sc = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000].find(v => v * kc * s >= 80) || 20000;
+  const scPx = sc * kc * s;
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px;border:1px solid #ccc;background:#fafaf7">${lines.map(l => draw(l, '#555', 2)).join('')}${reds.map(l => draw(l, '#e03131', 6)).join('')}
+<line x1="10" y1="14" x2="${10 + scPx}" y2="14" stroke="#000" stroke-width="2"/><text x="${10 + scPx + 6}" y="18" font-size="12">${sc >= 1000 ? sc / 1000 + ' km' : sc + ' m'}</text><text x="${W - 30}" y="24" font-size="16" font-weight="700">N↑</text></svg>`;
+}
+function afecHtml(rep) {
+  const E = esc, byOrg = new Map(); rep.rows.forEach(r => { if (!byOrg.has(r.org)) byOrg.set(r.org, []); byOrg.get(r.org).push(r); });
+  const per = new Map(); rep.targets.forEach(t => per.set(t.layerId + '#' + t.fi, { t, rows: [] })); rep.rows.forEach(r => { const g = per.get(r.layerId + '#' + r.fi); if (g) g.rows.push(r); });
+  const tramo = r => r.kind === 'punto' ? '—' : r.cross ? `${fmtPK((r.d0 + r.d1) / 2)} (cruce)` : `${fmtPK(r.d0)} – ${fmtPK(r.d1)}`;
+  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Informe de afecciones · ${E(rep.obra)}</title>
+<style>body{font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#16211c;max-width:900px;margin:24px auto;padding:0 16px}h1{font-size:22px;margin:0 0 4px}h2{font-size:17px;margin:26px 0 8px;border-bottom:2px solid #0b3d2e;padding-bottom:3px}
+table{border-collapse:collapse;width:100%;margin:6px 0 12px;font-size:13px}th,td{border:1px solid #cfd8d3;padding:5px 7px;text-align:left;vertical-align:top}th{background:#eef3f0}.sub{color:#5b6b63}.ok{color:#2f9e44;font-weight:600}.warn{background:#fff4e6;border:1px solid #ffd8a8;padding:8px 10px;border-radius:6px}small{color:#5b6b63}
+@media print{body{margin:0}h2{break-after:avoid}tr{break-inside:avoid}}</style></head><body>
+<h1>Informe de afecciones</h1><p class="sub">Obra: <b>${E(rep.obra)}</b> · ${new Date(rep.date).toLocaleString('es-ES')} · OBRA-GIS v${E(rep.v)}</p>
+<p>Se han revisado <b>${rep.targets.length} elemento${rep.targets.length === 1 ? '' : 's'}</b> (${fmtLen(rep.targets.reduce((s, t) => s + t.len, 0))} de traza) consultando cada <b>${rep.step} m</b> con una banda de <b>±${rep.radius || rep.band} m</b> a cada lado del eje${rep.radius > rep.band ? ` (pedida ±${rep.band} m; se amplía a la mitad de la distancia entre consultas para no dejar huecos)` : ''}. Resultado: <b>${rep.rows.length ? rep.rows.length + ' afecciones' : 'sin afecciones'}</b>${rep.partial ? ' (informe incompleto: se paró antes de terminar)' : ''}.</p>
+<h2>Capas consultadas</h2><table><tr><th>Capa</th><th>Estado</th></tr>${rep.services.map(s => `<tr><td>${E(s.name)}</td><td>${s.dead ? '<b>Sin respuesta: no revisada</b>' : 'Consultada'}</td></tr>`).join('')}</table>
+${rep.rows.length ? `<h2>Organismos y titulares a consultar</h2><table><tr><th>Organismo</th><th>Afecciones</th></tr>${[...byOrg].map(([o, l]) => `<tr><td>${E(o)}</td><td>${[...new Set(l.map(r => `${r.svc}: ${r.el}`))].map(E).join('<br>')}</td></tr>`).join('')}</table>` : ''}
+<h2>Croquis</h2>${afecSvg(rep)}<p><small>Gris: trazas revisadas. Rojo: tramos con afección.</small></p>
+<h2>Detalle por traza</h2>${[...per.values()].map(({ t, rows }) => `<h3 style="font-size:15px;margin:16px 0 4px">${E(t.layer)} · ${E(t.name)} <small>(${E(t.kind)}${t.len ? ', ' + fmtLen(t.len) : ''})</small></h3>
+${rows.length ? `<table><tr><th>PK</th><th>Long.</th><th>Afección</th><th>Elemento afectado y datos</th></tr>${rows.map(r => `<tr><td>${tramo(r)}</td><td>${!r.cross && r.len >= 1 ? fmtLen(r.len) : '—'}</td><td>${E(r.svc)}</td><td><b>${E(r.el)}</b><br><small>${r.attrs.map(([k, v]) => (k ? E(k) + ': ' : '') + E(v)).join(' · ')}</small></td></tr>`).join('')}</table>` : '<p class="ok">Sin afecciones en las capas consultadas.</p>'}`).join('')}
+<h2>Advertencia</h2><p class="warn">Informe orientativo elaborado con los servicios públicos de cartografía (IECA-DERA, REDIAM, MITECO, Catastro, SIGPAC…) en la fecha indicada. La exactitud depende de esas fuentes y de la distancia entre consultas: un elemento estrecho puede no detectarse si cae entre dos consultas fuera de la banda. No sustituye a las consultas oficiales a los organismos y titulares, ni a la comprobación en campo.</p>
+</body></html>`;
+}
+
 /* ---------------- Licencia de uso ----------------
    La app consulta licencia.json publicado junto a la web (GitHub Pages). Si el autor pone "activa": false,
    la app queda bloqueada salvo para exportar las obras. Sin conexión se permite trabajar DIAS_GRACIA días
@@ -3081,8 +3346,9 @@ function layerOptions(e) {
   let h = '';
   if (t !== 'photos') h += `<label class="rng">Opacidad<input type="range" min="10" max="100" step="5" value="${Math.round((r.opacity ?? 1) * 100)}" data-op="${id}"></label>`;
   if (t === 'kml') h += `<label class="rng">Color<input type="color" value="${r.color}" data-col="${id}"></label>`;
+  if (t === 'kml' && e.feats && e.feats.some(f => f.type === 'ln')) h += `<label class="rng">PK<select data-pkstep="${id}" aria-label="Distancia entre marcas de PK de esta capa">${pkStepOptions(r.pkStep || 0, true)}</select></label>`;
   h += `<div class="field row"><input type="text" value="${esc(r.name)}" data-name="${id}" aria-label="Nombre de la capa"><button class="mini" data-rename="${id}">Renombrar</button></div>`;
-  h += `<div class="row"><button class="mini" data-props="${id}">${ICON.info}Propiedades</button>${t === 'kml' ? `<button class="mini" data-attr="${id}">${ICON.table}Tabla</button>` : ''}${t !== 'wms' ? `<button class="mini" data-zoom="${id}">Encuadrar</button>` : ''}${t === 'photos' ? `<button class="mini" data-sharephotos="${id}">Compartir fotos con GPS</button>` : ''}<button class="mini del" data-dell="${id}">Eliminar capa</button></div>`;
+  h += `<div class="row"><button class="mini" data-props="${id}">${ICON.info}Propiedades</button>${t === 'kml' ? `<button class="mini" data-attr="${id}">${ICON.table}Tabla</button><button class="mini" data-afec="${id}">Afecciones</button>` : ''}${t !== 'wms' ? `<button class="mini" data-zoom="${id}">Encuadrar</button>` : ''}${t === 'photos' ? `<button class="mini" data-sharephotos="${id}">Compartir fotos con GPS</button>` : ''}<button class="mini del" data-dell="${id}">Eliminar capa</button></div>`;
   h += `<div class="field row"><input type="text" list="folderList" value="${esc(folderOf(r))}" data-folder="${id}" aria-label="Carpeta de la capa"><button class="mini" data-movefolder="${id}">Mover a carpeta</button></div>`;
   if (t === 'wms' && r.kind !== 'wmts') h += `<div class="legend"><img src="${esc(legendUrl(r))}" alt="Leyenda de ${esc(r.name)}" onerror="this.parentNode.remove()"></div>`;
   if (t === 'wms') h += `<p class="hint">${esc(r.url)}${r.layers ? ' · ' + esc(r.layers) : ''}${r.cover ? ' · cobertura: ' + esc(r.cover) : ''}</p>`;
@@ -3166,6 +3432,7 @@ async function renderDrawer() {
         <button class="mini ic" data-s="up" aria-label="Subir" ${nSel ? '' : 'disabled'}>${ICON.up}</button><button class="mini ic" data-s="down" aria-label="Bajar" ${nSel ? '' : 'disabled'}>${ICON.down}</button>
         <button class="mini" data-s="folder" ${nSel ? '' : 'disabled'}>${ICON.folder}Agrupar en carpeta</button>
         <button class="mini" data-s="union" ${selKml >= 2 ? '' : 'disabled'}>Unir KML</button>
+        <button class="mini" data-s="afec" ${selKml >= 1 ? '' : 'disabled'}>Informe de afecciones</button>
         <button class="mini" data-s="export" ${nSel ? '' : 'disabled'}>Exportar / compartir</button>
         <button class="mini del" data-s="del" ${nSel ? '' : 'disabled'}>Eliminar</button>
       </div></div>` : ''}
@@ -3183,6 +3450,7 @@ async function renderDrawer() {
     <h3>Herramientas</h3>
     <div class="acts">
       <button class="btn" data-t="calc">${ICON.calc}Calculadora</button>
+      <button class="btn" data-t="afec">${ICON.layers}Informe de afecciones</button>
       <button class="btn" data-t="reslist">${ICON.pin}Recursos</button>
       <button class="btn full" data-t="actlist">${ICON.road}Listado de actuaciones (${acts.size})</button>
       <button class="btn" data-t="csv">Actuaciones a Excel (CSV)</button>
@@ -3193,7 +3461,8 @@ async function renderDrawer() {
     <h3>Ajustes</h3>
     <div class="field"><label for="selTravel">Indicaciones de Google Maps</label>
       <select id="selTravel"><option value="driving">En coche</option><option value="walking">A pie</option></select></div>
-    <label class="opt"><input type="checkbox" id="chkPK" ${settings.pk ? 'checked' : ''}>Marcas de PK cada 100 m en las trazas (al acercar el mapa)</label>
+    <label class="opt"><input type="checkbox" id="chkPK" ${settings.pk ? 'checked' : ''}>Marcas de PK en las trazas (al acercar el mapa)</label>
+    <div class="field"><label for="selPkStep">Calibración general de los KML (distancia entre PK)</label><select id="selPkStep">${pkStepOptions(settings.pkStep || PK_STEP, false)}</select></div>
     <label class="opt"><input type="checkbox" id="chkStamp" ${settings.stamp ? 'checked' : ''}>Sellar fecha y coordenadas en las fotos que hago</label>
     <div class="version"><span>OBRA-GIS <b>v${APP_VERSION}</b> · ${NATIVE ? 'app Android' : 'versión web'}</span><button class="mini" data-t="news" type="button">Novedades</button><button class="mini" data-t="lic" type="button">Licencia</button></div>
     <p class="hint">${storage}</p>`;
@@ -3235,6 +3504,13 @@ async function renderDrawer() {
     };
     r.onchange = async () => { const id = r.dataset.op; await updateLayer(id, { opacity: +r.value / 100 }); if (typeOf(layers.get(id).rec) === 'kml') rebuildLayer(id); };
   });
+  d.querySelectorAll('[data-afec]').forEach(bt => bt.onclick = () => { closeDrawer(); afecSheet([bt.dataset.afec]); });
+  d.querySelectorAll('[data-pkstep]').forEach(sel => sel.onchange = async () => {
+    const id = sel.dataset.pkstep, rec = layers.get(id).rec, v = askPkStep(sel, rec.pkStep);
+    if (v === undefined) { renderDrawer(); return; }
+    await updateLayer(id, { pkStep: v || null }); rebuildLayer(id); renderDrawer();
+    toast(`«${rec.name}»: PK cada ${fmtStep(pkStepOf(layers.get(id).rec))}${v ? '' : ' (calibración general)'}.`);
+  });
   d.querySelectorAll('[data-col]').forEach(c => c.onchange = async () => { await updateLayer(c.dataset.col, { color: c.value }); rebuildLayer(c.dataset.col); renderDrawer(); });
   d.querySelectorAll('[data-rename]').forEach(bt => bt.onclick = async () => {
     const id = bt.dataset.rename, v = d.querySelector(`[data-name="${id}"]`).value.trim();
@@ -3266,11 +3542,18 @@ async function renderDrawer() {
   const al = d.querySelector('[data-actlist]'); if (al) al.onclick = () => { closeDrawer(); actList(); };
   d.querySelectorAll('[data-reslist], [data-t=reslist]').forEach(bt => bt.onclick = () => { closeDrawer(); resourceList(); });
   d.querySelector('[data-t=calc]').onclick = () => { closeDrawer(); calcSheet(); };
+  d.querySelector('[data-t=afec]').onclick = () => { closeDrawer(); afecSheet(); };
   d.querySelector('[data-t=measure]').onclick = () => { closeDrawer(); startMeasure(); };
   d.querySelector('[data-t=offline]').onclick = () => { closeDrawer(); offlineSheet(); };
   const sel = $('#selTravel'); sel.value = settings.travel; sel.onchange = () => { settings.travel = sel.value; saveSettings(); };
   $('#chkStamp').onchange = e => { settings.stamp = e.target.checked; saveSettings(); };
   $('#chkPK').onchange = e => { settings.pk = e.target.checked; saveSettings(); drawPK(); };
+  $('#selPkStep').onchange = e => {
+    const v = askPkStep(e.target, settings.pkStep); if (!v) { renderDrawer(); return; }
+    settings.pkStep = v; saveSettings();
+    layers.forEach((en, id) => { if (typeOf(en.rec) === 'kml' && !en.rec.pkStep) rebuildLayer(id); });
+    toast(`PK cada ${fmtStep(v)} en los KML sin calibración propia.`); renderDrawer();
+  };
 }
 let longPressAt = 0;
 function onLongPress(el, fn) {
@@ -3346,6 +3629,7 @@ async function selectionAction(act) {
     b.querySelector('[data-a=root]').onclick = () => go('');
     return;
   }
+  if (act === 'afec') { closeDrawer(); const k = ids.filter(id => typeOf(layers.get(id).rec) === 'kml'); selMode = false; selIds.clear(); return afecSheet(k); }
   if (act === 'union') { closeDrawer(); return unionSheet(ents.filter(e => typeOf(e.rec) === 'kml')); }
   if (act === 'export') return exportLayersKMZ(ents);
 }
@@ -3441,6 +3725,7 @@ function layerProps(id) {
     const la = [...acts.values()].filter(a => a.layerId === id), wcount = Object.keys(r.widths || {}).length;
     rows = rows.concat([
       ['Elementos', `${f.length}: ${ln.length} líneas · ${pg.length} polígonos · ${pt.length} puntos`],
+      ...(ln.length ? [['Calibración PK', `cada ${fmtStep(pkStepOf(r))}${r.pkStep ? ' (propia de la capa)' : ' (general)'}`]] : []),
       ln.length ? ['Longitud total de líneas', fmtLen(ln.reduce((s2, x) => s2 + x.length, 0))] : null,
       pg.length ? ['Superficie de polígonos', fmtArea(pg.reduce((s2, x) => s2 + (x.area || 0), 0))] : null,
       ['Campos de atributos', keys.size ? esc([...keys].join(', ')) : 'Ninguno'],
