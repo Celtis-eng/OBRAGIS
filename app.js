@@ -1,14 +1,15 @@
 'use strict';
-/* OBRA-GIS v1.14.0 (2026-11-07) — visor de KML/KMZ sobre ortofoto con gestor de capas, anotaciones
+/* OBRA-GIS v1.15.0 (2026-11-09) — visor de KML/KMZ sobre ortofoto con gestor de capas, anotaciones
    georreferenciadas (fotos, vídeos, notas de voz y texto), importación de fotos con GPS
    y navegación con Google Maps. Funciona como web instalable y como app nativa (Capacitor). */
 
 /* ---------------- Versión de la app ----------------
    Cambia APP_VERSION en cada entrega (también se usa como versión de la app Android).
    Formato MAYOR.MENOR.CORRECCIÓN: menor = función nueva, corrección = arreglo. */
-const APP_VERSION = '1.14.0';
-const APP_DATE = '2026-11-07';
+const APP_VERSION = '1.15.0';
+const APP_DATE = '2026-11-09';
 const CHANGELOG = [
+  ['1.15.0', '09/11/2026', 'Tramificación de pendientes: la traza se divide en rangos (menos del 5 %, 5–10 %, 10–20 % y 20 % o más, editables) con la longitud y el porcentaje de cada uno, sus tramos con PK, colores en el mapa, pendiente media, pendiente media absoluta y desnivel medio (m/km). Exportación a CSV y KMZ.'],
   ['1.14.0', '07/11/2026', 'Informe de afecciones de las trazas que elijas: recorre cada traza consultando las capas de servicios marcadas, con banda a cada lado del eje, y da las afecciones por tramos de PK con los organismos a consultar. Se exporta como informe para imprimir o PDF, CSV y KMZ, y va en el paquete de obra.'],
   ['1.13.0', '07/11/2026', 'Calibración de los KML: distancia entre marcas de PK configurable en Ajustes para todas las trazas (5 m a 1 km u otra distancia) y, si se quiere, distinta para cada capa. Las marcas y rótulos se adaptan al zoom para no amontonarse.'],
   ['1.12.0', '04/11/2026', 'Carpetas en árbol y selección múltiple de capas (mantener pulsado): mostrar, ocultar, subir, bajar, mover a carpeta, unir, exportar y borrar. Invertir el sentido de una traza con sus PK. KML de puntos. Unión de KML sin perder información. Tabla de atributos con exportación e importación CSV (Excel/Calc). Propiedades de la capa. Capa de recursos (plantas de RCD, hormigón, canteras, aglomerado…). Calculadora: distancias, áreas, pendientes, coordenadas y distancia por carretera. Pendientes por tramos ≤/≥. Fecha de la ortofoto. Modo sin conexión por municipio o tocando el mapa. Licencia de uso. Se retira Google híbrido.'],
@@ -762,7 +763,7 @@ function featureSheet(f, ll, rec) {
   }
   const noteAt = f.type === 'pt' ? { lat: f.start[0], lng: f.start[1] } : ll;
   acts += `<button class="btn" data-a="note">${ICON.note}Anotar aquí</button><button class="btn" data-a="fit">Encuadrar</button>`;
-  if (f.type === 'ln') acts += `<button class="btn go full" data-a="newact">${ICON.road}Nueva actuación en esta traza</button><button class="btn pri" data-a="slope">${ICON.slope}Pendiente</button><button class="btn pri" data-a="width">${ICON.width}Anchos</button>`;
+  if (f.type === 'ln') acts += `<button class="btn go full" data-a="newact">${ICON.road}Nueva actuación en esta traza</button><button class="btn pri" data-a="slope">${ICON.slope}Pendiente</button><button class="btn" data-a="slclass">${ICON.slope}Tramificar pendientes</button><button class="btn pri" data-a="width">${ICON.width}Anchos</button>`;
   acts += `<button class="btn" data-a="copy">${ICON.copy}Copiar coordenadas</button><button class="btn" data-a="measure">${ICON.ruler}Medir desde aquí</button>`;
   if (f.type === 'ln') acts += `<button class="btn" data-a="reverse">${ICON.swap}Invertir sentido</button>`;
   acts += `<button class="btn" data-a="props">${ICON.info}Propiedades de la capa</button>`;
@@ -791,6 +792,8 @@ function featureSheet(f, ll, rec) {
   b.querySelector('[data-a=measure]').onclick = () => { closeSheet(); startMeasure(ll); };
   const sl = b.querySelector('[data-a=slope]');
   if (sl) sl.onclick = () => slopeSheet(f, rec, 0, f.length);
+  const sc = b.querySelector('[data-a=slclass]');
+  if (sc) sc.onclick = () => { slopeScrollToClass = true; slopeSheet(f, rec, 0, f.length, { autorun: true }); };
   const wb = b.querySelector('[data-a=width]');
   if (wb) wb.onclick = () => widthSheet(rec, f);
   const na = b.querySelector('[data-a=newact]');
@@ -1771,7 +1774,12 @@ async function computeSlope(f, rec, d0, d1, source) {
     ${profileSVG(prof)}
     <p class="hint">Cotas: ${esc(res.label)}. Pendiente media = desnivel entre extremos ÷ longitud en planta.</p>
     <div class="acts"><button class="btn full" data-a="copyres">${ICON.copy}Copiar resultados</button></div>
-    <h3 class="sh">Tramos por pendiente</h3>
+    <h3 class="sh" id="slClassH">Tramificación por rangos de pendiente</h3>
+    <div class="pkrow"><div class="field"><label for="slBr">Límites de los rangos (%)</label><input type="text" id="slBr" inputmode="decimal" value="${esc((settings.slopeBreaks || [5, 10, 20]).join('; '))}"></div>
+      <div class="field"><label for="slCMin">Tramo mínimo (m)</label><input type="text" id="slCMin" inputmode="decimal" value="${settings.slopeMin ?? 20}"></div></div>
+    <div class="acts"><button class="btn full" data-a="classify">${ICON.slope}Recalcular rangos</button></div>
+    <div id="slClass"></div>
+    <h3 class="sh">Buscar tramos por pendiente</h3>
     <div class="pkrow"><div class="field"><label for="slLe">Pendiente ≤ (%)</label><input type="text" id="slLe" inputmode="decimal" placeholder="p. ej. 2"></div>
       <div class="field"><label for="slGe">Pendiente ≥ (%)</label><input type="text" id="slGe" inputmode="decimal" placeholder="p. ej. 8"></div></div>
     <div class="field row"><label class="opt grow" style="padding:0"><input type="checkbox" id="slAbs" checked>En valor absoluto (subidas y bajadas)</label><label for="slMin" class="grow" style="text-align:right">Tramo mínimo (m)</label><input type="text" id="slMin" inputmode="decimal" value="20" style="max-width:70px"></div>
@@ -1779,6 +1787,92 @@ async function computeSlope(f, rec, d0, d1, source) {
     <div id="slRanges"></div>`;
   box.querySelector('[data-a=copyres]').onclick = () => copyText(text);
   box.querySelector('[data-a=ranges]').onclick = () => slopeRanges(f, prof);
+  box.querySelector('[data-a=classify]').onclick = () => slopeClasses(f, prof, true);
+  slopeClasses(f, prof, false);
+  if (slopeScrollToClass) { slopeScrollToClass = false; setTimeout(() => { const h = $('#slClassH'); if (h) h.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 50); }
+}
+let slopeScrollToClass = false;
+/* Tramificación de la traza por rangos de pendiente (por defecto < 5 %, 5–10 %, 10–20 % y ≥ 20 %, en valor absoluto)
+   Pendiente suavizada en ventanas de 20 m; los tramos más cortos que el mínimo se unen al tramo vecino. */
+const SLOPE_COLORS = ['#2f9e44', '#f2c94c', '#f08c00', '#e03131', '#862e9c', '#343a40'];
+function slopeCells(prof) {
+  const zAt = d => { for (let i = 1; i < prof.length; i++) if (prof[i].d >= d) { const a = prof[i - 1], b = prof[i]; return a.z + (b.z - a.z) * (d - a.d) / ((b.d - a.d) || 1); } return prof[prof.length - 1].z; };
+  const d0 = prof[0].d, d1 = prof[prof.length - 1].d, W = 20, st = Math.max(1, Math.min(5, (d1 - d0) / 500)), cells = [];
+  for (let d = d0; d < d1 - 1e-6; d += st) {
+    const e = Math.min(d1, d + st), m = (d + e) / 2, a = Math.max(d0, m - W / 2), b = Math.min(d1, m + W / 2);
+    cells.push({ a: d, b: e, s: b > a ? (zAt(b) - zAt(a)) / (b - a) * 100 : 0 });
+  }
+  return { cells, zAt, d0, d1 };
+}
+function slopeClasses(f, prof, fromUser) {
+  const box = $('#slClass'); if (!box) return;
+  const br = String($('#slBr').value || '').split(/[;\s]+/).map(parseNum).filter(v => isFinite(v) && v > 0).sort((a, b) => a - b).filter((v, i, a) => i === 0 || v !== a[i - 1]).slice(0, 5);
+  if (!br.length) { box.innerHTML = '<p class="hint">Escribe los límites separados por punto y coma, por ejemplo 5; 10; 20.</p>'; return; }
+  const minL = Math.max(0, parseNum($('#slCMin').value) || 0);
+  if (fromUser) { settings.slopeBreaks = br; settings.slopeMin = minL; saveSettings(); }
+  const n = v => String(v).replace('.', ',');
+  const labels = br.map((v, i) => i === 0 ? `Menor del ${n(v)} %` : `Entre el ${n(br[i - 1])} y el ${n(v)} %`).concat([`${n(br[br.length - 1])} % o más`]);
+  const cls = v => { const a = Math.abs(v); let k = 0; while (k < br.length && a >= br[k]) k++; return k; };
+  const { cells, zAt, d0, d1 } = slopeCells(prof), L0 = d1 - d0;
+  // tramos continuos de la misma clase
+  let runs = [];
+  cells.forEach(c => { const k = cls(c.s), last = runs[runs.length - 1]; if (last && last.k === k) last.b = c.b; else runs.push({ a: c.a, b: c.b, k }); });
+  // los tramos cortos se unen al vecino de clase más parecida (y, si empata, al más largo)
+  while (runs.length > 1) {
+    let i = -1, mn = Infinity; runs.forEach((r, j) => { const l = r.b - r.a; if (l < minL && l < mn) { mn = l; i = j; } });
+    if (i < 0) break;
+    const r = runs[i], L = runs[i - 1], R = runs[i + 1];
+    const t = !L ? R : !R ? L : (Math.abs(L.k - r.k) < Math.abs(R.k - r.k) || (Math.abs(L.k - r.k) === Math.abs(R.k - r.k) && L.b - L.a >= R.b - R.a)) ? L : R;
+    t.a = Math.min(t.a, r.a); t.b = Math.max(t.b, r.b); runs.splice(i, 1);
+    for (let j = runs.length - 1; j > 0; j--) if (runs[j].k === runs[j - 1].k) { runs[j - 1].b = runs[j].b; runs.splice(j, 1); }
+  }
+  runs = runs.map(r => {
+    const cs = cells.filter(c => c.a >= r.a - 1e-6 && c.b <= r.b + 1e-6), len = r.b - r.a;
+    return { ...r, len, s: (zAt(r.b) - zAt(r.a)) / (len || 1) * 100, sAbs: cs.reduce((t, c) => t + Math.abs(c.s) * (c.b - c.a), 0) / (len || 1) };
+  });
+  const tot = labels.map((lb, k) => { const rr = runs.filter(r => r.k === k); return { lb, k, len: rr.reduce((t, r) => t + r.len, 0), n: rr.length }; });
+  // indicadores medios de la traza
+  const meanAbs = cells.reduce((t, c) => t + Math.abs(c.s) * (c.b - c.a), 0) / (L0 || 1);
+  let up = 0, down = 0; for (let i = 1; i < prof.length; i++) { const v = prof[i].z - prof[i - 1].z; v > 0 ? up += v : down -= v; }
+  const dz = prof[prof.length - 1].z - prof[0].z, mean = dz / (L0 || 1) * 100, perKm = (up + down) / (L0 || 1) * 1000;
+  // mapa
+  slopeHL.clearLayers(); showSlopeSegment(f, d0, d1);
+  runs.forEach(r => L.polyline(segmentCoords(f, r.a, r.b), { renderer: hlRenderer, color: SLOPE_COLORS[r.k], weight: 9, opacity: 0.9, interactive: false }).addTo(slopeHL));
+  const pc = v => (v / (L0 || 1) * 100).toFixed(1).replace('.', ',') + ' %';
+  box.innerHTML = `<table class="attrs ranges"><tr><th>Rango</th><th>Longitud</th><th>% traza</th><th>Tramos</th></tr>
+      ${tot.map(t => `<tr><td><span class="dot" style="background:${SLOPE_COLORS[t.k]}"></span>${t.lb}</td><td>${fmtLen(t.len)}</td><td>${pc(t.len)}</td><td>${t.n}</td></tr>`).join('')}
+      <tr class="tot"><td>Total</td><td>${fmtLen(L0)}</td><td>100 %</td><td>${runs.length}</td></tr></table>
+    <table class="attrs">
+      <tr><td>Pendiente media de la traza</td><td><b>${fmtPct(mean)}</b> (desnivel entre extremos ${(dz >= 0 ? '+' : '−') + fmtZ(Math.abs(dz))} en ${fmtLen(L0)})</td></tr>
+      <tr><td>Pendiente media absoluta</td><td><b>${meanAbs.toFixed(2).replace('.', ',')} %</b> (media de subidas y bajadas, ponderada por longitud)</td></tr>
+      <tr><td>Desnivel medio</td><td><b>${perKm.toFixed(1).replace('.', ',')} m/km</b> (subida + bajada acumulada: +${up.toFixed(1).replace('.', ',')} / −${down.toFixed(1).replace('.', ',')} m)</td></tr>
+    </table>
+    <details class="tramos"><summary>Ver los ${runs.length} tramos con sus PK</summary><table class="attrs"><tr><th>PK</th><th>Long.</th><th>Pend.</th><th>Rango</th></tr>
+      ${runs.map(r => `<tr><td>${fmtPK(r.a)} – ${fmtPK(r.b)}</td><td>${fmtLen(r.len)}</td><td>${fmtPct(r.s)}</td><td><span class="dot" style="background:${SLOPE_COLORS[r.k]}"></span>${labels[r.k]}</td></tr>`).join('')}</table></details>
+    <p class="hint">Rangos en valor absoluto (subidas y bajadas por igual), con la pendiente medida en ventanas de 20 m. Los tramos de menos de ${n(minL)} m se unen al vecino. Colores en el mapa: ${tot.map(t => `<span class="dot" style="background:${SLOPE_COLORS[t.k]}"></span>${t.lb.toLowerCase()}`).join(' · ')}.</p>
+    <div class="acts"><button class="btn" data-a="clcopy">${ICON.copy}Copiar</button><button class="btn" data-a="clcsv">CSV para Excel</button><button class="btn" data-a="clkmz">KMZ coloreado</button></div>`;
+  const summary = `${f.name} · PK ${fmtPK(d0)} a ${fmtPK(d1)} · ${fmtLen(L0)}\n` + tot.map(t => `${t.lb}: ${fmtLen(t.len)} (${pc(t.len)}) · ${t.n} tramos`).join('\n')
+    + `\nPendiente media: ${fmtPct(mean)}\nPendiente media absoluta: ${meanAbs.toFixed(2).replace('.', ',')} %\nDesnivel medio: ${perKm.toFixed(1).replace('.', ',')} m/km (+${up.toFixed(1).replace('.', ',')} / −${down.toFixed(1).replace('.', ',')} m)`;
+  box.querySelector('[data-a=clcopy]').onclick = () => copyText(summary);
+  const base = `pendientes_${safeName(f.name)}`;
+  box.querySelector('[data-a=clcsv]').onclick = () => {
+    const q = v => `"${String(v).replace(/"/g, '""')}"`, d = v => (Math.round(v * 100) / 100).toString().replace('.', ',');
+    const rows = [['resumen'], ['rango', 'longitud_m', 'porcentaje', 'n_tramos']].concat(tot.map(t => [t.lb, d(t.len), d(t.len / L0 * 100), t.n]))
+      .concat([[], ['pendiente_media_%', d(mean)], ['pendiente_media_absoluta_%', d(meanAbs)], ['desnivel_medio_m_km', d(perKm)], ['subida_acumulada_m', d(up)], ['bajada_acumulada_m', d(down)], [],
+        ['tramos'], ['pk_inicio', 'pk_fin', 'longitud_m', 'pendiente_%', 'pendiente_abs_media_%', 'rango']])
+      .concat(runs.map(r => [fmtPK(r.a), fmtPK(r.b), d(r.len), d(r.s), d(r.sAbs), labels[r.k]]));
+    saveBlob(new Blob(['\ufeff' + rows.map(r => r.map(q).join(';')).join('\r\n')], { type: 'text/csv' }), base + '.csv').catch(() => {});
+  };
+  box.querySelector('[data-a=clkmz]').onclick = async () => {
+    const kc = h => 'ff' + h.slice(5, 7) + h.slice(3, 5) + h.slice(1, 3);
+    const k = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="${KML_NS}"><Document><name>${xml('Pendientes · ' + f.name)}</name>
+${tot.map(t => `<Style id="r${t.k}"><LineStyle><color>${kc(SLOPE_COLORS[t.k])}</color><width>6</width></LineStyle></Style>`).join('')}
+${tot.map(t => `<Folder><name>${xml(t.lb)} · ${fmtLen(t.len)}</name>${runs.filter(r => r.k === t.k).map(r => `<Placemark><name>PK ${fmtPK(r.a)} – ${fmtPK(r.b)}</name><styleUrl>#r${t.k}</styleUrl><description>${xml(`${t.lb} · ${fmtLen(r.len)} · pendiente ${fmtPct(r.s)}`)}</description>
+<ExtendedData><Data name="pk_inicio"><value>${fmtPK(r.a)}</value></Data><Data name="pk_fin"><value>${fmtPK(r.b)}</value></Data><Data name="longitud_m"><value>${r.len.toFixed(1)}</value></Data><Data name="pendiente_pct"><value>${r.s.toFixed(2)}</value></Data><Data name="rango"><value>${xml(t.lb)}</value></Data></ExtendedData>
+<LineString><tessellate>1</tessellate><coordinates>${segmentCoords(f, r.a, r.b).map(c => `${c[1]},${c[0]},0`).join(' ')}</coordinates></LineString></Placemark>`).join('')}</Folder>`).join('\n')}
+</Document></kml>`;
+    const z = new JSZip(); z.file('doc.kml', k); saveBlob(await z.generateAsync({ type: 'blob', mimeType: 'application/vnd.google-earth.kmz' }), base + '.kmz').catch(() => {});
+  };
 }
 // Clasifica la traza en tramos que cumplen pendiente ≤ X o ≥ Y (pendiente suavizada en ventanas de 20 m)
 function slopeRanges(f, prof) {

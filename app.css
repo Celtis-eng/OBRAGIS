@@ -1,4 +1,4 @@
-/* OBRA-GIS v1.14.0 (2026-11-07) — estilos. Barra verde monte, acción principal naranja de alta visibilidad */
+/* OBRA-GIS v1.15.0 (2026-11-09) — estilos. Barra verde monte, acción principal naranja de alta visibilidad */
 :root{
   --bar:#0b3d2e; --bar-fg:#f2f7f4;
   --bg:#ffffff; --bg2:#f1f5f2; --fg:#16211c; --muted:#5b6b63; --line:#d5ddd8;
@@ -305,3 +305,8 @@ input[type=tel]{width:100%;font:inherit;font-size:1rem;padding:10px 12px;border-
 .chklist{max-height:30vh;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:2px 10px;margin:6px 0}
 .chklist .opt{padding:6px 0}
 .chklist small{color:var(--muted);margin-left:4px}
+.ranges th{text-align:left;font-size:.78rem;color:var(--muted);padding:4px 6px}
+.ranges td{white-space:nowrap}
+.ranges .tot td{font-weight:700;border-top:2px solid var(--line)}
+.ranges .dot,.tramos .dot,.hint .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:0}
+.tramos{margin:8px 0}.tramos summary{cursor:pointer;font-weight:600;padding:6px 0}
