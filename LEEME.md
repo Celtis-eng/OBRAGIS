@@ -16,6 +16,7 @@ App de campo para Android (también funciona en iPhone y en el ordenador) que:
 - **Fotos con GPS**: importa fotos JPEG y las coloca solas en el mapa con su fecha, altitud y orientación (si la cámara guardó la ubicación).
 - **Gestor de capas**: mostrar/ocultar, orden, opacidad, color, renombrar, encuadrar y borrar. Servicios WMS/WMTS: Catastro, SIGPAC, MTN y límites del IGN, o cualquier WMS escribiendo su dirección.
 - Recibir KML/KMZ **compartidos desde WhatsApp, Gmail o Drive** (botón Compartir → OBRA-GIS), una vez instalada.
+- **Ficha de inspección de campo** (restauración de caminos agrarios): Importar → «Previo de camino» con el BC3 del presupuesto y el .zip del previo (KMZ del camino, KMZ de cada actuación y sus fotos). La parte de PROYECTO se rellena sola con las partidas del presupuesto; la de CAMPO se rellena en la visita (¿coincide?, detectado en campo, actuaciones in situ con GPS y PK, anchos cada 100 m, accesos, zona de actuación, recursos y fotos). Se exporta para imprimir (PDF) y en JSON. También desde la traza del camino → «Ficha de inspección de campo» o Capas → Herramientas.
 
 Todo se guarda en el propio móvil. No hay servidor ni cuentas.
 
@@ -56,6 +57,7 @@ Los datos viven en el navegador del móvil. Si desinstalas la app o borras los d
 ## Archivos
 
 - `index.html`, `app.css`, `app.js`: la aplicación.
+- `ficha.js`: ficha de inspección de campo (lector de BC3, formulario y exportación).
 - `sw.js`: funcionamiento sin conexión y recepción de ficheros compartidos.
 - `manifest.webmanifest`, `icons/`: instalación como app.
 - `vendor/`: Leaflet 1.9.4 (mapa) y JSZip 3.10.1 (KMZ).

@@ -19,7 +19,7 @@ if (step === 'www') {
   const www = path.join(HERE, 'www');
   fs.rmSync(www, { recursive: true, force: true });
   fs.mkdirSync(www, { recursive: true });
-  for (const f of ['index.html', 'app.css', 'app.js', 'manifest.webmanifest', 'icons', 'vendor']) copy(path.join(ROOT, f), path.join(www, f));
+  for (const f of ['index.html', 'app.css', 'app.js', 'ficha.js', 'manifest.webmanifest', 'icons', 'vendor']) copy(path.join(ROOT, f), path.join(www, f));
   console.log('Web copiada a www/');
 }
 

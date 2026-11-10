@@ -1,14 +1,15 @@
 'use strict';
-/* OBRA-GIS v1.15.0 (2026-11-09) — visor de KML/KMZ sobre ortofoto con gestor de capas, anotaciones
+/* OBRA-GIS v1.16.0 (2026-11-10) — visor de KML/KMZ sobre ortofoto con gestor de capas, anotaciones
    georreferenciadas (fotos, vídeos, notas de voz y texto), importación de fotos con GPS
    y navegación con Google Maps. Funciona como web instalable y como app nativa (Capacitor). */
 
 /* ---------------- Versión de la app ----------------
    Cambia APP_VERSION en cada entrega (también se usa como versión de la app Android).
    Formato MAYOR.MENOR.CORRECCIÓN: menor = función nueva, corrección = arreglo. */
-const APP_VERSION = '1.15.0';
-const APP_DATE = '2026-11-09';
+const APP_VERSION = '1.16.0';
+const APP_DATE = '2026-11-10';
 const CHANGELOG = [
+  ['1.16.0', '10/11/2026', 'Ficha de inspección de campo (restauración de caminos agrarios): al cargar el previo (BC3 del presupuesto y .zip con los KMZ del camino y de las actuaciones y sus fotos) la app sitúa trazas y fotos y rellena sola la parte de PROYECTO de la ficha con las partidas del presupuesto, su medición y su tramo de PK. En la visita se rellena la parte de CAMPO con botones grandes: ¿coincide con la realidad?, lo detectado en campo, otras actuaciones in situ situadas con GPS, anchos cada 100 m («¿En qué PK estoy?»), vías de acceso, zona de actuación, recursos y fotos de cada casilla con su PK. Se exporta para imprimir o PDF y en JSON para la revisión del presupuesto, y viaja en el paquete de obra.'],
   ['1.15.0', '09/11/2026', 'Tramificación de pendientes: la traza se divide en rangos (menos del 5 %, 5–10 %, 10–20 % y 20 % o más, editables) con la longitud y el porcentaje de cada uno, sus tramos con PK, colores en el mapa, pendiente media, pendiente media absoluta y desnivel medio (m/km). Exportación a CSV y KMZ.'],
   ['1.14.0', '07/11/2026', 'Informe de afecciones de las trazas que elijas: recorre cada traza consultando las capas de servicios marcadas, con banda a cada lado del eje, y da las afecciones por tramos de PK con los organismos a consultar. Se exporta como informe para imprimir o PDF, CSV y KMZ, y va en el paquete de obra.'],
   ['1.13.0', '07/11/2026', 'Calibración de los KML: distancia entre marcas de PK configurable en Ajustes para todas las trazas (5 m a 1 km u otra distancia) y, si se quiere, distinta para cada capa. Las marcas y rótulos se adaptan al zoom para no amontonarse.'],
@@ -763,7 +764,7 @@ function featureSheet(f, ll, rec) {
   }
   const noteAt = f.type === 'pt' ? { lat: f.start[0], lng: f.start[1] } : ll;
   acts += `<button class="btn" data-a="note">${ICON.note}Anotar aquí</button><button class="btn" data-a="fit">Encuadrar</button>`;
-  if (f.type === 'ln') acts += `<button class="btn go full" data-a="newact">${ICON.road}Nueva actuación en esta traza</button><button class="btn pri" data-a="slope">${ICON.slope}Pendiente</button><button class="btn" data-a="slclass">${ICON.slope}Tramificar pendientes</button><button class="btn pri" data-a="width">${ICON.width}Anchos</button>`;
+  if (f.type === 'ln') acts += `<button class="btn go full" data-a="newact">${ICON.road}Nueva actuación en esta traza</button><button class="btn pri" data-a="slope">${ICON.slope}Pendiente</button><button class="btn" data-a="slclass">${ICON.slope}Tramificar pendientes</button><button class="btn pri" data-a="width">${ICON.width}Anchos</button><button class="btn go full" data-a="ficha">${ICON.note}Ficha de inspección de campo</button>`;
   acts += `<button class="btn" data-a="copy">${ICON.copy}Copiar coordenadas</button><button class="btn" data-a="measure">${ICON.ruler}Medir desde aquí</button>`;
   if (f.type === 'ln') acts += `<button class="btn" data-a="reverse">${ICON.swap}Invertir sentido</button>`;
   acts += `<button class="btn" data-a="props">${ICON.info}Propiedades de la capa</button>`;
@@ -800,6 +801,8 @@ function featureSheet(f, ll, rec) {
   if (na) na.onclick = () => { const d = pkAt(f, ll).d; openActEditor({ rec, f, d0: d, d1: d }); };
   const rv = b.querySelector('[data-a=reverse]');
   if (rv) rv.onclick = () => reverseTrace(rec, f);
+  const fb = b.querySelector('[data-a=ficha]');
+  if (fb) fb.onclick = () => fichaForTrace(rec, f);
   b.querySelector('[data-a=props]').onclick = () => layerProps(rec.id);
 }
 
@@ -1094,12 +1097,14 @@ async function writeExif(blob, m) {
   } catch (e) { console.warn('EXIF', e); return blob; }
 }
 async function handleIncoming(files) {
-  const rest = [];
+  const rest = []; let previo = false;
   for (const f of files) {
-    if (/\.zip$/i.test(f.name) || /zip/.test(f.type)) { const z = await isObraPackage(f); if (z) { await importObraPackage(f, z); continue; } }
+    if (/\.zip$/i.test(f.name) || /zip/.test(f.type)) { const z = await isObraPackage(f); if (z) { await importObraPackage(f, z); continue; } previo = true; }
+    if (/\.bc3$/i.test(f.name)) previo = true;
     rest.push(f);
   }
-  if (rest.length) handleIncomingFiles(rest);
+  if (previo) fichaImportFiles(rest); // .zip que no es paquete de obra o BC3: previo de la ficha de inspección
+  else if (rest.length) handleIncomingFiles(rest);
 }
 function handleIncomingFiles(files) {
   const k = files.filter(f => /\.km[lz]$/i.test(f.name) || /google-earth/.test(f.type));
@@ -1115,6 +1120,7 @@ function importMenu() {
       <button class="btn full" data-a="photos">${ICON.gallery}Fotos (con GPS o con marca de agua)</button>
       <button class="btn full" data-a="service">${ICON.wms}Capa de un servicio (WMS)</button>
       <button class="btn full" data-a="obra">${ICON.folder}Obra completa (paquete .zip)</button>
+      <button class="btn go full" data-a="previo">${ICON.note}Previo de camino: BC3, KMZ y fotos (ficha de inspección)</button>
       <button class="btn" data-a="drawtap">${ICON.pen}Dibujar traza</button>
       <button class="btn" data-a="drawgps">${ICON.locate}Grabar traza con GPS</button>
       <button class="btn full" data-a="drawpts">${ICON.pin}Crear KML de puntos (tocando el mapa o con GPS)</button>
@@ -1124,6 +1130,7 @@ function importMenu() {
   b.querySelector('[data-a=photos]').onclick = () => { closeSheet(); $('#inPhotosImport').click(); };
   b.querySelector('[data-a=service]').onclick = serviceMenu;
   b.querySelector('[data-a=obra]').onclick = () => { closeSheet(); $('#inObra').click(); };
+  b.querySelector('[data-a=previo]').onclick = fichaImportPick;
   b.querySelector('[data-a=drawtap]').onclick = () => { closeSheet(); startDrawing(false); };
   b.querySelector('[data-a=drawgps]').onclick = () => { closeSheet(); startDrawing(true); };
   b.querySelector('[data-a=drawpts]').onclick = () => { closeSheet(); startDrawing('points'); };
@@ -2198,6 +2205,7 @@ async function deleteObraData(id) {
   for (const x of l.filter(x => x.obraId === id)) await DB.del('layers', x.id);
   for (const x of n.filter(x => x.obraId === id)) await DB.del('notes', x.id);
   for (const x of a.filter(x => x.obraId === id)) await DB.del('acts', x.id);
+  await DB.del('kv', 'ficha:' + id).catch(() => {}); delete fichaCache[id];
 }
 async function obrasSheet() {
   const list = [...obras.values()].sort((a, b) => a.name.localeCompare(b.name));
@@ -2254,7 +2262,7 @@ async function exportObraPackage(id) {
   });
   const notePts = nts.map(n => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [n.lng, n.lat] },
     properties: { id: n.id, titulo: n.title, texto: n.text || '', fecha: new Date(n.created).toISOString(), origen_posicion: n.src || '', precision_m: n.acc ?? null,
-      altitud_m: n.alt ?? null, orientacion_grados: n.dir ?? null, capa: layerName(n.layerId), capa_id: n.layerId || null, multimedia: media(n.title + '_' + n.id.slice(-4), n.media, n.layerId ? 'fotos_importadas' : 'anotaciones') } }));
+      altitud_m: n.alt ?? null, orientacion_grados: n.dir ?? null, capa: layerName(n.layerId), capa_id: n.layerId || null, ficha: n.ficha || undefined, multimedia: media(n.title + '_' + n.id.slice(-4), n.media, n.layerId ? 'fotos_importadas' : 'anotaciones') } }));
   const actFeats = ats.map(a => ({ type: 'Feature',
     geometry: a.coords.length > 1 && a.d1 > a.d0 ? { type: 'LineString', coordinates: a.coords.map(c => [c[1], c[0]]) } : { type: 'Point', coordinates: [a.coords[0][1], a.coords[0][0]] },
     properties: { id: a.id, tipo: a.type, margen: SIDES[a.side] || '', margen_cod: a.side, pk_inicio: fmtPK(a.d0), pk_fin: fmtPK(a.d1), pk_inicio_m: +a.d0.toFixed(2), pk_fin_m: +a.d1.toFixed(2),
@@ -2270,11 +2278,12 @@ async function exportObraPackage(id) {
   if (resFC.length) Z.file('datos/recursos.geojson', fc(resFC));
   const afr = id === settings.activeObra ? afecLast() : await DB.get('kv', 'afec:' + id).catch(() => null);
   if (afr) { Z.file('informes/afecciones.html', afecHtml(afr)); Z.file('informes/afecciones.csv', '\ufeff' + afecCsv(afr)); Z.file('informes/afecciones.json', JSON.stringify(afr)); }
+  const nFichas = await fichaPackExport(Z, id);
   Z.file('datos/actuaciones.csv', actsCSV(ats.sort((a, b) => (a.traceName || '').localeCompare(b.traceName || '') || a.d0 - b.d0)));
   Z.file('obra.json', JSON.stringify({ formato: 'OBRA-GIS', version: 1, app_version: APP_VERSION, exportado: new Date().toISOString(),
     obra: { id: o.id, nombre: o.name, descripcion: o.desc || '', creada: new Date(o.created).toISOString() },
     sistema_referencia: 'WGS84 / ETRS89 geográficas (EPSG:4326)', capas,
-    resumen: { capas: capas.length, anotaciones: notePts.length, actuaciones: actFeats.length } }, null, 2));
+    resumen: { capas: capas.length, anotaciones: notePts.length, actuaciones: actFeats.length, fichas_inspeccion: nFichas } }, null, 2));
   Z.file('LEEME.txt', [`OBRA-GIS · ${o.name}`, `Exportado el ${fmtDate(Date.now())}`, '',
     'obra.json                    Datos de la obra y lista de capas (carpeta, orden, estilo, servicios WMS)',
     'capas/kml/                   KML originales de las trazas',
@@ -2286,6 +2295,9 @@ async function exportObraPackage(id) {
     'informes/afecciones.html     Último informe de afecciones (abrir en el navegador; imprimir a PDF)',
     'datos/anchos.csv             Anchos del camino por tramos (PK, ancho, longitud, superficie)',
     'datos/anchos_superficie.geojson  Plataforma del camino con su ancho (polígonos, con superficie en m²)',
+    'datos/fichas_inspeccion.json Fichas de inspección de campo (para cargarlas en otro móvil)',
+    'informes/ficha_*.html        Fichas de inspección para imprimir o guardar en PDF (y su .json para la revisión del presupuesto)',
+    'presupuesto/                 BC3 del presupuesto usado para la parte de proyecto de las fichas',
     'multimedia/                  Fotos, vídeos y notas de voz, enlazados desde los GeoJSON (campo multimedia)', '',
     'Para cargar la obra completa en otro móvil: abre este .zip con OBRA-GIS (Compartir → OBRA-GIS, o Obras → Importar obra).',
     'Los GeoJSON se abren directamente en QGIS (coordenadas EPSG:4326).'].join('\r\n'));
@@ -2339,7 +2351,7 @@ async function importObraPackage(file, zipIn) {
   for (const ft of [...await readFC('datos/anotaciones.geojson'), ...await readFC('datos/fotos_importadas.geojson')]) {
     const p = ft.properties, [lng, lat] = ft.geometry.coordinates;
     await DB.put('notes', { id: uid(), obraId, layerId: p.capa_id ? idMap[p.capa_id] || null : null, lat, lng, title: p.titulo, text: p.texto, created: Date.parse(p.fecha) || Date.now(),
-      src: p.origen_posicion, acc: p.precision_m, alt: p.altitud_m, dir: p.orientacion_grados, media: await readMedia(p.multimedia) }); nN++;
+      src: p.origen_posicion, acc: p.precision_m, alt: p.altitud_m, dir: p.orientacion_grados, ficha: p.ficha || undefined, media: await readMedia(p.multimedia) }); nN++;
   }
   for (const ft of await readFC('datos/actuaciones.geojson')) {
     const p = ft.properties, g = ft.geometry;
@@ -2354,6 +2366,7 @@ async function importObraPackage(file, zipIn) {
     const r = { id: p.id, type: p.tipo, name: p.nombre, company: p.empresa, phone: p.telefono, address: p.direccion, materials: p.materiales, notes: p.notas, lat: ft.geometry.coordinates[1], lng: ft.geometry.coordinates[0], created: Date.now() };
     await DB.put('resources', r); resources.set(r.id, r); drawResource(r);
   }
+  await fichaPackImport(zip, pre, obraId, idMap);
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
   await loadObra(obraId, true);
   toast(`Obra «${o.name}» importada: ${(meta.capas || []).length} capas, ${nN} anotaciones y ${nA} actuaciones.`, 7000);
@@ -3543,6 +3556,7 @@ async function renderDrawer() {
       : '<p class="empty">Mantén pulsado en el mapa o usa el botón naranja para crear la primera.</p>'}
     <h3>Herramientas</h3>
     <div class="acts">
+      <button class="btn go full" data-t="fichas">${ICON.note}Fichas de inspección de campo</button>
       <button class="btn" data-t="calc">${ICON.calc}Calculadora</button>
       <button class="btn" data-t="afec">${ICON.layers}Informe de afecciones</button>
       <button class="btn" data-t="reslist">${ICON.pin}Recursos</button>
@@ -3636,6 +3650,7 @@ async function renderDrawer() {
   const al = d.querySelector('[data-actlist]'); if (al) al.onclick = () => { closeDrawer(); actList(); };
   d.querySelectorAll('[data-reslist], [data-t=reslist]').forEach(bt => bt.onclick = () => { closeDrawer(); resourceList(); });
   d.querySelector('[data-t=calc]').onclick = () => { closeDrawer(); calcSheet(); };
+  d.querySelector('[data-t=fichas]').onclick = () => { closeDrawer(); fichaList(); };
   d.querySelector('[data-t=afec]').onclick = () => { closeDrawer(); afecSheet(); };
   d.querySelector('[data-t=measure]').onclick = () => { closeDrawer(); startMeasure(); };
   d.querySelector('[data-t=offline]').onclick = () => { closeDrawer(); offlineSheet(); };
@@ -3941,7 +3956,7 @@ $('#scrim').onclick = closeDrawer;
 $('#sheetX').onclick = closeSheet;
 $('#btnImport').onclick = importMenu;
 $('#inKml').addEventListener('change', e => { const f = Array.from(e.target.files || []); e.target.value = ''; if (f.length) importFiles(f); });
-$('#inObra').addEventListener('change', async e => { const f = (e.target.files || [])[0]; e.target.value = ''; if (f) { const z = await isObraPackage(f); z ? importObraPackage(f, z) : toast('Este .zip no es un paquete de obra de OBRA-GIS.'); } });
+$('#inObra').addEventListener('change', async e => { const f = (e.target.files || [])[0]; e.target.value = ''; if (f) { const z = await isObraPackage(f); z ? importObraPackage(f, z) : fichaImportFiles([f]); } });
 $('#btnObra').onclick = obrasSheet;
 $('#inPhotosImport').addEventListener('change', e => { const f = Array.from(e.target.files || []); e.target.value = ''; if (f.length) importPhotos(f); });
 $('#fabLocate').onclick = locate;
