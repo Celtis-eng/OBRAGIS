@@ -1,4 +1,4 @@
-/* OBRA-GIS v1.16.0 (2026-11-10) — estilos. Barra verde monte, acción principal naranja de alta visibilidad */
+/* OBRA-GIS v1.18.0 (2026-11-20) — estilos. Barra verde monte, acción principal naranja de alta visibilidad */
 :root{
   --bar:#0b3d2e; --bar-fg:#f2f7f4;
   --bg:#ffffff; --bg2:#f1f5f2; --fg:#16211c; --muted:#5b6b63; --line:#d5ddd8;
@@ -24,7 +24,7 @@ svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-l
 .brand{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;background:none;border:0;color:inherit;font:inherit;font-size:1.1rem;letter-spacing:.02em;text-align:left;cursor:pointer;padding:0}
 .brand small{font-size:.74rem;opacity:.85;letter-spacing:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .brand b{color:#ffb37a}
-.ibtn,.tbtn{border:0;background:rgba(255,255,255,.12);color:inherit;border-radius:10px;min-height:42px;cursor:pointer;font:600 .95rem inherit;font-family:inherit}
+.ibtn,.tbtn{border:0;background:rgba(255,255,255,.12);color:inherit;border-radius:10px;min-height:42px;cursor:pointer;font-weight:600;font-size:.95rem;font-family:inherit}
 .ibtn{width:42px;display:grid;place-items:center}
 .tbtn{padding:0 14px}
 .ibtn:focus-visible,.tbtn:focus-visible,.fab:focus-visible,.btn:focus-visible{outline:3px solid #ffb37a;outline-offset:2px}
@@ -81,7 +81,7 @@ table.attrs td{border-bottom:1px solid var(--line);padding:4px 6px;vertical-alig
 table.attrs td:first-child{color:var(--muted);width:40%}
 .acts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
 .btn{display:flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 12px;border-radius:12px;border:1px solid var(--line);
-  background:var(--bg2);color:var(--fg);font:600 .95rem inherit;font-family:inherit;text-decoration:none;cursor:pointer;text-align:center}
+  background:var(--bg2);color:var(--fg);font-weight:600;font-size:.95rem;font-family:inherit;text-decoration:none;cursor:pointer;text-align:center}
 .btn.go{background:var(--go);color:var(--go-fg);border-color:var(--go)}
 .btn.full{grid-column:1/-1}
 .btn.pri{background:var(--accent);color:#fff;border-color:var(--accent)}
@@ -109,7 +109,7 @@ textarea{resize:vertical;min-height:70px}
 .cross{width:28px;height:28px;border:3px solid #ffd43b;border-radius:50%;box-shadow:0 0 0 2px rgba(0,0,0,.5)}
 
 .toast{position:absolute;z-index:3000;left:50%;transform:translateX(-50%);bottom:calc(var(--safe-b) + 110px);max-width:min(92vw,480px);
-  background:#111;color:#fff;padding:12px 16px;border-radius:12px;box-shadow:var(--shadow);font-size:.92rem}
+  background:#111;color:#fff;padding:12px 16px;border-radius:12px;box-shadow:var(--shadow);font-size:.92rem;pointer-events:none}
 .leaflet-control-attribution{font-size:10px}
 .leaflet-bottom.leaflet-left{margin-bottom:var(--safe-b)}
 @media (prefers-reduced-motion:reduce){.fab.wait svg{animation:none}}
@@ -146,7 +146,7 @@ textarea{resize:vertical;min-height:70px}
 /* catálogo de servicios */
 .catalog{display:flex;flex-direction:column;gap:8px;margin:8px 0}
 .cgroup{border:1px solid var(--line);border-radius:12px;overflow:hidden}
-.chead{width:100%;display:flex;justify-content:space-between;align-items:center;gap:8px;text-align:left;background:var(--bg2);border:0;color:var(--fg);font:600 .95rem inherit;font-family:inherit;padding:12px;cursor:pointer}
+.chead{width:100%;display:flex;justify-content:space-between;align-items:center;gap:8px;text-align:left;background:var(--bg2);border:0;color:var(--fg);font-weight:600;font-size:.95rem;font-family:inherit;padding:12px;cursor:pointer}
 .chead small{color:var(--muted);font-weight:500}
 .citems{display:flex;flex-direction:column;padding:4px 8px 10px;gap:2px}
 .citems .mini{align-self:flex-start;margin-top:6px}
@@ -181,11 +181,11 @@ textarea{resize:vertical;min-height:70px}
 .leaflet-tooltip.pk-tip{font:600 11px ui-monospace,Menlo,Consolas,monospace;padding:2px 6px}
 /* actuaciones */
 .chips{display:flex;flex-wrap:wrap;gap:6px}
-.chip{border:1px solid var(--line);background:var(--bg2);color:var(--fg);border-radius:999px;padding:8px 12px;font:500 .88rem inherit;font-family:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.chip{border:1px solid var(--line);background:var(--bg2);color:var(--fg);border-radius:999px;padding:8px 12px;font-weight:500;font-size:.88rem;font-family:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
 .chip::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--c)}
 .chip.on{border-color:var(--c);box-shadow:inset 0 0 0 2px var(--c);font-weight:700}
 .seg{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-radius:10px;overflow:hidden}
-.seg button{border:0;border-right:1px solid var(--line);background:var(--bg2);color:var(--fg);padding:10px 4px;font:500 .85rem inherit;font-family:inherit;cursor:pointer}
+.seg button{border:0;border-right:1px solid var(--line);background:var(--bg2);color:var(--fg);padding:10px 4px;font-weight:500;font-size:.85rem;font-family:inherit;cursor:pointer}
 .seg button:last-child{border-right:0}
 .seg button.on{background:var(--accent);color:#fff;font-weight:700}
 .pkbtns{display:flex;flex-direction:column;gap:6px}
@@ -204,7 +204,7 @@ textarea{resize:vertical;min-height:70px}
 .folder{border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .fhead{display:flex;align-items:center;gap:6px;padding:4px 8px;background:var(--bg2)}
 .fhead input{width:20px;height:20px;accent-color:var(--accent);flex:none}
-.fname{flex:1;min-width:0;display:flex;align-items:center;gap:6px;background:none;border:0;color:var(--fg);font:600 .92rem inherit;font-family:inherit;padding:8px 2px;cursor:pointer;text-align:left}
+.fname{flex:1;min-width:0;display:flex;align-items:center;gap:6px;background:none;border:0;color:var(--fg);font-weight:600;font-size:.92rem;font-family:inherit;padding:8px 2px;cursor:pointer;text-align:left}
 .fname .caret svg{width:16px;height:16px}
 .fname svg{width:18px;height:18px;color:var(--muted)}
 .fname .ft{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -271,7 +271,7 @@ textarea{resize:vertical;min-height:70px}
 .odate{position:absolute;z-index:900;left:calc(var(--safe-l) + 8px);bottom:calc(var(--safe-b) + 34px);background:rgba(255,255,255,.82);color:#16211c;font:500 11px/1.3 system-ui,sans-serif;padding:3px 7px;border-radius:6px;pointer-events:none;max-width:60vw}
 .progress{position:relative;height:22px;border-radius:11px;background:var(--bg2);border:1px solid var(--line);overflow:hidden;margin:10px 0}
 .progress div{position:absolute;inset:0 auto 0 0;width:0;background:var(--accent);transition:width .2s}
-.progress span{position:relative;display:block;text-align:center;font:600 .78rem/22px inherit;font-family:inherit;color:var(--fg);mix-blend-mode:normal}
+.progress span{position:relative;display:block;text-align:center;font-weight:600;font-size:.78rem;line-height:22px;font-family:inherit;color:var(--fg);mix-blend-mode:normal}
 .seg.three{grid-template-columns:repeat(3,1fr)}
 .seg.two{grid-template-columns:repeat(2,1fr)}
 .zsel{background:var(--bg2);border-radius:10px;padding:8px 10px;margin:8px 0}
@@ -316,7 +316,7 @@ input[type=tel]{width:100%;font:inherit;font-size:1rem;padding:10px 12px;border-
 .fhead2{position:sticky;top:-10px;z-index:2;background:var(--bg);margin:-10px -4px 0;padding:8px 4px 6px;border-bottom:1px solid var(--line)}
 .ftabs{display:flex;gap:6px;overflow-x:auto;padding:4px 0 2px;scrollbar-width:none}
 .ftabs::-webkit-scrollbar{display:none}
-.ftabs button{flex:0 0 auto;border:1px solid var(--line);background:var(--bg2);color:var(--fg);border-radius:999px;padding:8px 12px;font:600 .85rem inherit;font-family:inherit;cursor:pointer;white-space:nowrap}
+.ftabs button{flex:0 0 auto;border:1px solid var(--line);background:var(--bg2);color:var(--fg);border-radius:999px;padding:8px 12px;font-weight:600;font-size:.85rem;font-family:inherit;cursor:pointer;white-space:nowrap}
 .ftabs button.on{background:var(--bar);color:#fff;border-color:var(--bar)}
 .ftabs small{display:inline-block;margin-left:4px;padding:0 6px;border-radius:8px;background:#ffe8cc;color:#7a3e00;font-weight:700}
 .ftabs small.ok{background:#d3f0de;color:#0b5d3b}
@@ -363,9 +363,474 @@ input[type=tel]{width:100%;font:inherit;font-size:1rem;padding:10px 12px;border-
 .ficha .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .ficha .row .field{flex:1;min-width:120px}
 .fback{position:absolute;z-index:1450;left:calc(var(--safe-l) + 10px);top:calc(var(--safe-t) + 66px);border:0;border-radius:999px;padding:10px 16px;
-  background:var(--go);color:var(--go-fg);font:700 .95rem inherit;font-family:inherit;box-shadow:var(--shadow);cursor:pointer}
+  background:var(--go);color:var(--go-fg);font-weight:700;font-size:.95rem;font-family:inherit;box-shadow:var(--shadow);cursor:pointer}
 .fchips .chip::before{background:transparent;border:2px solid var(--muted);border-radius:4px;width:12px;height:12px}
 .fchips .chip.on{background:rgba(11,110,79,.12)}
 .fchips .chip.on::before{background:var(--c);border-color:var(--c);box-shadow:inset 0 0 0 2px var(--bg)}
 .ficha input[type=date]{flex:1;min-width:0;font:inherit;font-size:1rem;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg2);color:var(--fg)}
 .fchips .chip.on::before{content:"✓";color:#fff;font:900 11px/12px system-ui,sans-serif;text-align:center;box-shadow:none}
+
+/* ---- v1.17.0: actuaciones con datos y mediciones, subcalibración, ancho en el punto, informe de visita ---- */
+.pk-label.sub span{font-size:10px;font-weight:500;color:#fff3c4;opacity:.9}
+.act-label.clk{pointer-events:auto}
+.act-label.clk span{pointer-events:auto;cursor:pointer}
+.act-label.clk span:hover{background:rgba(16,32,24,.95)}
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+.pgrid .field label{font-size:.8rem}
+.meas{background:var(--bg2);border-radius:10px;padding:4px 10px;margin:4px 0 10px}
+.meas table{margin:4px 0}
+.linkb{border:0;background:none;color:var(--accent);font:inherit;font-size:.8rem;text-decoration:underline;cursor:pointer;padding:0;margin-left:4px}
+.mini.fav{font-size:1.1rem;color:#f59f00}
+.mini.fav.on{background:#fff4e6;border-color:#f59f00}
+.row select{flex:1}
+.wquick{background:var(--bg2);border-radius:10px;padding:8px 10px;margin:8px 0;font-size:.9rem}
+.wquick .field{margin:6px 0 0}
+.tgroup{border:1px solid var(--line);border-radius:10px;margin:8px 0;padding:0 8px}
+.tgroup>summary{cursor:pointer;font-weight:700;padding:8px 0}
+.tgroup>summary small{color:var(--muted);font-weight:500;margin-left:6px}
+.cgroup .cname{font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:6px 0 2px}
+.prio{background:#e03131;color:#fff;border-radius:4px;padding:0 4px;font-size:.72rem;margin-left:4px}
+.sumt th{font-size:.72rem;color:var(--muted);text-align:right;padding:3px 4px}
+.sumt th:first-child,.sumt td:first-child{text-align:left}
+.sumt td{text-align:right;font-variant-numeric:tabular-nums;padding:4px}
+.livepk{position:absolute;z-index:950;left:50%;transform:translateX(-50%);top:calc(var(--safe-t) + 64px);background:rgba(11,61,46,.92);color:#fff;border-radius:999px;padding:6px 14px;font:600 .85rem system-ui,sans-serif;box-shadow:var(--shadow);max-width:92vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:auto;cursor:pointer}
+.livepk small{font-weight:500;opacity:.85;margin-left:6px}
+.upbanner{position:absolute;z-index:1500;left:10px;right:10px;bottom:calc(var(--safe-b) + 96px);background:#fff4e6;color:#16211c;border:1px solid #ffc078;border-radius:12px;padding:10px 12px;box-shadow:var(--shadow);font-size:.9rem}
+.upbanner .row{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.field > .row{display:flex;gap:6px;align-items:center}
+.field > .row select{flex:1;min-width:0}
+
+/* ---- v1.17.1: arreglos de las pruebas con usuarios ---- */
+.mini{min-height:40px}
+.savebar{position:sticky;bottom:calc(-18px - var(--safe-b));margin:10px -16px -18px;padding:10px 16px calc(12px + var(--safe-b));background:var(--bg);border-top:1px solid var(--line);z-index:3}
+.savebar .btn{width:100%}
+input.bad{border-color:#e03131!important;box-shadow:0 0 0 2px rgba(224,49,49,.25)}
+small.rb{display:block;font-size:.78rem;color:var(--accent);min-height:1em;margin-top:2px}
+.sumt td{white-space:nowrap}
+.sumt{font-size:.85rem}
+#sheet:not([hidden]) ~ #toast{bottom:auto;top:calc(var(--safe-t) + 66px)}
+.livepk{white-space:normal;text-align:center;border-radius:14px;line-height:1.3}
+.livepk small{display:block;margin-left:0}
+.draftbar{border-color:#74c0fc;background:#e7f5ff}
+.draftbar{top:calc(var(--safe-t) + 64px);bottom:auto;z-index:1350}
+.wquick .field.row{display:flex;gap:6px;align-items:center}
+.wquick .field.row input{flex:1;min-width:0}
+.wquick .field.row .mini{flex:none}
+.field.row input{flex:1 1 0}
+.wquick .field.row{flex-wrap:nowrap}
+#sheet:not([hidden]) ~ .draftbar{display:none}
+.wquick .field.row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px}
+.wquick .field.row input{width:100%}
+
+/* ---- v1.18.0: tramo andando, enviar a la oficina, modo sencillo, dictado, BC3 ---- */
+.walkbar{position:absolute;z-index:1300;left:10px;right:calc(var(--safe-r) + 10px);bottom:calc(var(--safe-b) + 22px);display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:#0b6e4f;color:#fff;border-radius:14px;padding:8px 10px;box-shadow:var(--shadow);font-size:.9rem}
+.walkbar span{flex:1;min-width:0}
+.walkbar .mini{background:#fff;color:#0b3d2e;border-color:#fff;font-weight:700}
+.walkbar .mini:last-child{background:transparent;color:#fff}
+#sheet:not([hidden]) ~ .walkbar{display:none}
+.bigtypes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
+.bigtypes .btn{justify-content:flex-start;text-align:left;min-height:52px}
+.steps{padding-left:22px;line-height:1.45}
+.steps li{margin:6px 0}
+.mini.dict{margin-top:4px}
+.mini.dict.rec{background:#e03131;color:#fff;border-color:#e03131}
+.bc3map{display:flex;flex-direction:column;gap:10px;margin:8px 0}
+.bc3row{border:1px solid var(--line);border-radius:10px;padding:8px}
+.bc3row .bt{margin-bottom:6px}
+.bc3row .bt small{color:var(--muted)}
+.pgrid3{display:grid;grid-template-columns:minmax(0,1.4fr) 76px minmax(0,1fr);gap:6px}
+.pgrid3 input,.pgrid3 select{padding:8px}
+/* Modo sencillo: letra grande y solo lo imprescindible */
+html:has(body.simple){font-size:18px}
+body.simple [data-t=calc],body.simple [data-t=afec],body.simple [data-t=reslist],body.simple [data-t=csv],body.simple [data-t=bc3],body.simple [data-t=export],
+body.simple [data-t=measure],body.simple [data-t=offline],body.simple [data-t=fichas],body.simple [data-t=newfolder],body.simple [data-t=selmode],
+body.simple #sheetBody [data-a=slope],body.simple #sheetBody [data-a=slclass],body.simple #sheetBody [data-a=reverse],body.simple #sheetBody [data-a=props],
+body.simple #sheetBody [data-a=hidef],body.simple #sheetBody [data-a=hidel],body.simple #sheetBody [data-a=measure],body.simple #sheetBody [data-a=ficha],
+body.simple #sheetBody [data-a=copy],body.simple #sheetBody .coords,body.simple #sheetBody .attrs.fattrs{display:none!important}
+body.simple .btn{min-height:54px;font-size:1rem}
+.warn{color:#b45309;font-weight:600}
+.linkbtn{background:none;border:0;padding:6px 2px;color:var(--accent,#c2410c);font:inherit;font-weight:600;text-decoration:underline;cursor:pointer;min-height:36px}
+
+/* 1.18.1: las barras no se pisan */
+body:has(#livePk:not([hidden])) .draftbar{top:calc(var(--safe-t) + 124px)}
+body:has(#walkBar:not([hidden])) .toast{bottom:auto;top:calc(var(--safe-t) + 150px)}
+.walkbar{font-size:.85rem;line-height:1.3}
+.walkbar .mini{min-height:44px}
+body.simple .tech{display:none!important}
+body.simple .version{flex-wrap:wrap;margin-bottom:48px}
+body.simple #drawer{padding-bottom:calc(var(--safe-b) + 32px)}
+body:has(#walkBar:not([hidden])) .fabs{bottom:calc(var(--safe-b) + 104px)} /* con un tramo en marcha los botones suben y la barra ocupa todo el ancho */
+.walkbar span{flex:1 1 140px}
+.seg.walkseg [data-ws=auto]{grid-column:1/-1}
+.bc3tot{font-weight:700;margin:10px 0 4px}.rb.imp{display:block;font-weight:600}
+
+/* ================= 1.18.3 · Tema y componentes (propuesta de diseño, contraste AA medido) ================= */
+
+/* ---------- 1. Tokens ---------- */
+:root{
+  /* marca */
+  --brand:#0b3d2e;          /* verde monte: barra, cabeceras, texto seleccionado (12,2:1 con blanco) */
+  --brand-fg:#ffffff;
+  --brand-accent:#ffb37a;   /* «-GIS» y foco sobre la barra (6,96:1 sobre --brand) */
+  /* superficies */
+  --surface:#ffffff; --surface-2:#eef3ef; --surface-sel:#dff1e6;
+  /* texto */
+  --text:#16211c;           /* 16,6:1 sobre blanco · 14,7:1 sobre surface-2 */
+  --text-2:#4a5a52;         /* 7,3:1 sobre blanco · 6,5:1 sobre surface-2 (pistas, subtítulos) */
+  /* bordes */
+  --border:#d5ddd8;         /* solo separadores decorativos */
+  --border-strong:#6b7a72;  /* contorno de campos y botones secundarios: 4,5:1 (WCAG 1.4.11 pide 3:1) */
+  /* acciones */
+  --primary:#0a5c42; --primary-fg:#ffffff;   /* Guardar / confirmar: 8,0:1 */
+  --field:#f76707;   --field-fg:#1a0d04;     /* acción de campo (+, Empezar tramo, Enviar): 6,25:1; sobre mapa oscuro 5,9:1 */
+  --danger:#b42318;  --danger-fg:#ffffff;    /* 6,6:1 en ambos sentidos */
+  --focus:#1d4ed8;                           /* anillo de foco 6,7:1, distinto de todo lo demás */
+  /* avisos */
+  --info-bg:#e7f5ff; --info-fg:#0b4a6f;      /* 8,5:1 */
+  --warn-bg:#fff4e6; --warn-fg:#5c3200;      /* 10,1:1 */
+  --ok-bg:#d3f0de;   --ok-fg:#0b5d3b;
+  --radius:12px; --tap:48px;
+  /* se reasignan los tokens antiguos de app.css para que todo herede */
+  --bar:var(--brand); --bar-fg:var(--brand-fg); --bg:var(--surface); --bg2:var(--surface-2); --fg:var(--text); --muted:var(--text-2);
+  --line:var(--border); --go:var(--field); --go-fg:var(--field-fg); --accent:var(--primary);
+}
+@media (prefers-color-scheme:dark){:root{
+  --surface:#18211d; --surface-2:#24302a; --surface-sel:#1f3b2f;
+  --text:#e6eee9;           /* 13,9:1 */
+  --text-2:#b6c4bc;         /* 9,1:1 */
+  --border:#2f3c36; --border-strong:#8a9a92;  /* 5,6:1 */
+  --primary:#45c493; --primary-fg:#04241a;    /* ANTES blanco sobre #45c493 = 2,19:1 (falla). Ahora 7,5:1 */
+  --field:#ff8a3d;   --field-fg:#1a0d04;      /* 8,1:1 */
+  --danger:#ff8787;  --danger-fg:#2a0505;
+  --focus:#93c5fd;
+  --info-bg:#0f2a3a; --info-fg:#cfe8ff; --warn-bg:#3a2410; --warn-fg:#ffe1c2; --ok-bg:#12382a; --ok-fg:#c9f0d9;
+}}
+
+/* ---------- 2. Base y tipografía (mínimo 14 px en textos de ayuda) ---------- */
+body{background:#0e1a15}
+.hint,.sub,.lrow small,.nrow .t small,.field label,.coords,.rng,.empty{font-size:max(.875rem,14px)}
+.sheet h2{font-size:1.3rem;font-weight:700;letter-spacing:-.005em}
+.drawer h3,.sh{font-size:.8125rem;letter-spacing:.06em;color:var(--text-2);font-weight:700}
+.bar{background:var(--brand)}
+
+/* ---------- 3. Foco, pulsado, desactivado ---------- */
+:is(button,a,input,select,textarea,summary,label.opt):focus-visible{outline:3px solid var(--focus)!important;outline-offset:2px;box-shadow:0 0 0 5px var(--surface)}
+.bar :is(button):focus-visible{outline-color:var(--brand-accent)!important;box-shadow:none}
+:is(.btn,.mini,.tbtn,.ibtn,.fab,.chip,.seg button,.sheet-x):active{transform:translateY(1px);filter:brightness(.92)}
+:is(button,input,select):disabled{opacity:.45;cursor:not-allowed;filter:grayscale(.6)}
+
+/* ---------- 4. Botones ---------- */
+.btn{min-height:52px;border-radius:var(--radius);border:2px solid var(--border-strong);background:var(--surface);color:var(--text);font-size:1rem;font-weight:600}
+.btn.pri,.mini.pri{background:var(--primary);border-color:var(--primary);color:var(--primary-fg)}
+.btn.go{background:var(--field);border-color:var(--field);color:var(--field-fg);font-weight:700}
+.btn.del,.mini.del{background:var(--surface);border-color:var(--danger);color:var(--danger)}
+.btn.rec,.mini.dict.rec{background:var(--danger);border-color:var(--danger);color:var(--danger-fg)}
+.mini{min-height:44px;border:2px solid var(--border-strong);background:var(--surface);color:var(--text);border-radius:10px;font-weight:600;font-size:.9375rem}
+.mini.ic{width:44px}
+.linkbtn,.linkb{min-height:44px;color:var(--primary);text-underline-offset:3px}
+@media (pointer:coarse){
+  .mini,.ibtn,.tbtn,.sheet-x,.seg button,.chip,.pkbtns .mini,.linkbtn{min-height:var(--tap)}
+  .mini.ic,.ibtn,.sheet-x{width:var(--tap)}
+}
+.sheet-x{width:44px;height:44px;border:2px solid var(--border-strong);background:var(--surface)}
+.ibtn,.tbtn{min-height:44px}
+.ibtn{width:44px}
+.tbtn{background:rgba(255,255,255,.16);border:2px solid rgba(255,255,255,.55)}
+/* botones flotantes: anillo blanco para separarlos de la ortofoto */
+.fab{width:56px;height:56px;border:3px solid #fff;box-shadow:0 2px 0 rgba(0,0,0,.25),0 6px 20px rgba(0,0,0,.35)}
+.fab.main{width:66px;height:66px}
+.fab.main svg{width:32px;height:32px;stroke-width:2.6}
+
+/* ---------- 5. Segmentados: seleccionado = tinte + borde + ✓ (no se confunde con «Guardar») ---------- */
+.seg{border:2px solid var(--border-strong);border-radius:var(--radius);background:var(--surface)}
+.seg button{background:var(--surface);color:var(--text);border-right:1px solid var(--border);min-height:46px;font-size:.9375rem}
+.seg button.on{background:var(--surface-sel);color:var(--text);font-weight:700;box-shadow:inset 0 0 0 3px var(--primary)}
+.seg button.on::before{content:"✓ ";color:var(--primary);font-weight:900}
+.fseg button.on.si,.fseg button.on.no,.fseg button.on.parcial{color:#fff}
+
+/* chips de tipo */
+.chip{border:2px solid var(--border-strong);background:var(--surface);min-height:44px}
+.chip.on{background:var(--surface-sel);box-shadow:inset 0 0 0 2px var(--c)}
+
+/* ---------- 6. Campos ---------- */
+input[type=text],input[type=password],input[type=tel],input[type=date],input[type=number],textarea,select{
+  min-height:48px;background:var(--surface);border:2px solid var(--border-strong);border-radius:10px;color:var(--text);font-size:1rem}
+::placeholder{color:var(--text-2);opacity:.85;font-style:italic}
+input:focus,textarea:focus,select:focus{border-color:var(--focus)}
+input.bad{border-color:var(--danger)!important;box-shadow:0 0 0 3px color-mix(in srgb,var(--danger) 25%,transparent)}
+/* casillas y radios: 24 px y que no se encojan */
+input[type=checkbox],input[type=radio]{width:24px!important;height:24px!important;flex:none;accent-color:var(--primary);margin:0}
+.opt{min-height:48px;padding:8px 0;gap:12px;align-items:center}
+/* fila «Longitud desde el inicio»: estaba en columna (label centrado, campo suelto) */
+.field.row{flex-direction:row;align-items:center;flex-wrap:wrap}
+.field.row label.grow{flex:1 1 100%}
+.field.row input{flex:1 1 0;max-width:none!important}
+
+/* ---------- 7. Fichas inferiores ---------- */
+.sheet{border-radius:20px 20px 0 0;box-shadow:0 -2px 0 rgba(0,0,0,.08),0 -8px 32px rgba(0,0,0,.35)}
+.sheet::before{content:"";display:block;width:40px;height:5px;border-radius:3px;background:var(--border-strong);margin:-8px auto 10px;opacity:.6}
+.savebar{border-top:1px solid var(--border);box-shadow:0 -6px 16px rgba(0,0,0,.08)}
+.acts{gap:10px}
+/* ficha «+»: la explicación pasa a texto discreto y los botones se alinean a la izquierda con su icono */
+#sheetBody .acts .btn.full{justify-content:flex-start;text-align:left;padding:0 16px}
+
+/* ---------- 8. Panel ☰: menos ruido ---------- */
+.drawer{width:min(380px,92vw)}
+.treehead{flex-wrap:wrap}
+.treehead h3{flex:1 1 100%;margin-bottom:4px}
+/* un solo naranja en el panel (Enviar a la oficina); Fichas pasa a secundario */
+.drawer [data-t=fichas]{background:var(--surface);color:var(--text);border-color:var(--border-strong)}
+/* Herramientas como lista de una columna, ordenada por uso: informes primero, utilidades después */
+.drawer .acts:has([data-t=calc]){grid-template-columns:1fr;gap:0;border:2px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.drawer .acts:has([data-t=calc]) .btn{border:0;border-bottom:1px solid var(--border);border-radius:0;justify-content:flex-start;min-height:52px;font-weight:600}
+.drawer [data-t=actlist]{order:1}.drawer [data-t=visit]{order:2}.drawer [data-t=bc3]{order:3}.drawer [data-t=csv]{order:4}
+.drawer [data-t=measure]{order:5}.drawer [data-t=calc]{order:6}.drawer [data-t=afec]{order:7}.drawer [data-t=fichas]{order:8}
+.drawer [data-t=reslist]{order:9}.drawer [data-t=export]{order:10}.drawer [data-t=offline]{order:11}
+.version{flex-wrap:wrap;row-gap:8px}
+.version span{flex:1 1 100%}
+.obra-card{border:2px solid var(--border);border-left:6px solid var(--field)}
+.obra-card span{color:var(--primary)}
+
+/* ---------- 9. Barras flotantes y avisos ---------- */
+.mbar,.walkbar{border-radius:14px;min-height:56px;font-size:.95rem}
+.mbar.draw{background:var(--field);color:var(--field-fg)}           /* ANTES blanco sobre #ff6b00 = 2,86:1 */
+.mbar.draw .tbtn{color:var(--field-fg);border-color:rgba(0,0,0,.35)}
+.mbar .tbtn{border:2px solid rgba(0,0,0,.35);color:inherit}
+.walkbar{background:var(--brand);border:2px solid #fff}
+.walkbar .mini{background:#fff;color:var(--brand);border-color:#fff}
+.walkbar .mini:last-child{background:transparent;color:#fff;border-color:rgba(255,255,255,.7)}
+.toast{background:#16211c;border-left:6px solid var(--field);font-size:1rem;line-height:1.35;max-width:min(92vw,440px)}
+.fmsg{background:var(--info-bg);color:var(--info-fg)} .fwarn,.upbanner{background:var(--warn-bg);color:var(--warn-fg)} .fok{background:var(--ok-bg);color:var(--ok-fg)}
+.livepk{background:var(--brand);border:2px solid rgba(255,255,255,.6)}
+.odate{background:rgba(255,255,255,.92);font-size:12px}
+
+/* ---------- 10. Etiquetas del mapa: más grandes, con fondo opaco ---------- */
+.act-label span{font-size:12.5px;background:rgba(11,26,18,.92);padding:3px 7px;border-left-width:6px}
+.pk-label span{font-size:12px}
+
+/* ---------- 11. Modo sencillo: aún más grande y botones de 56 px ---------- */
+body.simple .btn{min-height:58px;font-size:1.05rem}
+body.simple .seg button{min-height:54px}
+
+/* ---------- 12. Ajustes tras la primera comparación ---------- */
+/* «Ir al inicio / Ir al final» son navegación (salen a Google Maps): secundario con icono, no naranja */
+a.btn.go[href]{background:var(--surface);color:var(--text);border-color:var(--border-strong);font-weight:600}
+/* el PK grande de la ficha de actuación se pintaba con el color del tipo (#8bc34a sobre blanco = 2,1:1) */
+.slope-main span[style*=color]{color:var(--text)!important}
+.slope-main span{color:var(--primary)}
+/* botones de ancho completo con texto largo: alineado a la izquierda */
+.btn.full{text-align:left}
+.version{justify-content:flex-start}
+/* aviso emergente: ancho útil, no media pantalla */
+.toast{left:12px;right:12px;transform:none;margin:0 auto;width:fit-content}
+/* segmentado de 4: que «✓ Sin indicar» quepa en una línea */
+.seg button{padding:8px 2px}
+.seg button.on::before{content:"✓\00a0"}
+/* barra del tramo: una sola línea; la ✕ (cancelar) separada y con borde rojo para no tocarla sin querer */
+.walkbar{flex-wrap:nowrap;gap:10px}
+.walkbar span{flex:1 1 auto;min-width:0}
+.walkbar .mini:last-child{border-color:#ffb4b4;color:#ffd6d6;margin-left:6px}
+body:has(#walkBar:not([hidden])) .fabs{bottom:calc(var(--safe-b) + 112px)}
+.walkbar .mini{white-space:nowrap;padding:0 14px}
+/* 1.18.3: ajustes propios */
+body:has(#draftBar:not([hidden])) .toast{top:calc(var(--safe-t) + 240px);bottom:auto}
+.reprow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 10px;border:2px solid var(--border);border-radius:var(--radius);background:var(--surface-2)}
+.reprow span{flex:1 1 100%;display:flex;flex-direction:column}.reprow small{color:var(--text-2)}
+.reprow .mini{flex:1 1 0}
+.bigtypes .btn.on{background:var(--surface-sel);box-shadow:inset 0 0 0 3px var(--primary);font-weight:700}
+.acts>.reprow{grid-column:1/-1}
+.flabel{display:block;font-weight:600;margin-bottom:6px}
+label.small{display:block;margin:10px 0 4px;color:var(--text-2);font-size:max(.875rem,14px)}
+.fwarn{border-radius:var(--radius);padding:10px 12px;margin:10px 0}
+.fwarn .row{margin-top:8px}
+.btn.go:disabled{opacity:.55}
+details.more{margin:12px 0;border:2px solid var(--border);border-radius:var(--radius);padding:0 12px}
+details.more>summary{min-height:48px;display:flex;align-items:center;font-weight:600;cursor:pointer;color:var(--text)}
+details.more[open]{padding-bottom:12px}
+.pkbtns{display:flex;gap:6px;margin-top:6px}.pkbtns .mini{flex:1 1 0;display:flex;align-items:center;justify-content:center;gap:4px}
+.pkbtns .mini svg{width:18px;height:18px}
+.drawer .acts.mlist{display:flex;flex-direction:column;gap:0;border:2px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.drawer .acts.mlist .btn{border:0;border-bottom:1px solid var(--border);border-radius:0;justify-content:flex-start;min-height:52px}
+.drawer .acts.mlist .btn:last-child{border-bottom:0}
+details.dmore{margin-top:12px}
+
+/* ================= 1.18.4 · segunda propuesta de diseño (Irene) ================= */
+/* D2-1 · El aviso de 0 m y su botón quedaban DEBAJO de la savebar: scrollIntoView respeta scroll-margin */
+#sheetBody .fwarn{scroll-margin-bottom:110px;border-left:6px solid var(--field)}
+#zeroWarn .mini{min-height:48px;font-weight:700;border-color:var(--field)}
+/* D2-2 · «Aquí/Mapa» se apilaban (heredaban flex-direction:column de la línea 191): en fila, ahorra 54 px */
+.pkbtns{flex-direction:row}
+.pkbtns .mini{min-height:48px;padding:0 6px}
+/* D2-3 · La ✕ flotante se montaba sobre el PK final y otros campos al desplazar: halo del fondo y sin solapar */
+.sheet-x{box-shadow:0 0 0 6px var(--surface);z-index:4}
+/* D2-4 · El toast de «Guardada» tapaba los botones de foto y GPS justo cuando se quiere seguir: se deja libre la columna derecha */
+@media (max-width:700px){ #sheet[hidden] ~ #toast{left:12px;right:auto;margin:0;width:auto;max-width:calc(100vw - 104px)} }
+/* D2-5 · Barra del tramo: «Terminar aquí» a 56 px y la ✕ más lejos (guantes) */
+.walkbar .mini{min-height:48px}
+.walkbar .mini:last-child{margin-left:18px;min-width:48px}
+/* D2-9 · con el tramo en marcha la barra (≈96 px a 360) tapaba media «+»: los botones suben según la altura real */
+.walkbar{flex-wrap:wrap;row-gap:6px}
+.walkbar span{flex:1 1 100%;white-space:normal}
+.walkbar span br{display:none} .walkbar span b::after{content:" · "}
+.walkbar .mini[data-w=end]{flex:1 1 auto}
+/* D2-6 · Cabecera de carpetas del árbol de capas a 48 px */
+.fname{min-height:48px}
+/* D2-8 · Selección de tipo en «Empezar tramo»: ✓ también aquí, como en los segmentados */
+.bigtypes .btn{position:relative}
+.bigtypes .btn.on::after{content:"✓";position:absolute;top:2px;right:6px;font-weight:800;color:var(--primary)}
+/* D-4 (sigue abierto) · puntos de tipo oscuros invisibles en tema oscuro: anillo claro */
+.dot{box-shadow:0 0 0 2px var(--surface),0 0 0 3px var(--border-strong)}
+/* los botones redondos suben lo que mida de verdad la barra del tramo (--wbh lo pone la app) */
+body:has(#walkBar:not([hidden])) .fabs{bottom:calc(var(--safe-b) + var(--wbh, 96px) + 34px)}
+/* el aviso de 0 m va dentro de la barra de guardar: nunca queda tapado */
+.savebar .fwarn{margin:0 0 8px}
+.bigtypes .btn.on .dot{visibility:hidden}
+@media (min-width:1000px){ .sheet{width:min(760px,56vw)} .bc3row .pgrid3{grid-template-columns:1.4fr .7fr 1fr} } /* escritorio: ficha más ancha */
+.undobar{position:absolute;z-index:3100;left:12px;right:12px;bottom:calc(var(--safe-b) + 24px);margin:0 auto;max-width:440px;display:flex;align-items:center;gap:10px;background:#16211c;color:#fff;border-radius:12px;padding:8px 8px 8px 14px;box-shadow:var(--shadow);border-left:6px solid var(--field)}
+.undobar span{flex:1}.undobar .mini{background:#fff;color:#16211c;border-color:#fff}
+.chiprow{display:flex;flex-wrap:wrap;gap:8px;grid-column:1/-1}.chiprow .mini{flex:1 1 auto}
+.revlist{list-style:none;padding:0;margin:6px 0}.revlist li{padding:6px 0;border-bottom:1px solid var(--border)}.revlist button{min-height:44px}
+.savebar .row2{display:grid;grid-template-columns:1fr 1.4fr;gap:8px}
+.walkbar .mini{padding:0 10px}.walkbar .mini:last-child{margin-left:4px;flex:none}
+.walkbar .mini[data-w=split]{flex:1 1 auto}
+.chiprow::before{content:"Tramo andando de:";flex:1 1 100%;font-size:max(.875rem,14px);color:var(--text-2);font-weight:600}
+.walkbar{display:grid;grid-template-columns:1fr 1fr 48px;gap:8px}.walkbar span{grid-column:1/-1}.walkbar .mini{margin:0!important;min-width:0}
+.walkbar{grid-template-columns:1.3fr 1fr 48px}.walkbar .mini{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ================= 1.18.5 · tercera propuesta de diseño (Irene) ================= */
+/* D3-1 · «Deshacer» tapaba la barra del tramo (y su botón quedaba justo donde estaba «Y seguir ▸»): con tramo en marcha va ENCIMA de la barra
+   y deja libre la columna de los botones redondos */
+body:has(#walkBar:not([hidden])) #undoBar{bottom:calc(var(--safe-b) + var(--wbh, 120px) + 30px);right:96px;left:12px;margin:0}
+/* D3-3 · «Deshacer» quedaba encima de la barra de guardar de una ficha abierta («Preparar y enviar», «Guardar»): con ficha abierta, arriba */
+#sheet:not([hidden]) ~ #undoBar{bottom:auto;top:calc(var(--safe-t) + 66px)}
+/* D3-5 · sin tramo, «Deshacer» tapaba medio «+»: deja libre la columna derecha en móvil */
+@media (max-width:700px){ #undoBar{right:96px;margin:0} }
+/* D3-6 · Escritorio: la barra del tramo ocupaba 1346 px («Terminar aquí» de 711 px): barra compacta a la izquierda */
+@media (min-width:900px){
+  .walkbar{right:auto;width:min(560px,calc(100vw - 120px))}
+  #undoBar{left:12px;right:auto;margin:0;width:min(560px,calc(100vw - 120px))}
+  body:has(#walkBar:not([hidden])) #undoBar{right:auto}
+}
+/* Accesibilidad: «Deshacer» es la acción que salva un error: botón de 48 px y contraste fuerte, nombre visible largo */
+#undoBar .mini{min-height:48px;min-width:96px;font-weight:800}
+#undoBar{border-left-color:#ffb020}
+/* D3-7 · Modo sencillo (Paco): en «Empezar tramo» el margen automático basta; el segmentado técnico (izquierdo/derecho/Eje) se pliega */
+body.simple #sheetBody .walkseg, body.simple #sheetBody .walkseg + .hint, body.simple #sheetBody #wsLbl{display:none}
+/* D3-8 · «Y seguir ▸» es la acción de la cadena: más peso visual que «Terminar aquí» cuando ya hay un tramo anterior hoy no se puede saber por CSS;
+   al menos se distinguen: borde naranja de campo y texto en negrita */
+.walkbar .mini[data-w=split]{border:2px solid var(--field,#f26b1d);font-weight:800}
+.chiprow.pts::before{content:"Puntual aquí (un toque):"}
+.pkrow{display:grid;grid-template-columns:1fr 1fr;gap:8px}.pkrow .field{min-width:0}.pkrow input{width:100%;min-width:0;box-sizing:border-box}
+.savebar .bc3tot{margin:0 0 8px}
+.walkbar .mini{font-size:.9rem}
+.fabpad{height:120px}
+
+/* ================= 1.18.6 · cuarta propuesta de diseño (Irene) ================= */
+/* D4-2 · «Guardar y…» salía cortado con puntos suspensivos a 360 px (nombre visible incompleto, 2.5.3/1.4.10):
+   el botón de la cadena puede partir en dos líneas dentro de sus 48 px y gana ancho frente a «Terminar aquí» */
+@media (max-width:700px){
+  .walkbar{grid-template-columns:1fr 1.15fr 48px}
+  .walkbar .mini[data-w=end],.walkbar .mini[data-w=split]{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.1;padding:0 8px}
+}
+/* D3-6 (sigue) · el bloqueo de 1,5 s de la barra no se veía: botones atenuados y una barra que se llena en 1,5 s.
+   La animación arranca cada vez que la barra aparece (al empezar, tras «Guardar y seguir» y al deshacer), igual que el bloqueo en JS */
+@keyframes wbwait{from{opacity:.45}to{opacity:.45}}
+@keyframes wbfill{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.walkbar .mini{animation:wbwait 1.5s step-end 1}
+.walkbar{position:absolute;overflow:hidden}
+.walkbar::after{content:"";position:absolute;left:0;right:0;bottom:0;height:4px;background:#ffb020;transform-origin:left;transform:scaleX(1);opacity:0;animation:wbfill 1.5s linear 1, wbbar 1.6s step-end 1}
+@keyframes wbbar{from{opacity:1}to{opacity:0}}
+@media (prefers-reduced-motion:reduce){.walkbar::after{animation:wbbar 1.5s step-end 1;transform:scaleX(1)}}
+/* D4-3 · tras «Guardar y seguir», «Deshacer» medía 252×156 px (6 líneas) y tapaba medio mapa, con el toast repitiendo lo mismo encima:
+   texto compacto y botón a la derecha; sigue fuera de la columna de los botones redondos */
+#undoBar{padding:6px 6px 6px 12px;gap:8px}
+#undoBar span{font-size:max(.85rem,14px);line-height:1.25}
+@media (max-width:700px){ body:has(#walkBar:not([hidden])) #undoBar{bottom:calc(var(--safe-b) + var(--wbh, 120px) + 24px)} }
+/* D2-6 (sigue) · modo sencillo: «En tu posición GPS ·» quedaba colgando y el enlace en otra línea: la línea cabe entera */
+body.simple #sheetBody p.sub:has([data-a=send]){font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.simple #sheetBody p.sub [data-a=send]{font-size:15px;min-height:44px}
+/* D4-6 · el foco de teclado sobre el mapa no se veía (outline: auto 1px sobre fondo oscuro) */
+#map:focus-visible{outline:3px solid #ffb020;outline-offset:-3px}
+/* Accesibilidad · la fila de puntuales se distingue de la de tramos (ambas eran chips iguales): borde discontinuo = «se guarda al tocar» */
+.chiprow.pts .mini{border-style:dashed;border-width:2px}
+/* «Deshacer» siempre arriba, bajo la cabecera: nunca tapa la barra del tramo, las fichas ni los botones redondos */
+#undoBar,body:has(#walkBar:not([hidden])) #undoBar,#sheet:not([hidden]) ~ #undoBar{top:calc(var(--safe-t) + 66px)!important;bottom:auto!important;left:12px!important;right:12px!important;margin:0 auto!important;width:auto!important;max-width:520px;height:auto}
+/* «▶ Seguir»: botón de texto junto al «+» */
+.fab.seguir{width:auto;height:48px;border-radius:24px;padding:0 14px;background:var(--surface);color:var(--text);font-weight:800;font-size:.95rem;border:3px solid var(--field)}
+#sheetBody .field:has(+ .savebar){margin-bottom:28px}
+
+/* ================= 1.18.7 · pulido (Irene, propuesta 5) ================= */
+
+/* D5-4 · Al aparecer «▶ Seguir» (99 px) la columna de botones redondos se ensancha y el «+», la cámara y ⌖ saltan 33 px a la izquierda.
+   Columna alineada a la derecha y botones de 56 px centrados sobre el «+» (66 px): el «+» no se mueve nunca */
+.fabs{align-items:flex-end}
+.fabs > .fab:not(.main):not(.seguir){margin-right:5px}
+body.simple .fabs > .fab:not(.main):not(.seguir){margin-right:5px}
+
+/* D5-5 · «Deshacer» (arriba, top 66) tapa la píldora del PK en directo durante 8-10 s después de cada guardado, justo cuando se está andando.
+   Con el PK visible y sin ficha abierta, «Deshacer» baja por debajo de la píldora; el toast, por debajo de «Deshacer» */
+@media (max-width:700px){
+  body:has(#livePk:not([hidden])):has(#sheet[hidden]) #undoBar#undoBar{top:calc(var(--safe-t) + 138px)!important}
+  body:has(#livePk:not([hidden])):has(#sheet[hidden]):has(#undoBar:not([hidden])) #toast{top:calc(var(--safe-t) + 214px)!important;bottom:auto!important}
+}
+@media (min-width:701px){
+  body:has(#livePk:not([hidden])):has(#sheet[hidden]) #undoBar#undoBar{top:calc(var(--safe-t) + 120px)!important}
+  body:has(#livePk:not([hidden])):has(#sheet[hidden]):has(#undoBar:not([hidden])) #toast{top:calc(var(--safe-t) + 190px)!important;bottom:auto!important}
+}
+
+/* D5-6 · Los chips «Puntual aquí (un toque)» no aceptan toques durante 1,5 s pero se ven activos: el toque se pierde sin aviso.
+   Misma señal que ya tiene la barra del tramo: atenuados mientras esperan (la fila se crea al abrir la ficha, así que la animación arranca sola) */
+@keyframes pqwait{from{opacity:.45}to{opacity:.45}}
+.chiprow.pts .mini{animation:pqwait 1.5s step-end 1}
+
+/* D5-11 · «Empezar tramo aquí»: el ✓ del tipo elegido pisa el texto («Limpieza de✓ cunetas») */
+.bigtypes .btn.on{padding-right:22px}
+
+/* D5-12 · Cabecera: «OBRA-GIS · Mi primera obra» medía 35 px de alto en el móvil y 1191 px de ancho en escritorio
+   (un clic en cualquier hueco de la barra abría «Obras»). El botón ocupa solo su texto y llega a 44 px */
+.bar .brand{flex:0 1 auto;min-height:44px;justify-content:center}
+.bar #btnImport{margin-left:auto}
+
+/* D5-13 · Escritorio: la barra del tramo iba pegada a la izquierda (10-570 px) mientras «Deshacer», el toast y el PK en directo van centrados.
+   Se centra como ellos */
+@media (min-width:900px){
+  .walkbar#walkBar{left:0;right:0;margin:0 auto;width:min(560px,calc(100vw - 180px))}
+}
+
+/* D5-14 · Menú › Capas: a 360 px el nombre del KML se queda en «pendiente…» y «KML · 1 elemen…».
+   El nombre puede ocupar varias líneas y partir palabras largas (los nombres de fichero no tienen espacios) */
+.lrow .nm{white-space:normal;overflow-wrap:anywhere;line-height:1.2;overflow:visible}
+.lrow .nm small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* ficha «+»: pie «Cerrar» fijo (queda bajo el dedo del «+») */
+.savebar.plusfoot .btn{background:var(--surface-2);border-color:var(--border-strong);font-weight:600;justify-content:center;text-align:center}
+.fabpad{display:none}
+/* modo sencillo: los PK del editor en una columna (letra grande) */
+body.simple .pkrow{grid-template-columns:1fr}
+/* los campos no quedan bajo la barra fija al enfocarlos */
+#sheetBody :is(input,textarea,select){scroll-margin-bottom:140px}
+
+/* ================= 1.18.8 · pulido (Irene, propuesta 6) ================= */
+
+/* D6-1 · Móvil: «Deshacer» (z-index 3100) queda ENCIMA del menú ☰ (z 1600) y tapa «Obra activa · Cambiar…»
+   y el botón naranja de debajo (13_menu). Con el menú abierto baja al pie, como un aviso normal, y deja libre la cabecera del menú. */
+@media (max-width:700px){
+  body:has(#drawer:not([hidden])) #undoBar#undoBar#undoBar#undoBar{top:auto!important;bottom:calc(var(--safe-b) + 16px)!important}
+  body:has(#drawer:not([hidden])) #toast#toast#toast{top:auto!important;bottom:calc(var(--safe-b) + 92px)!important}
+}
+
+/* D6-3 · Modo sencillo: la ficha «+» (72vh) corta «Otra actuación en este punto» bajo el pie «Cerrar» y
+   «Anotación o foto suelta» no se ve sin desplazar. Con el pie fijo hay sitio: la ficha «+» crece hasta 80vh
+   (su borde superior sigue por debajo de la píldora del PK, 64–136 px). */
+#sheet:has(.plusfoot){max-height:80vh}
+
+/* D6-4 · «▶ Seguir» empieza un tramo al instante y está a solo 12 px del «+»: el pulgar que sube hacia el «+»
+   lo roza. 8 px más de separación (20 px) sin mover el «+». */
+.fabs > .fab.seguir{margin-bottom:8px}
+
+/* D6-5 (= D5-15 restante) · «Longitud 80 m (×2 márgenes = 160 m)» deja «m)» sola en otra línea */
+#aMeas td:last-child b, .attrs.meas td:last-child b{white-space:nowrap}
+/* el aviso pasajero va arriba con la ficha cerrada (no tapa «▶ Seguir» ni la cámara) */
+#sheet[hidden] ~ #toast{top:calc(var(--safe-t) + 70px);bottom:auto}
+body:has(#livePk:not([hidden])) #sheet[hidden] ~ #toast{top:calc(var(--safe-t) + 140px)}
+/* ficha «+» más alta: todo a la vista sin quedar bajo el pie «Cerrar» */
+#sheet:has(.plusfoot){max-height:86vh}

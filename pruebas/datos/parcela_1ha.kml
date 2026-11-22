@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Parcela de prueba 1 ha</name>
+<Placemark><name>Cuadrado 100 x 100 m</name><description>Superficie exacta 10.000 m2 (1 ha), perímetro 400 m (sobre el elipsoide)</description>
+<Polygon><outerBoundaryIs><LinearRing><coordinates>-2.92000000,37.60800000,0 -2.91886746,37.60800000,0 -2.91886746,37.60890099,0 -2.92000000,37.60890099,0 -2.92000000,37.60800000,0</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>
+</Document></kml>

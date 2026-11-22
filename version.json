@@ -1,0 +1,6 @@
+{
+  "version": "1.18.8",
+  "fecha": "2026-11-22",
+  "apk": "https://github.com/Celtis-eng/OBRAGIS/releases/download/apk/CampoKML.apk",
+  "notas": "Depuración: puntuales del + siempre pulsables, unidades coherentes, tramos hacia atrás y Deshacer más seguro."
+}

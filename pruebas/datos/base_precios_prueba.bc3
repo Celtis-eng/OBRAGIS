@@ -1,0 +1,12 @@
+~V|BASE PRUEBA|FIEBDC-3/2016\01012026|Prueba|\|ANSI|
+~C|BASE##|||Base de precios de prueba caminos|0|0|
+~C|C01#||Capítulo 01 Movimiento de tierras y firmes|0|0|
+~C|E01DES010|m2|Desbroce y limpieza del terreno con medios mecánicos|0,62|010126|0|
+~C|E02LCU010|m|Limpieza y perfilado de cuneta en tierra con motoniveladora|0,95|010126|0|
+~C|E03ZA020|m3|Zahorra artificial ZA 0/32 extendida y compactada al 98 % PM|24,80|010126|0|
+~C|E03REF010|m2|Refino y planeo de explanada sin aporte de material|0,48|010126|0|
+~C|E04ESC010|m3|Escollera de piedra caliza colocada con retroexcavadora|38,50|010126|0|
+~C|E05AGL010|t|Mezcla bituminosa en caliente AC16 surf S|62,30|010126|0|
+~C|E06OF010|ud|Caño de hormigón D 600 mm con aletas y embocaduras|1250,00|010126|0|
+~D|BASE##|C01#\1\1\|
+~D|C01#|E01DES010\1\1\E02LCU010\1\1\E03ZA020\1\1\E03REF010\1\1\E04ESC010\1\1\E05AGL010\1\1\E06OF010\1\1\|

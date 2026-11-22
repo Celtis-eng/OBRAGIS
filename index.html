@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- OBRA-GIS v1.16.0 (2026-11-10) -->
+<!-- OBRA-GIS v1.18.8 (2026-11-22) -->
 <html lang="es">
 <head>
 <meta charset="utf-8">
@@ -11,13 +11,13 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="vendor/leaflet.css">
-<link rel="stylesheet" href="app.css?v=1.16.0">
+<link rel="stylesheet" href="app.css?v=1.18.8">
 </head>
 <body>
 <div id="map"></div>
 
 <header class="bar">
-  <button id="btnMenu" class="ibtn" type="button" aria-label="Capas, mapa base y herramientas"></button>
+  <button id="btnMenu" class="ibtn" type="button" aria-label="Menú: capas, mapa base, informes y herramientas"></button>
   <button id="btnObra" class="brand" type="button" aria-label="Obras"><span>OBRA<b>-GIS</b></span><small id="obraName"></small></button>
   <button id="btnImport" class="tbtn" type="button">Importar</button>
 </header>
@@ -56,7 +56,7 @@
 </section>
 
 <div id="orthoDate" class="odate" hidden></div>
-<div id="toast" class="toast" hidden></div>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 <div id="viewer" class="viewer" hidden></div>
 
 <input type="file" id="inKml" accept=".kml,.kmz,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz" multiple hidden>
@@ -69,7 +69,7 @@
 <script src="vendor/leaflet.js"></script>
 <script src="vendor/jszip.min.js"></script>
 <script src="vendor/piexif.js"></script>
-<script src="app.js?v=1.16.0"></script>
-<script src="ficha.js?v=1.16.0"></script>
+<script src="app.js?v=1.18.8"></script>
+<script src="ficha.js?v=1.18.8"></script>
 </body>
 </html>

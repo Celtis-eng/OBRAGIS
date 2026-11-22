@@ -1,0 +1,31 @@
+name: Pruebas OBRA-GIS
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Instalar navegador de pruebas
+        run: |
+          npm install --no-save playwright@1.63.0
+          npx playwright install --with-deps chromium
+      - name: Pasar la batería de pruebas
+        run: |
+          python3 -m http.server 8765 >/dev/null 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://localhost:8765/ >/dev/null && break; sleep 1; done
+          mkdir -p pruebas/capturas
+          node pruebas/pruebas.js
+      - name: Guardar capturas si algo falla
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: capturas-de-fallos
+          path: pruebas/capturas/

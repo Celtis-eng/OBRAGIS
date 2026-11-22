@@ -1,0 +1,12 @@
+~V|BASE|FIEBDC-3/2016\01012026|Prueba|\|ANSI|
+~C|B##|||Base realista|0|0|
+~C|C1#||Firmes y drenaje|0|0|
+~C|U03AC010|t|Mezcla bituminosa en caliente AC16 surf S, extendida y compactada|58.40|010126|0|
+~C|P01MB010|Tn|Mezcla bituminosa AC16 a pie de planta|41.20|010126|3|
+~C|M07CB010|h|Camión basculante|42.00|010126|2|
+~C|U01LOD010|ud|Limpieza de obra de drenaje transversal|130.00|010126|0|
+~C|U06TH060|m|Tubo de hormigón armado D 600 mm en caño de paso, colocado|156.30|010126|0|
+~C|U05LC010|m|Limpieza y perfilado de cuneta en tierra|0.95|010126|0|
+~D|B##|C1#\1\1\|
+~D|C1#|U03AC010\1\1\U01LOD010\1\1\U06TH060\1\1\U05LC010\1\1\|
+~D|U03AC010|P01MB010\1\1\M07CB010\1\0.02\|

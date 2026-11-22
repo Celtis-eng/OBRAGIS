@@ -1,7 +1,7 @@
-/* OBRA-GIS v1.16.0 (2026-11-10) — service worker: app disponible sin conexión, teselas PNOA en caché
+/* OBRA-GIS v1.18.8 (2026-11-22) — service worker: app disponible sin conexión, teselas PNOA en caché
    y recepción de KML/KMZ compartidos desde otras apps.
    VERSION debe coincidir con APP_VERSION de app.js: al cambiarla, los móviles descargan la versión nueva. */
-const VERSION = '1.16.0';
+const VERSION = '1.18.8';
 const SHELL = 'shell-' + VERSION;
 const TILES = 'tiles-v1';
 const ASSETS = ['./', 'index.html', 'app.css', 'app.js', 'ficha.js', 'manifest.webmanifest',
@@ -23,7 +23,7 @@ self.addEventListener('fetch', e => {
     e.respondWith(receiveShare(req)); return;
   }
   if (req.method !== 'GET') return;
-  if (url.origin === location.origin && url.pathname.endsWith('/licencia.json')) return; // siempre de la red
+  if (url.origin === location.origin && /\/(licencia|version)\.json$/.test(url.pathname)) return; // siempre de la red
   if (url.origin === location.origin) { e.respondWith(staleWhileRevalidate(req)); return; }
   if (url.hostname === 'www.ign.es') { e.respondWith(tile(req)); return; }
   if (req.destination === 'image') { e.respondWith(cachedImage(req)); return; } // capas de servicios descargadas para uso sin conexión

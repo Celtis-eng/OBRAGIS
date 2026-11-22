@@ -1,5 +1,5 @@
 'use strict';
-/* OBRA-GIS v1.16.0 (2026-11-10) — Ficha de inspección de campo · Restauración de caminos agrarios.
+/* OBRA-GIS v1.18.8 (2026-11-22) — Ficha de inspección de campo · Restauración de caminos agrarios.
    · Parte de PROYECTO: se rellena sola a partir del presupuesto (BC3 de Presto) y de los KMZ de las actuaciones.
    · Parte de CAMPO: se rellena en la visita con el móvil (botones grandes, fotos con GPS y PK, sin conexión).
    · Exporta la ficha para imprimir (PDF) y en JSON para la revisión del presupuesto.
@@ -63,6 +63,8 @@ const FICHA_TABS = [['datos', 'Datos'], ...FICHA_SECTIONS.map(s => [s.id, s.id +
 /* ---------------- Lector de BC3 (FIEBDC-3) ---------------- */
 // Presto suele declarar «ANSI» aunque guarde en UTF-8: se prueba UTF-8 estricto y, si falla, Windows-1252
 function bc3Decode(buf) { let t; try { t = new TextDecoder('utf-8', { fatal: true }).decode(buf); } catch (e) { t = new TextDecoder('windows-1252').decode(buf); } return t.replace(/^\ufeff/, ''); }
+// Números del BC3: el estándar usa punto, pero hay bases con coma decimal («24,80») o con miles («1.250,00»)
+function bc3Float(v) { let s = String(v == null ? '' : v).trim(); if (!s) return NaN; if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.'); return parseFloat(s); }
 function parseBC3(src) {
   const txt = typeof src === 'string' ? src : bc3Decode(src);
   const C = new Map(), D = new Map(), T = new Map(), M = new Map();
@@ -75,10 +77,10 @@ function parseBC3(src) {
       const codes = (f[1] || '').split('\\').filter(Boolean); if (!codes.length) continue;
       const c0 = codes[0], code = clean(c0);
       if (/##$/.test(c0)) root = code;
-      C.set(code, { code, chapter: /#$/.test(c0), unit: f[2] || '', summary: (f[3] || '').trim(), price: parseFloat(String(f[4] || '').split('\\')[0]) || 0, type: f[6] || '' });
+      C.set(code, { code, chapter: /#$/.test(c0), unit: f[2] || '', summary: (f[3] || '').trim(), price: bc3Float(String(f[4] || '').split('\\')[0]) || 0, type: f[6] || '' });
     } else if (t === 'D') {
       const parts = (f[2] || '').split('\\'), kids = [];
-      for (let i = 0; i + 2 < parts.length; i += 3) if (parts[i]) kids.push({ code: clean(parts[i]), factor: parseFloat(parts[i + 1]) || 1, qty: parts[i + 2] === '' ? 1 : parseFloat(parts[i + 2]) || 0 });
+      for (let i = 0; i + 2 < parts.length; i += 3) if (parts[i]) kids.push({ code: clean(parts[i]), factor: bc3Float(parts[i + 1]) || 1, qty: parts[i + 2] === '' ? 1 : bc3Float(parts[i + 2]) || 0 });
       D.set(clean(f[1]), kids);
     } else if (t === 'T') {
       T.set(clean(f[1]), (f[2] || '').trim());
@@ -89,7 +91,7 @@ function parseBC3(src) {
         const l = { tipo: p[i], com: (p[i + 1] || '').trim(), n: p[i + 2], lo: p[i + 3], an: p[i + 4], al: p[i + 5] };
         if (l.com || l.n || l.lo || l.an || l.al) lines.push(l);
       }
-      M.set(par + '\\' + ch, { total: parseFloat(f[3]) || 0, lines });
+      M.set(par + '\\' + ch, { total: bc3Float(f[3]) || 0, lines });
     }
   }
   return { C, D, T, M, root };

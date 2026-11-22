@@ -1,14 +1,25 @@
 'use strict';
-/* OBRA-GIS v1.16.0 (2026-11-10) — visor de KML/KMZ sobre ortofoto con gestor de capas, anotaciones
+/* OBRA-GIS v1.18.8 (2026-11-22) — visor de KML/KMZ sobre ortofoto con gestor de capas, anotaciones
    georreferenciadas (fotos, vídeos, notas de voz y texto), importación de fotos con GPS
    y navegación con Google Maps. Funciona como web instalable y como app nativa (Capacitor). */
 
 /* ---------------- Versión de la app ----------------
    Cambia APP_VERSION en cada entrega (también se usa como versión de la app Android).
    Formato MAYOR.MENOR.CORRECCIÓN: menor = función nueva, corrección = arreglo. */
-const APP_VERSION = '1.16.0';
-const APP_DATE = '2026-11-10';
+const APP_VERSION = '1.18.8';
+const APP_DATE = '2026-11-22';
 const CHANGELOG = [
+  ['1.18.8', '22/11/2026', 'Depuración: los puntuales del «+» ya no quedan bajo «Cerrar» y van arriba; caño, arqueta, entronque y badén sin número cuentan 1 ud en todas las salidas (el bacheo, por superficie, no); andando hacia atrás «Aquí» en «Hasta PK» alarga el tramo sin perder metros; «Guardar y seguir andando» desde el editor también ofrece «Deshacer»; un toque fallido ya no borra el «Deshacer»; en una cadena «sin medidas» no se vuelve a preguntar en cada corte; un tramo de milímetros avisa de 0 m; nombres claros en «▶ Seguir»; un doble toque sin querer ya no amplía el mapa; avisos arriba, sin tapar «▶ Seguir».'],
+  ['1.18.7', '22/11/2026', 'Depuración: «Deshacer» caduca en cuanto cambia la situación (no puede borrar un tramo viejo ni solapar tramos); «Guardar y seguir andando» sigue desde el PK guardado aunque se corrija en el editor y también después de «Guardar sin medidas» o «Guardar con 0 m»; la ficha «+» tiene un pie «Cerrar» bajo el dedo (un toque de más ya no apunta un puntual); badén y puntuales sin número cuentan 1 ud en pantalla, CSV, informe y BC3; «▶ Seguir» muestra el tipo y ofrece el último tramo aunque luego se apunte un caño; el «+» ya no se mueve; el PK en directo no se queda con una lectura vieja; pulido de Irene.'],
+  ['1.18.6', '22/11/2026', '«▶ Seguir» junto al «+»: un toque empieza andando otro tramo como el último. «Deshacer» siempre arriba, sin tapar nada. «Terminar aquí» desde el «+» vuelve a funcionar. «Guardar y seguir andando» desde el editor, también hacia atrás, sin tramos repetidos. Si no hay medidas que copiar, «Guardar y seguir» abre el editor. Badén puntual por unidad en el BC3. Puntuales protegidos 1,5 s frente a toques de más. Foco accesible en las fichas.'],
+  ['1.18.5', '21/11/2026', 'Actuaciones puntuales (caño, badén, arqueta) con un toque desde el «+». «Guardar y seguir» en la barra del tramo (antes «Y seguir»), también andando hacia atrás. «Deshacer» ya no tapa la barra del tramo. Toques de más protegidos al abrir el «+», al terminar un tramo y al cerrar fichas. Aviso de actuaciones sin medidas con «Guardar sin medidas». Tramos andando solo de tipos lineales. Total del BC3 siempre a la vista.'],
+  ['1.18.4', '21/11/2026', 'Trabajo más fluido: «Y seguir» en la barra del tramo guarda el tramo y empieza el siguiente igual sin abrir nada; al terminar un tramo, sus medidas se rellenan con las de la última del mismo tipo y hay «Guardar y seguir andando»; tipos recientes como atajo en el «+»; «Deshacer» en lugar de preguntas al cancelar un tramo o eliminar una actuación; vibración al empezar y terminar; pantalla encendida durante el tramo; revisión antes de enviar a la oficina. Arreglos: «Guardar con 0 m» ya no queda tapado, un toque de más al aparecer la barra no termina el tramo, no se puede terminar un tramo sin haber andado, precios «0.125» y aviso en «24.800», cambiar una foto cuenta como cambio, y más.'],
+  ['1.18.3', '21/11/2026', 'Nuevo diseño: colores con buen contraste (también en modo oscuro y a pleno sol), botones de 48 px, opción elegida con ✓ distinta de «Guardar», naranja solo para las acciones de campo. Menú por secciones (informes, herramientas, más, ajustes), ficha «+» más corta con «Repetir» en una fila, editor de actuación en 4 pasos con «Más opciones». Tramo andando: se elige y luego se pulsa «Empezar» (un toque de más nunca empieza un tramo) y el mapa acompaña. Aviso de 0 m dentro de la ficha con su botón. BC3: importe y total a la vista, precios con punto de miles, bases sin «#», partidas auxiliares, caño por unidad. Borradores más robustos y por obra. El APK lleva el código ofuscado.'],
+  ['1.18.2', '21/11/2026', 'Arreglos de la tercera ronda de pruebas. Borradores: uno por anotación o actuación (guardar o cerrar otra ya no borra el que tenías pendiente), copia al pasar la app a segundo plano y sin avisos falsos. Tramo andando: un toque rápido de más ya no elige un tipo, «Repetir la última andando», aviso antes de descartar un tramo en curso, barra a todo el ancho y sin avisos de GPS pasajeros. 0 m: los puntuales (badén, caño, arqueta…) se guardan sin aviso; los demás piden un segundo «Guardar» pausado. BC3: sin precios básicos de las descomposiciones en las propuestas, palabra principal obligatoria (caño ≠ limpieza de drenaje), unidades «Tn», «ml», «Ud»…, propuestas no fijadas al cambiar de base, resumen conservado sin la base, ajustes dañados saneados, sin notación científica y códigos únicos. Aviso al escribir un PK que pasa del final, etiquetas que no se montan, nombres con segundos.'],
+  ['1.18.1', '21/11/2026', 'Arreglos de la segunda ronda de pruebas. BC3: precios con coma de la base, unidad y precio tomados de la partida elegida, propuestas más prudentes y sin códigos repetidos, líneas de medición que suman el total, códigos propios únicos y BC3 incluido en «Enviar a la oficina». Los avisos ya no tapan botones; la barra del tramo deja libre la cámara. Toques repetidos que ya no abren otra ficha por error. Borradores guardados mientras se escribe. Tramo andando por obra, con margen automático y a menos de 50 m del camino. Dictado que avisa si no responde. Modo sencillo más limpio.'],
+  ['1.18.0', '20/11/2026', 'Tramo andando: «Empezar tramo aquí» y «Terminar aquí» con el GPS, sin tener el editor abierto. «Repetir la última» actuación desde donde acabó la anterior. «Enviar a la oficina» en un paso (paquete de obra + informe de la visita + mediciones). Exportación de mediciones a BC3 (FIEBDC-3) con los códigos de tu base de precios o presupuesto. Modo sencillo con letra grande, guía de primer uso y dictado por voz en las observaciones.'],
+  ['1.17.1', '20/11/2026', 'Arreglos tras las pruebas con usuarios: PK bien escritos (nunca «0+1000») y bien leídos («1.250», «1+250», «250 m»), con comprobación al escribir; números con unidades y avisos de valores imposibles; lo escrito en actuaciones y anotaciones ya no se pierde (borrador recuperable); sin toques fantasma; botón Atrás cierra fichas; importación de obras que no borra nada si falla; fotos y copias con nombres únicos; invertir trazas sin riesgo; actuaciones conservadas al borrar una capa y reenlazadas al recargarla; polígonos con huecos; distancias sobre el elipsoide; tramificación exacta con cotas del KML; mismas cifras en pantalla, CSV, KMZ e informe; botones más grandes y «Guardar» siempre visible.'],
+  ['1.17.0', '20/11/2026', 'Actuaciones completas: catálogo en desplegable por familias (desbroces, demoliciones, explanada, firmes, drenaje, contención, sobreanchos/abanicos…) con favoritas y recientes, datos de cada una (ancho, espesor, altura, unidades, material…) y mediciones automáticas (m, m², m³, t). Informe de la visita con resumen de mediciones, croquis y fotos. Etiquetas de actuación que se pueden tocar. Ocultar elementos. Ancho en el punto tocado y anchos a mano. Subcalibración de PK hasta 10 m. PK en directo con el GPS. Copias de seguridad en Documentos y arreglo de la exportación de obras en Android. La app Android ya se actualiza sin desinstalar (firma fija).'],
   ['1.16.0', '10/11/2026', 'Ficha de inspección de campo (restauración de caminos agrarios): al cargar el previo (BC3 del presupuesto y .zip con los KMZ del camino y de las actuaciones y sus fotos) la app sitúa trazas y fotos y rellena sola la parte de PROYECTO de la ficha con las partidas del presupuesto, su medición y su tramo de PK. En la visita se rellena la parte de CAMPO con botones grandes: ¿coincide con la realidad?, lo detectado en campo, otras actuaciones in situ situadas con GPS, anchos cada 100 m («¿En qué PK estoy?»), vías de acceso, zona de actuación, recursos y fotos de cada casilla con su PK. Se exporta para imprimir o PDF y en JSON para la revisión del presupuesto, y viaja en el paquete de obra.'],
   ['1.15.0', '09/11/2026', 'Tramificación de pendientes: la traza se divide en rangos (menos del 5 %, 5–10 %, 10–20 % y 20 % o más, editables) con la longitud y el porcentaje de cada uno, sus tramos con PK, colores en el mapa, pendiente media, pendiente media absoluta y desnivel medio (m/km). Exportación a CSV y KMZ.'],
   ['1.14.0', '07/11/2026', 'Informe de afecciones de las trazas que elijas: recorre cada traza consultando las capas de servicios marcadas, con banda a cada lado del eje, y da las afecciones por tramos de PK con los organismos a consultar. Se exporta como informe para imprimir o PDF, CSV y KMZ, y va en el paquete de obra.'],
@@ -98,6 +109,10 @@ const DB = (() => {
     get: (s, k) => tx(s, 'readonly', st => st.get(k)),
     put: (s, v, k) => tx(s, 'readwrite', st => (k === undefined ? st.put(v) : st.put(v, k))),
     del: (s, k) => tx(s, 'readwrite', st => st.delete(k)),
+    // varias escrituras en una sola transacción: o se guardan todas o ninguna
+    putMany: async list => { const d = await open(), stores = [...new Set(list.map(x => x[0]))];
+      return new Promise((res, rej) => { const t = d.transaction(stores, 'readwrite'); list.forEach(([s0, v]) => t.objectStore(s0).put(v));
+        t.oncomplete = () => res(); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error || new Error('Operación cancelada')); }); },
   };
 })();
 
@@ -204,19 +219,98 @@ function toast(msg, ms = 3500) {
 }
 
 let sheetCleanup = [], pendingUrls = [];
+let sheetOpenAt = 0, editorRerender = false, sheetTitle = '', lastFocus = null;
 function openSheet(html, cls = '') {
   const urls = pendingUrls; pendingUrls = [];
-  closeSheet();
+  const wasHidden = $('#sheet').hidden;
+  closeSheet(true);
+  const title = (/<h2[^>]*>([\s\S]*?)<\/h2>/.exec(html) || [])[1] || html.slice(0, 80);
+  if (wasHidden || title !== sheetTitle) sheetOpenAt = Date.now(); // ficha nueva bajo el dedo (también si sustituye a otra): se ignoran los toques de 350 ms
+  sheetTitle = title;
+  if (wasHidden) { armBack(); lastFocus = document.activeElement; } // «Atrás» la cierra · el foco vuelve aquí al cerrar
   urls.forEach(u => sheetCleanup.push(() => URL.revokeObjectURL(u)));
+  if (/^Obteniendo posición/.test($('#toast').textContent)) $('#toast').hidden = true; // aviso ya resuelto
   const b = $('#sheetBody'); b.className = cls; b.innerHTML = html;
   $('#sheet').hidden = false; $('#sheet').scrollTop = 0;
+  a11ySheet(b, wasHidden || sheetOpenAt === Date.now());
   return b;
 }
+// Accesibilidad de las fichas: diálogo con título, foco al título al abrir y estado «pulsado» de los botones segmentados
+function a11ySheet(b, fresh) {
+  const sh = $('#sheet'), h = b.querySelector('h2');
+  sh.setAttribute('role', 'dialog'); sh.setAttribute('aria-modal', 'false');
+  if (h) { h.id = h.id || 'sheetTitle'; h.tabIndex = -1; sh.setAttribute('aria-labelledby', h.id); if (fresh) try { h.focus({ preventScroll: true }); } catch (e) { /* nada */ } }
+  b.querySelectorAll('.seg button:not([role])').forEach(x => x.setAttribute('aria-pressed', x.classList.contains('on')));
+}
+new MutationObserver(ms => ms.forEach(m => { const x = m.target; if (x.matches && x.matches('.seg button:not([role])')) x.setAttribute('aria-pressed', x.classList.contains('on')); }))
+  .observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class'] });
 function onSheetClose(fn) { sheetCleanup.push(fn); }
-function closeSheet() {
+let histArmed = false;
+function armBack() { if (!histArmed) { try { history.pushState({ obragis: 1 }, ''); histArmed = true; } catch (e) { /* nada */ } } }
+window.addEventListener('popstate', () => {
+  histArmed = false;
+  if (!$('#viewer').hidden) { $('#viewer').hidden = true; armBack(); return; }
+  if (!$('#sheet').hidden) { closeSheet(); return; }
+  if (!$('#drawer').hidden) { closeDrawer(); return; }
+});
+// Evita «toques fantasma»: si se pulsa dos veces seguidas, el segundo toque caía en el botón que aparece debajo del dedo
+document.addEventListener('click', e => {
+  if (e.isTrusted && Date.now() - sheetOpenAt < 350 && e.target.closest && e.target.closest('#sheetBody button, #sheetBody a')) { e.stopPropagation(); e.preventDefault(); }
+}, true);
+// Al pasar la app a segundo plano (o cerrarla) se guarda al momento lo que se esté escribiendo
+document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'hidden') return;
+  try { if (typeof draft !== 'undefined' && draft && $('#nTitle')) { syncDraft(); storeDraft('note', { ...draft, media: [...draft.media] }, true); }
+    if (typeof actDraft !== 'undefined' && actDraft && $('#aText')) { syncAct(); storeDraft('act', { ...actDraft, params: { ...actDraft.params } }, true); } } catch (e) { /* nada */ } });
+/* ---------------- Borradores: lo que se escribe no se pierde ----------------
+   Si se cierra un editor sin guardar (X, Escape, otra ficha, la app se cierra…), el borrador se guarda y se ofrece recuperarlo. */
+// Huella de una actuación para saber si ha cambiado (parámetros vacíos o internos no cuentan; PK redondeados al cm)
+const actKey = d => JSON.stringify([d.type, Math.round((+d.d0 || 0) * 100), Math.round((+d.d1 || 0) * 100), d.side, String(d.text || ''), Object.fromEntries(Object.entries(d.params || {}).filter(([k, v]) => v != null && v !== '' && k[0] !== '_').sort()), d.prio || '', (d.media || []).map(m => m && m.id || '?').join(',')]); // las fotos cuentan por su identificador (cambiar una por otra también es un cambio)
+const noteKey = d => JSON.stringify([String(d.title || ''), String(d.text || ''), (d.media || []).map(m => m && m.id || '?').join(',')]);
+let pendingDraft = null, drafts = {}; // un borrador por anotación o actuación (id → { kind, data, t }); pendingDraft = el más reciente
+const draftHasContent = d => !!(d && d.data && ((d.data.media || []).length || String(d.data.text || '').trim() || (d.kind === 'act' ? d.data.type : String(d.data.title || '').trim() && d.data.title !== d.data._autoTitle)));
+// solo se ofrecen los borradores de la obra abierta (los de otras obras esperan a que se abra la suya)
+function refreshPending() { const l = Object.values(drafts).filter(d => draftHasContent(d) && (!d.data.obraId || d.data.obraId === settings.activeObra)).sort((x, y) => y.t - x.t); pendingDraft = l[0] || null; return l.length; }
+// un borrador leído de la base de datos se comprueba y se normaliza; si está dañado se descarta solo ese
+function cleanDraft(d) {
+  if (!d || typeof d !== 'object' || !d.data || typeof d.data !== 'object' || !['act', 'note'].includes(d.kind)) return null;
+  const x = { ...d.data }; if (!x.id || typeof x.id !== 'string') x.id = uid();
+  x.media = Array.isArray(x.media) ? x.media.filter(m => m && m.blob instanceof Blob) : [];
+  x.text = typeof x.text === 'string' ? x.text : x.text == null ? '' : String(x.text);
+  if (d.kind === 'note') { x.title = typeof x.title === 'string' ? x.title : ''; if (!isFinite(x.lat) || !isFinite(x.lng)) return null; }
+  else { if (!isFinite(x.d0) || !isFinite(x.d1)) return null; x.params = x.params && typeof x.params === 'object' && !Array.isArray(x.params) ? x.params : {}; }
+  return { kind: d.kind, data: x, t: isFinite(d.t) ? d.t : Date.now() };
+}
+async function storeDraft(kind, data, silent) {
+  if (!data || !data.id) return;
+  drafts[data.id] = { kind, data, t: Date.now() }; refreshPending();
+  try { await DB.put('kv', drafts, 'drafts'); } catch (e) { /* sin espacio */ }
+  if (!silent) showDraftBar();
+}
+async function clearDraft(id) { // sin id: el borrador que muestra la barra
+  const k = id || (pendingDraft && pendingDraft.data.id); if (k) delete drafts[k];
+  refreshPending(); try { await DB.put('kv', drafts, 'drafts'); } catch (e) { /* nada */ }
+  const b = $('#draftBar'); if (b) { if (pendingDraft && $('#sheet').hidden) showDraftBar(); else if (!pendingDraft) b.hidden = true; }
+}
+function draftLabel(d) { return d.kind === 'act' ? `${d.data.type || 'Actuación sin tipo'} · ${esc(d.data.traceName || '')} · PK ${fmtPK(d.data.d0)}` : esc(d.data.title || d.data.text || 'Anotación'); }
+function showDraftBar() {
+  if (!pendingDraft) return;
+  let el = $('#draftBar'); if (!el) { el = document.createElement('div'); el.id = 'draftBar'; el.className = 'upbanner draftbar'; document.body.appendChild(el); }
+  const nD = refreshPending(); if (!pendingDraft) { el.hidden = true; return; }
+  el.innerHTML = `<b>Tienes ${pendingDraft.kind === 'act' ? 'una actuación' : 'una anotación'} sin guardar${nD > 1 ? ` (y ${nD - 1} más)` : ''}</b><br><small>${draftLabel(pendingDraft)}${pendingDraft.data.media && pendingDraft.data.media.length ? ` · ${pendingDraft.data.media.length} foto(s)` : ''}</small>
+    <div class="row"><button class="mini pri" data-d="go">Seguir editando</button><button class="mini del" data-d="no">Descartar</button></div>`;
+  el.hidden = false;
+  el.querySelector('[data-d=go]').onclick = () => {
+    const d = pendingDraft; if (!d) return;
+    try { if (d.kind === 'act') { actDraft = { ...d.data }; renderActEditor(); } else { draft = { ...d.data }; renderEditor(); } el.hidden = true; }
+    catch (e) { console.error(e); toast('Este borrador está dañado y no se puede abrir. Puedes descartarlo.', 6000); }
+  };
+  el.querySelector('[data-d=no]').onclick = () => { const id = pendingDraft && pendingDraft.data.id; if (confirm('¿Descartar lo que no has guardado?')) clearDraft(id); };
+}
+function closeSheet(replacing) {
   const fns = sheetCleanup; sheetCleanup = [];
   fns.forEach(fn => { try { fn(); } catch (e) { console.error(e); } });
-  $('#sheet').hidden = true; $('#sheetBody').innerHTML = '';
+  if (replacing !== true) { $('#sheet').hidden = true; if (walkAct) walkAct.shown = Date.now(); if (lastFocus && lastFocus.isConnected && lastFocus !== document.body) try { lastFocus.focus({ preventScroll: true }); } catch (e) { /* nada */ } lastFocus = null; } // la barra del tramo reaparece bajo el dedo: 1,5 s sin toques // al sustituir una ficha por otra no se oculta (evita parpadeos y toques perdidos)
+  $('#sheetBody').innerHTML = '';
 }
 const objectUrl = blob => { const u = URL.createObjectURL(blob); pendingUrls.push(u); return u; };
 
@@ -229,20 +323,48 @@ const blobToB64 = blob => new Promise((res, rej) => { const r = new FileReader()
 const b64ToBlob = (b64, type) => { const s = atob(b64), a = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) a[i] = s.charCodeAt(i); return new Blob([a], { type }); };
 
 // Guardar o enviar un fichero generado (KMZ). En la app nativa abre el menú Compartir de Android.
-async function saveBlob(blob, name) {
+// En la app nativa el fichero se guarda en Documentos/OBRA-GIS (sobrevive a desinstalar la app) y después se abre
+// el menú Compartir. Se escribe por trozos para que los paquetes grandes (con muchas fotos) no agoten la memoria.
+let lastSaved = null;
+async function nativeWrite(FS, path, blob, directory) {
+  const CH = 3 * 1024 * 1024; // múltiplo de 3: el base64 de cada trozo se puede concatenar
+  let first = true;
+  for (let i = 0; first || i < blob.size; i += CH) {
+    const data = await blobToB64(blob.slice(i, i + CH));
+    if (first) await FS.writeFile({ path, data, directory, recursive: true });
+    else await FS.appendFile({ path, data, directory });
+    first = false;
+  }
+  return (await FS.getUri({ path, directory })).uri;
+}
+async function saveBlob(blob, name, opts = {}) {
   const FS = Plug('Filesystem'), SH = Plug('Share');
-  if (NATIVE && FS && SH) {
-    const w = await FS.writeFile({ path: name, data: await blobToB64(blob), directory: 'CACHE' });
-    await SH.share({ title: name, files: [w.uri], dialogTitle: 'Guardar o enviar ' + name });
-    return;
+  if (NATIVE && FS) {
+    let uri = null, where = '', errMsg = '';
+    if (FS.requestPermissions) { try { await FS.requestPermissions(); } catch (e) { /* Android 11+ no lo necesita */ } }
+    for (const directory of ['DOCUMENTS', 'EXTERNAL', 'CACHE']) {
+      try { uri = await nativeWrite(FS, 'OBRA-GIS/' + name, blob, directory); where = directory; break; }
+      catch (e) { errMsg = e.message || String(e); console.warn('No se pudo escribir en', directory, e); }
+    }
+    if (!uri) throw new Error('no se pudo escribir el fichero en el móvil (' + errMsg + ')');
+    lastSaved = { name, where, uri, t: Date.now() };
+    if (where === 'DOCUMENTS') toast(`Guardado en Documentos › OBRA-GIS › ${name}`, 7000);
+    else if (where === 'EXTERNAL') toast('Guardado en la carpeta de la app. Ojo: se borra si desinstalas la app. Envíalo a Drive o por correo.', 8000);
+    if (SH && opts.share !== false) {
+      try { await SH.share({ title: name, files: [uri], dialogTitle: 'Guardar o enviar ' + name }); }
+      catch (e) { if (!/cancel/i.test(e.message || '') && where === 'CACHE') throw e; }
+    }
+    return { uri, where };
   }
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
   document.body.appendChild(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 5000);
+  return { where: 'DOWNLOAD' };
 }
 
 /* ---------------- Mapa y capas base ---------------- */
 const map = L.map('map', { zoomControl: false, renderer: L.canvas({ tolerance: 12 }), maxZoom: 21 }).setView([37.18, -3.6], 9);
+if (matchMedia('(pointer:coarse)').matches) map.doubleClickZoom.disable(); // con el dedo se amplía pellizcando; un doble toque sin querer no mueve el mapa
 L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(map);
 map.createPane('rasters').style.zIndex = 350;   // servicios WMS/WMTS, por encima del mapa base
 map.createPane('hl').style.zIndex = 590;        // resaltes y mediciones, por debajo de los marcadores
@@ -409,8 +531,8 @@ const AFECCIONES_KIT = ['Líneas eléctricas', 'Subestaciones eléctricas', 'Gas
 const byTag = (el, tag) => Array.from(el.getElementsByTagNameNS('*', tag));
 const childText = (el, tag) => { const n = Array.from(el.children).find(c => c.localName === tag); return n ? n.textContent.trim() : ''; };
 const firstText = (el, tag) => { const n = byTag(el, tag)[0]; return n ? n.textContent.trim() : ''; };
-const parseCoords = t => (t || '').trim().split(/\s+/).map(s => s.split(',').map(Number))
-  .filter(a => a.length >= 2 && isFinite(a[0]) && isFinite(a[1])).map(a => (a.length > 2 && isFinite(a[2]) ? [a[1], a[0], a[2]] : [a[1], a[0]])); // → [lat, lng, z?]
+const parseCoords = t => (t || '').trim().replace(/\s*,\s*/g, ',').split(/\s+/).map(s => s.split(',').map(Number)) // «lng, lat» con espacios también vale
+  .filter(a => a.length >= 2 && isFinite(a[0]) && isFinite(a[1]) && Math.abs(a[0]) <= 180 && Math.abs(a[1]) <= 90).map(a => (a.length > 2 && isFinite(a[2]) ? [a[1], a[0], a[2]] : [a[1], a[0]])); // → [lat, lng, z?]
 
 function kmlColor(abgr) {
   const s = (abgr || '').trim().replace('#', '');
@@ -448,9 +570,18 @@ function folderPath(pm) {
   while (p) { if (p.localName === 'Folder') { const n = childText(p, 'name'); if (n) parts.unshift(n); } p = p.parentElement; }
   return parts.join(' › ');
 }
-function polyArea(c) { // área en m² (proyección local, válida para obras)
+// Distancias y áreas sobre el elipsoide (WGS84 ≈ ETRS89): radios de curvatura en la latitud media.
+// Para tramos de obra (vértices a menos de unos km) coincide con el cálculo elipsoidal de QGIS al milímetro.
+const ELL_A = 6378137, ELL_E2 = 0.00669437999014;
+function ellRadii(lat) { const s2 = Math.sin(lat * Math.PI / 180) ** 2, w = Math.sqrt(1 - ELL_E2 * s2); return { M: ELL_A * (1 - ELL_E2) / (w * w * w), N: ELL_A / w }; }
+function ellDist(a, b) {
+  const lat = (a.lat + b.lat) / 2, { M, N } = ellRadii(lat), r = Math.PI / 180;
+  return Math.hypot((b.lat - a.lat) * r * M, (b.lng - a.lng) * r * N * Math.cos(lat * r));
+}
+L.CRS.Earth.distance = (a, b) => ellDist(L.latLng(a), L.latLng(b)); // todas las distancias de la app (PK, mediciones, anchos…)
+function polyArea(c) { // área en m² sobre el elipsoide (proyección local en el centro del polígono)
   if (c.length < 3) return 0;
-  const lat0 = c.reduce((s2, p) => s2 + p[0], 0) / c.length, k = Math.cos(lat0 * Math.PI / 180) * 111320, m = 111320;
+  const lat0 = c.reduce((s2, p) => s2 + p[0], 0) / c.length, R = ellRadii(lat0), k = Math.cos(lat0 * Math.PI / 180) * R.N * Math.PI / 180, m = R.M * Math.PI / 180;
   let a = 0; for (let i = 0; i < c.length; i++) { const p = c[i], q = c[(i + 1) % c.length]; a += (p[1] * k) * (q[0] * m) - (q[1] * k) * (p[0] * m); }
   return Math.abs(a) / 2;
 }
@@ -470,7 +601,9 @@ function parseKML(text) {
     const parts = [];
     byTag(pm, 'Point').forEach(g => { const c = parseCoords(firstText(g, 'coordinates')); if (c.length) parts.push({ t: 'pt', c }); });
     byTag(pm, 'LineString').forEach(g => { const c = parseCoords(firstText(g, 'coordinates')); if (c.length > 1) parts.push({ t: 'ln', c }); });
-    byTag(pm, 'Polygon').forEach(g => { const r = byTag(g, 'outerBoundaryIs')[0] || g; const c = parseCoords(firstText(r, 'coordinates')); if (c.length > 2) parts.push({ t: 'pg', c }); });
+    byTag(pm, 'Polygon').forEach(g => { const r = byTag(g, 'outerBoundaryIs')[0] || g; const c = parseCoords(firstText(r, 'coordinates'));
+      const holes = byTag(g, 'innerBoundaryIs').map(ib => parseCoords(firstText(ib, 'coordinates'))).filter(h => h.length > 2); // huecos (islas, enclaves)
+      if (c.length > 2) parts.push(holes.length ? { t: 'pg', c, holes } : { t: 'pg', c }); });
     byTag(pm, 'Track').forEach(g => {
       const c = byTag(g, 'coord').map(n => n.textContent.trim().split(/\s+/).map(Number)).filter(a => a.length >= 2 && isFinite(a[0]) && isFinite(a[1])).map(a => [a[1], a[0]]);
       if (c.length > 1) parts.push({ t: 'ln', c });
@@ -485,7 +618,7 @@ function parseKML(text) {
     const type = lines.length ? 'ln' : parts.some(p => p.t === 'pg') ? 'pg' : 'pt';
     const f = { pm: i, name: childText(pm, 'name') || 'Elemento ' + (i + 1), folder: folderPath(pm), desc: htmlToText(childText(pm, 'description')), attrs, parts, type, style };
     if (type === 'ln') { f.start = lines[0].c[0]; const last = lines[lines.length - 1].c; f.end = last[last.length - 1]; f.length = lines.reduce((s, l) => s + lineLength(l.c), 0); }
-    else if (type === 'pg') { const c = parts.find(p => p.t === 'pg').c; f.start = centroid(c); f.length = lineLength(c); f.area = parts.filter(p => p.t === 'pg').reduce((s2, p) => s2 + polyArea(p.c), 0); }
+    else if (type === 'pg') { const c = parts.find(p => p.t === 'pg').c; f.start = centroid(c); f.length = lineLength(c); f.area = parts.filter(p => p.t === 'pg').reduce((s2, p) => s2 + Math.max(0, polyArea(p.c) - (p.holes || []).reduce((h, r) => h + polyArea(r), 0)), 0); }
     else f.start = parts[0].c[0];
     out.push(f);
   });
@@ -531,7 +664,10 @@ function askPkStep(sel, cur) {
   if (!isFinite(v) || v < 1 || v > 5000) { toast('Distancia no válida. Escribe un número de metros entre 1 y 5000.'); return undefined; }
   return Math.round(v);
 }
-const fmtPK = d => `${Math.floor(d / 1000)}+${String(Math.round(d % 1000)).padStart(3, '0')}`;
+// Celda CSV entre comillas. Si el texto empieza por = + @ (o - sin ser un número) se antepone ' para que Excel no lo ejecute como fórmula.
+const csvQ = v => { let t = String(v ?? ''); if (/^[=+@\t\r]/.test(t) || (/^-/.test(t) && !/^-?\d+([.,]\d+)?$/.test(t))) t = "'" + t; return '"' + t.replace(/"/g, '""').replace(/\r?\n/g, ' ') + '"'; };
+// PK con formato km+metros. Se redondea al metro ANTES de separar los km (antes salía «0+1000»).
+const fmtPK = d => { if (!isFinite(d)) return '—'; const m = Math.round(Math.abs(d)); return `${d < 0 && m ? '−' : ''}${Math.floor(m / 1000)}+${String(m % 1000).padStart(3, '0')}`; };
 function lineParts(f) { return f.parts.filter(p => p.t === 'ln'); }
 function chainage(f, step = PK_STEP) {
   const out = []; let acc = 0, next = 0, last = null;
@@ -554,7 +690,7 @@ function chainage(f, step = PK_STEP) {
 }
 // PK del punto de la traza más cercano a una posición
 function pkAt(f, ll) {
-  const k = Math.cos(ll.lat * Math.PI / 180), M = 111320;
+  const R0 = ellRadii(ll.lat), k = Math.cos(ll.lat * Math.PI / 180) * R0.N / R0.M, M = R0.M * Math.PI / 180;
   let best = Infinity, bestD = 0, acc = 0;
   lineParts(f).forEach(p => {
     const c = p.c;
@@ -583,29 +719,38 @@ function drawPK() {
   let n = 0;
   for (const e of layers.values()) {
     if (typeOf(e.rec) !== 'kml' || !e.rec.visible || !e.pk) continue;
-    const step = e.pkStep || PK_STEP;
-    // Solo se dibujan si las marcas quedan separadas al menos 12 px: así no se amontonan ni tapan el mapa
-    // múltiplos «redondos» de la calibración: 25 → 50, 100, 250, 500, 1000…
-    const cands = [...new Set([step, ...PK_NICE.filter(v => v % step === 0), ...[2, 5, 10, 20, 50, 100, 200].map(k => k * step)])].sort((x, y) => x - y);
-    const tickEvery = cands.find(v => v / mpp >= 12); if (!tickEvery || tickEvery / mpp > 400) continue;
-    const labelEvery = cands.find(v => v % tickEvery === 0 && v / mpp >= 60) || tickEvery;
-    const bigEvery = Math.max(1000, labelEvery * 5);
+    const step = e.pkStep || PK_STEP, base = e.pkBase || step;
+    let tickEvery, labelEvery, majorEvery = step;
+    if (step / mpp >= 12) {
+      // Calibración principal visible: al acercar se añaden subcalibraciones (½, ⅕, 1/10 del paso) sin bajar de 10 m
+      const subs = settings.pkSub === false ? [] : [step / 10, step / 5, step / 4, step / 2].filter(v => v >= base && Math.abs(v / base - Math.round(v / base)) < 1e-6);
+      tickEvery = subs.find(v => v / mpp >= 16) || step;
+      const isM = (x, y) => Math.abs(x / y - Math.round(x / y)) < 1e-6;
+      labelEvery = [...new Set([tickEvery, ...subs, ...[1, 2, 5, 10, 20, 50].map(k => k * step)])].sort((x, y) => x - y).find(v => isM(v, tickEvery) && (isM(step, v) || isM(v, step)) && v / mpp >= 64) || step * 50;
+    } else {
+      const cands = [...new Set([step, ...PK_NICE.filter(v => v % step === 0), ...[2, 5, 10, 20, 50, 100, 200].map(k => k * step)])].sort((x, y) => x - y);
+      tickEvery = cands.find(v => v / mpp >= 12); if (!tickEvery) continue;
+      labelEvery = cands.find(v => v % tickEvery === 0 && v / mpp >= 60) || tickEvery;
+      majorEvery = tickEvery;
+    }
+    const bigEvery = Math.max(1000, step * 10);
     const op = e.rec.opacity ?? 1;
     for (const m of e.pk) {
-      if (n > 1500) return;
-      const dr = Math.round(m.d);
-      if (!m.end && dr % tickEvery !== 0) continue;
+      if (n > 2500) return;
+      const dr = Math.round(m.d * 100) / 100, mod = v => Math.abs(dr / v - Math.round(dr / v)) < 1e-6;
+      if (!m.end && !mod(tickEvery)) continue;
       if (!bounds.contains([m.lat, m.lng])) continue;
       const p = map.latLngToLayerPoint([m.lat, m.lng]);
       const len = Math.hypot(m.dx, m.dy) || 1, nx = m.dy / len, ny = m.dx / len; // perpendicular en pantalla
-      const big = m.end || dr % bigEvery === 0, lab = m.end || dr % labelEvery === 0, h = big ? 9 : lab ? 6 : 4;
+      const major = m.end || mod(majorEvery), big = m.end || mod(bigEvery), lab = m.end || mod(labelEvery);
+      const h = big ? 10 : major ? 7 : 4;
       const a = map.layerPointToLatLng([p.x + nx * h, p.y + ny * h]), b = map.layerPointToLatLng([p.x - nx * h, p.y - ny * h]);
-      L.polyline([a, b], { renderer: pkRenderer, color: '#102018', weight: 4, opacity: 0.55 * op, interactive: false }).addTo(pkLayer);
-      L.polyline([a, b], { renderer: pkRenderer, color: '#ffffff', weight: 2, opacity: op, interactive: false }).addTo(pkLayer);
+      L.polyline([a, b], { renderer: pkRenderer, color: '#102018', weight: major ? 4 : 3, opacity: 0.55 * op, interactive: false }).addTo(pkLayer);
+      L.polyline([a, b], { renderer: pkRenderer, color: major ? '#ffffff' : '#ffe08a', weight: major ? 2 : 1.5, opacity: op, interactive: false }).addTo(pkLayer);
       if (lab) {
         const at = map.layerPointToLatLng([p.x + nx * (h + 13), p.y + ny * (h + 13)]);
         L.marker(at, { interactive: false, keyboard: false, pane: 'pk',
-          icon: L.divIcon({ className: 'pk-label' + (big ? ' big' : ''), html: `<span style="opacity:${op}">${fmtPK(m.d)}</span>`, iconSize: [0, 0] }) }).addTo(pkLayer);
+          icon: L.divIcon({ className: 'pk-label' + (big ? ' big' : major ? '' : ' sub'), html: `<span style="opacity:${op}">${fmtPK(m.d)}</span>`, iconSize: [0, 0] }) }).addTo(pkLayer);
       }
       n++;
     }
@@ -637,17 +782,23 @@ function parseOrthoInfo(html) {
   return 'vuelo ' + date + (r ? ` · ${r[1].replace('.', ',')} ${r[2] || 'm'}/píxel` : '');
 }
 
+const isFeatHidden = (rec, i) => !!(rec && rec.hiddenFeats && rec.hiddenFeats.includes(i));
+async function setFeatHidden(rec, i, hide) {
+  const s0 = new Set(rec.hiddenFeats || []); hide ? s0.add(i) : s0.delete(i);
+  await updateLayer(rec.id, { hiddenFeats: [...s0].sort((a, b) => a - b) }); rebuildLayer(rec.id);
+}
 function buildKml(entry) {
   const { rec } = entry;
   const { feats } = parseKML(rec.text);
   const op = rec.opacity ?? 1;
   const group = L.featureGroup();
-  feats.forEach(f => {
+  feats.forEach((f, fi) => {
+    if (isFeatHidden(rec, fi)) return; // elemento ocultado por el usuario
     const st = f.style, col = st.line || rec.color;
     f.parts.forEach(p => {
       let lyr;
       if (p.t === 'ln') lyr = L.polyline(p.c, { color: col, weight: Math.max(3, st.width || 3), opacity: (st.lineOp > 0.2 ? st.lineOp : 1) * op });
-      else if (p.t === 'pg') lyr = L.polygon(p.c, { color: col, weight: Math.max(2, st.width || 2), opacity: op, fillColor: st.fill || col, fillOpacity: st.noFill ? 0 : Math.min(st.fillOp ?? 0.2, 0.45) * op });
+      else if (p.t === 'pg') lyr = L.polygon(p.holes ? [p.c, ...p.holes] : p.c, { color: col, weight: Math.max(2, st.width || 2), opacity: op, fillColor: st.fill || col, fillOpacity: st.noFill ? 0 : Math.min(st.fillOp ?? 0.2, 0.45) * op });
       else lyr = L.circleMarker(p.c[0], { radius: 7, color: '#fff', weight: 2, opacity: op, fillColor: st.icon || rec.color, fillOpacity: op });
       lyr.on('click', e => {
         L.DomEvent.stop(e);
@@ -660,7 +811,9 @@ function buildKml(entry) {
   });
   entry.feats = feats; entry.group = group;
   entry.pkStep = pkStepOf(entry.rec);
-  entry.pk = feats.filter(f => f.type === 'ln').flatMap(f => chainage(f, entry.pkStep));
+  // marcas cada 10 m (o 5 m) para poder dibujar subcalibraciones al acercar el mapa
+  entry.pkBase = entry.pkStep % 10 === 0 && entry.pkStep >= 20 ? 10 : entry.pkStep % 5 === 0 && entry.pkStep >= 10 ? 5 : entry.pkStep;
+  entry.pk = feats.filter((f, i) => f.type === 'ln' && !isFeatHidden(rec, i)).flatMap(f => chainage(f, entry.pkBase));
 }
 function buildRaster(entry) {
   const r = entry.rec, common = { pane: 'rasters', opacity: r.opacity ?? 1, maxZoom: 21, attribution: r.attribution || '' };
@@ -734,11 +887,25 @@ function zoomToLayer(id) {
   if (b && b.isValid()) map.fitBounds(b.pad(0.15), { maxZoom: 18 });
   else toast('Esta capa es un servicio de imagen: no tiene una extensión que encuadrar.');
 }
+// Actuaciones cuya capa ya no está: se conservan y se vuelven a enlazar al cargar otra vez la traza (por su nombre)
+async function relinkOrphanActs(e) {
+  if (!e || !e.feats || typeOf(e.rec) !== 'kml') return;
+  const orphans = [...acts.values()].filter(a => !layers.has(a.layerId));
+  const matches = orphans.map(a => ({ a, fi: e.feats.findIndex(f => f.type === 'ln' && f.name === a.traceName) })).filter(x => x.fi >= 0);
+  if (!matches.length) return;
+  const names = [...new Set(matches.map(x => x.a.traceName))].join(', ');
+  if (!confirm(`Hay ${matches.length} actuaciones de «${names}» que se quedaron sin traza. ¿Enlazarlas a la capa «${e.rec.name}» que acabas de cargar?`)) return;
+  const upd = matches.map(({ a, fi }) => { const f = e.feats[fi], d1 = Math.min(f.length, a.d1), d0 = Math.min(a.d0, d1);
+    return { ...a, layerId: e.rec.id, layerName: e.rec.name, featIdx: fi, d0, d1, coords: segmentCoords(f, d0, d1), updated: Date.now() }; });
+  try { await DB.putMany(upd.map(a => ['acts', a])); upd.forEach(a => acts.set(a.id, a)); drawActs(); toast(`${upd.length} actuaciones enlazadas de nuevo a su traza.`, 5000); }
+  catch (err) { toast('No se pudieron enlazar: ' + (err.message || err), 6000); }
+}
 async function deleteLayer(id) {
   const e = layers.get(id); if (!e) return;
   const pts = [...notes.values()].filter(n => n.layerId === id);
+  const nActs = [...acts.values()].filter(a => a.layerId === id).length;
   const extra = pts.length ? ` y sus ${pts.length} fotos` : '';
-  if (!confirm(`¿Quitar la capa «${e.rec.name}»${extra} de la app?`)) return;
+  if (!confirm(`¿Quitar la capa «${e.rec.name}»${extra} de la app?${nActs ? `\n\nSus ${nActs} actuaciones NO se borran: se quedan en la obra sin traza y se volverán a enlazar si vuelves a cargar ese KML.` : ''}`)) return;
   map.removeLayer(mapLayerOf(e));
   for (const n of pts) { await DB.del('notes', n.id); notes.delete(n.id); noteMarkers.delete(n.id); }
   pointGroups.delete(id);
@@ -752,7 +919,7 @@ async function updateLayer(id, changes) {
 }
 
 function featureSheet(f, ll, rec) {
-  const kind = f.type === 'ln' ? 'Traza · ' + fmtLen(f.length) : f.type === 'pg' ? 'Polígono · perímetro ' + fmtLen(f.length) : 'Punto';
+  const kind = f.type === 'ln' ? 'Traza · ' + fmtLen(f.length) : f.type === 'pg' ? `Polígono · superficie ${fmtArea(f.area || 0)}${(f.area || 0) >= 10000 ? '' : ` (${String(Math.round((f.area || 0) / 100) / 100).replace('.', ',')} ha)`} · perímetro ${fmtLen(f.length)}` : 'Punto';
   let acts = '';
   if (f.type === 'ln') {
     acts += goBtn(f.start[0], f.start[1], 'Ir al inicio') + goBtn(f.end[0], f.end[1], 'Ir al final');
@@ -764,19 +931,28 @@ function featureSheet(f, ll, rec) {
   }
   const noteAt = f.type === 'pt' ? { lat: f.start[0], lng: f.start[1] } : ll;
   acts += `<button class="btn" data-a="note">${ICON.note}Anotar aquí</button><button class="btn" data-a="fit">Encuadrar</button>`;
-  if (f.type === 'ln') acts += `<button class="btn go full" data-a="newact">${ICON.road}Nueva actuación en esta traza</button><button class="btn pri" data-a="slope">${ICON.slope}Pendiente</button><button class="btn" data-a="slclass">${ICON.slope}Tramificar pendientes</button><button class="btn pri" data-a="width">${ICON.width}Anchos</button><button class="btn go full" data-a="ficha">${ICON.note}Ficha de inspección de campo</button>`;
+  if (f.type === 'ln') acts += `<button class="btn pri" data-a="slope">${ICON.slope}Pendiente</button><button class="btn" data-a="slclass">${ICON.slope}Tramificar pendientes</button><button class="btn pri" data-a="width">${ICON.width}Anchos</button><button class="btn go full" data-a="ficha">${ICON.note}Ficha de inspección de campo</button>`;
   acts += `<button class="btn" data-a="copy">${ICON.copy}Copiar coordenadas</button><button class="btn" data-a="measure">${ICON.ruler}Medir desde aquí</button>`;
   if (f.type === 'ln') acts += `<button class="btn" data-a="reverse">${ICON.swap}Invertir sentido</button>`;
-  acts += `<button class="btn" data-a="props">${ICON.info}Propiedades de la capa</button>`;
+  acts += `<button class="btn" data-a="props">${ICON.info}Propiedades de la capa</button><button class="btn" data-a="hidef">${ICON.eyeOff || ''}Ocultar este elemento</button><button class="btn" data-a="hidel">Ocultar la capa</button>`;
 
   let coords = '';
   const pkTap = f.type === 'ln' ? pkAt(f, ll) : null;
+  const fiw = layers.get(rec.id).feats.indexOf(f);
+  let wq = '';
+  if (f.type === 'ln') {
+    const wHere = roadWidthAt(rec, fiw, pkTap.d, pkTap.d), wd = rec.widths && rec.widths[fiw], wsg = wd ? widthSegments(wd, f) : [], wst = wsg.length ? widthStats(wsg) : null;
+    wq = `<div class="wquick"><div><b>Ancho en este punto:</b> ${wHere ? fmtW(wHere) : 'sin dato'}${wst ? ` · ancho medio de la traza ${fmtW(wst.mean)}` : ''}</div>
+      <div class="field row"><input type="text" id="wqV" inputmode="decimal" placeholder="Ancho aquí (m)"><button class="mini pri" data-a="wq">Guardar en PK ${fmtPK(pkTap.d)}</button></div>
+      <div class="field row"><input type="text" id="goPk" inputmode="decimal" placeholder="Ir a PK (p. ej. 1+250)"><button class="mini" data-a="gopk">Ver PK</button></div><div id="goPkRes"></div></div>`;
+  }
   if (f.type === 'ln') coords = `<div class="coords"><b>PK del punto tocado</b> ${fmtPK(pkTap.d)} de ${fmtPK(f.length)}<br><b>Inicio</b> ${fmtLL(...f.start)}${distFromMe(...f.start)}<br>${fmtUTM(...f.start)}<br><b>Final</b>&nbsp; ${fmtLL(...f.end)}${distFromMe(...f.end)}<br>${fmtUTM(...f.end)}</div>`;
   else coords = coordsBlock(f.start[0], f.start[1]);
   const attrs = f.attrs.length ? `<table class="attrs">${f.attrs.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('')}</table>` : '';
 
   const b = openSheet(`<h2>${esc(f.name)}</h2><p class="sub">${esc(kind)} · ${esc(rec.name)}${f.folder ? ' › ' + esc(f.folder) : ''}</p>
-    ${coords}${f.desc ? `<div class="desc">${esc(f.desc)}</div>` : ''}${attrs}<div class="acts">${acts}</div>`);
+    ${f.type === 'ln' ? `<div class="acts"><button class="btn go full" data-a="newact">${ICON.road}Nueva actuación aquí (PK ${fmtPK(pkTap.d)})</button></div>` : ''}
+    ${coords}${wq}${f.desc ? `<div class="desc">${esc(f.desc)}</div>` : ''}${attrs}<div class="acts">${acts}</div>`);
   highlight.clearLayers();
   f.parts.forEach(p => {
     if (p.t === 'pt') L.circleMarker(p.c[0], { renderer: hlRenderer, radius: 12, color: '#fff', weight: 3, fill: false, interactive: false }).addTo(highlight);
@@ -804,6 +980,28 @@ function featureSheet(f, ll, rec) {
   const fb = b.querySelector('[data-a=ficha]');
   if (fb) fb.onclick = () => fichaForTrace(rec, f);
   b.querySelector('[data-a=props]').onclick = () => layerProps(rec.id);
+  b.querySelector('[data-a=hidef]').onclick = async () => { await setFeatHidden(rec, fiw, true); closeSheet(); toast(`«${f.name}» oculto. Para verlo otra vez: Capas → opciones de «${rec.name}» → Mostrar ocultos.`, 6000); };
+  b.querySelector('[data-a=hidel]').onclick = async () => { await setLayerVisible(rec.id, false); if (!$('#drawer').hidden) renderDrawer(); closeSheet(); toast(`Capa «${rec.name}» oculta. Vuelve a marcarla en Capas para verla.`, 5000); };
+  const wqb = b.querySelector('[data-a=wq]');
+  if (wqb) wqb.onclick = async () => {
+    const v = parseNum($('#wqV').value); if (!(v > 0 && v < 100)) { toast('Escribe el ancho en metros, por ejemplo 4,20.'); return; }
+    rec.widths = rec.widths || {};
+    const data = rec.widths[fiw] || { mode: 'changes', interval: 20, points: [] }, d = Math.round(pkTap.d * 100) / 100;
+    data.points = (data.points || []).filter(q => Math.abs(q.d - d) > 1).concat([{ d, w: v }]).sort((x, y) => x.d - y.d);
+    if (data.mode === 'changes' && data.points[0].d > 0.5 && data.points.length === 1) toast('Con un solo dato, ese ancho se aplica desde este PK hasta el final. Añade más anchos en otros puntos.', 6000);
+    data.updated = Date.now(); rec.widths[fiw] = data;
+    await updateLayer(rec.id, { widths: rec.widths }); drawWidths();
+    toast(`Ancho de ${fmtW(v)} guardado en el PK ${fmtPK(d)}`); featureSheet(f, ll, rec);
+  };
+  const gpi = b.querySelector('#goPk'); if (gpi) gpi.onkeydown = ev => { if (ev.key === 'Enter') b.querySelector('[data-a=gopk]').click(); };
+  const wqi = b.querySelector('#wqV'); if (wqi) wqi.onkeydown = ev => { if (ev.key === 'Enter') b.querySelector('[data-a=wq]').click(); };
+  const gpb = b.querySelector('[data-a=gopk]');
+  if (gpb) gpb.onclick = () => {
+    const d = parsePK($('#goPk').value); if (!isFinite(d) || d < 0 || d > f.length + 0.5) { toast(`Escribe un PK entre 0+000 y ${fmtPK(f.length)}.`); return; }
+    const q = pointAtPK(f, Math.min(d, f.length)); map.setView([q.lat, q.lng], Math.max(map.getZoom(), 17));
+    L.circleMarker([q.lat, q.lng], { renderer: hlRenderer, radius: 10, color: '#fff', weight: 3, fillColor: '#e8590c', fillOpacity: 1, interactive: false }).bindTooltip('PK ' + fmtPK(d), { permanent: true, direction: 'top', offset: [0, -10] }).addTo(highlight);
+    $('#goPkRes').innerHTML = `<div class="acts">${goBtn(q.lat, q.lng, 'Llévame al PK ' + fmtPK(d), 'full')}</div>`;
+  };
 }
 
 /* ---------------- Invertir el sentido de una traza ----------------
@@ -823,25 +1021,29 @@ async function reverseTrace(rec, f) {
   const relActs = [...acts.values()].filter(a => a.layerId === rec.id && a.featIdx === fi);
   const wd = rec.widths && rec.widths[fi];
   if (!confirm(`¿Invertir el sentido de «${f.name}»? El inicio pasa a ser el final y los PK se cuentan desde el otro extremo.${relActs.length ? ` Se recalcularán ${relActs.length} actuaciones (el margen izquierdo pasa a ser el derecho).` : ''}${wd ? ' También se recalcularán sus anchos.' : ''}`)) return;
-  try { rec.text = reverseKmlPlacemark(rec.text, f.pm); } catch (err) { toast('No se pudo invertir: ' + err.message, 6000); return; }
+  // Se prepara todo en copias y se guarda en una sola transacción; solo si se guarda bien se aplica en pantalla
+  let newText;
+  try { newText = reverseKmlPlacemark(rec.text, f.pm); } catch (err) { toast('No se pudo invertir: ' + err.message, 6000); return; }
+  const newWidths = rec.widths ? JSON.parse(JSON.stringify(rec.widths)) : rec.widths;
   if (wd) {
     const segs = widthSegments(wd, f);
     const pts = wd.mode === 'changes'
       ? segs.map(sg => ({ d: +(L0 - sg.b).toFixed(2), w: sg.wa })).sort((a, b) => a.d - b.d)
       : (wd.points || []).map(p => ({ d: +(L0 - p.d).toFixed(2), w: p.w })).sort((a, b) => a.d - b.d);
-    rec.widths[fi] = { ...wd, points: pts, updated: Date.now() };
+    newWidths[fi] = { ...wd, points: pts, updated: Date.now() };
   }
-  await DB.put('layers', rec);
+  const nf = parseKML(newText).feats[fi]; // mismos índices de elementos que la capa cargada
+  const newActs = relActs.map(a => { const d0 = Math.max(0, L0 - a.d1), d1 = Math.min(nf.length, L0 - a.d0);
+    return { ...a, d0, d1, side: a.side === 'izq' ? 'der' : a.side === 'der' ? 'izq' : a.side, coords: segmentCoords(nf, d0, d1), updated: Date.now() }; });
+  try { await DB.putMany([['layers', { ...rec, text: newText, widths: newWidths }], ...newActs.map(a => ['acts', a])]); }
+  catch (err) { toast('No se pudo guardar el cambio de sentido (' + (err && err.message || 'almacenamiento lleno') + '). No se ha cambiado nada.', 8000); return; }
+  rec.text = newText; rec.widths = newWidths; newActs.forEach(a => acts.set(a.id, a));
+  if (walkAct && walkAct.draft.layerId === rec.id && walkAct.draft.featIdx === fi) { const w = walkAct.draft; w.d0 = w.d1 = Math.max(0, L0 - w.d0); w.side = w.side === 'izq' ? 'der' : w.side === 'der' ? 'izq' : w.side; DB.put('kv', walkAct, 'walk').catch(() => {}); showWalkBar(); }
   rebuildLayer(rec.id);
-  const nf = layers.get(rec.id).feats[fi];
-  for (const a of relActs) {
-    const d0 = Math.max(0, L0 - a.d1), d1 = Math.min(nf.length, L0 - a.d0);
-    Object.assign(a, { d0, d1, side: a.side === 'izq' ? 'der' : a.side === 'der' ? 'izq' : a.side, coords: segmentCoords(nf, d0, d1), updated: Date.now() });
-    await DB.put('acts', a);
-  }
+  const nf2 = layers.get(rec.id).feats[fi];
   drawActs(); drawWidths(); drawPK(); closeSheet();
-  toast(`Sentido invertido: «${nf.name}» empieza ahora en el antiguo final.`, 5000);
-  featureSheet(nf, L.latLng(nf.start[0], nf.start[1]), rec);
+  toast(`Sentido invertido: «${nf2.name}» empieza ahora en el antiguo final.`, 5000);
+  featureSheet(nf2, L.latLng(nf2.start[0], nf2.start[1]), rec);
 }
 
 /* ---------------- Importación de ficheros ---------------- */
@@ -865,8 +1067,9 @@ async function importFiles(files) {
       const rec = { id: uid(), obraId: settings.activeObra, type: 'kml', name: file.name.replace(/\.km[lz]$/i, '') || docName || 'Capa', text, color: PALETTE[nk % PALETTE.length], visible: true, opacity: 1, order: nextOrder(), created: Date.now() };
       await DB.put('layers', rec);
       last = registerLayer(rec);
-      toast(`${rec.name}: ${feats.length} elementos cargados`);
-    } catch (e) { toast(e.message || 'No se pudo leer ' + file.name, 6000); }
+      toast(`${rec.name}: ${plural(feats.length, 'elemento cargado', 'elementos cargados')}`);
+      await relinkOrphanActs(last);
+    } catch (e) { const msg = String(e.message || 'no se pudo leer'); toast(msg.startsWith(file.name) ? msg : `${file.name}: ${/zip|central directory|end of data|corrupt/i.test(msg) ? 'el fichero está dañado o no es un KMZ/ZIP válido' : msg}`, 6000); }
   }
   if (last) map.fitBounds(last.group.getBounds().pad(0.1), { maxZoom: 18 });
   drawPK();
@@ -1118,12 +1321,12 @@ function importMenu() {
     <div class="acts">
       <button class="btn full" data-a="kml">${ICON.kml}KML o KMZ</button>
       <button class="btn full" data-a="photos">${ICON.gallery}Fotos (con GPS o con marca de agua)</button>
-      <button class="btn full" data-a="service">${ICON.wms}Capa de un servicio (WMS)</button>
+      <button class="btn full tech" data-a="service">${ICON.wms}Capa de un servicio (WMS)</button>
       <button class="btn full" data-a="obra">${ICON.folder}Obra completa (paquete .zip)</button>
-      <button class="btn go full" data-a="previo">${ICON.note}Previo de camino: BC3, KMZ y fotos (ficha de inspección)</button>
+      <button class="btn go full tech" data-a="previo">${ICON.note}Previo de camino: BC3, KMZ y fotos (ficha de inspección)</button>
       <button class="btn" data-a="drawtap">${ICON.pen}Dibujar traza</button>
       <button class="btn" data-a="drawgps">${ICON.locate}Grabar traza con GPS</button>
-      <button class="btn full" data-a="drawpts">${ICON.pin}Crear KML de puntos (tocando el mapa o con GPS)</button>
+      <button class="btn full tech" data-a="drawpts">${ICON.pin}Crear KML de puntos (tocando el mapa o con GPS)</button>
     </div>
     <p class="hint">Las fotos se sitúan solas si la cámara guardó la ubicación. ${NATIVE ? '' : 'En Android, si llegan sin posición, elígelas desde «Archivos» y no desde la galería.'}</p>`);
   b.querySelector('[data-a=kml]').onclick = () => { closeSheet(); $('#inKml').click(); };
@@ -1189,7 +1392,7 @@ async function addService(def, quiet = false) {
 async function addServices(defs, label) {
   let n = 0;
   for (const d of defs) if (await addService(d, true)) n++;
-  toast(n ? `${n} capas añadidas${label ? ' (' + label + ')' : ''}. Mantén pulsado un punto para consultar las afecciones.` : 'Esas capas ya estaban añadidas.', 6000);
+  toast(n ? `${plural(n, 'capa añadida', 'capas añadidas')}${label ? ' (' + label + ')' : ''}. Mantén pulsado un punto para consultar las afecciones.` : 'Esas capas ya estaban añadidas.', 6000);
   if (!$('#drawer').hidden) renderDrawer();
 }
 
@@ -1220,7 +1423,7 @@ function pointMenu(ll) {
   if (drawing && !drawing.gps) return addDrawPt(L.latLng(ll)); if (slopePick || actPick || widthPick || offPick || calcPick) return slopePickPoint(ll);
   if (measure) return addMeasurePt(ll);
   const queryable = orderedLayers().filter(e => e.rec.visible && e.tile && e.rec.kind === 'wms' && e.rec.info);
-  const b = openSheet(`<h2>Punto seleccionado</h2><p class="sub">Pulsación larga${distFromMe(ll.lat, ll.lng)}</p>
+  const b = openSheet(`<h2>Punto seleccionado</h2><p class="sub">${matchMedia('(pointer:fine)').matches ? 'Clic derecho' : 'Pulsación larga'}${distFromMe(ll.lat, ll.lng)}</p>
     ${coordsBlock(ll.lat, ll.lng)}
     <div class="acts">
       ${goBtn(ll.lat, ll.lng, 'Llévame aquí', 'full')}
@@ -1329,11 +1532,13 @@ function onPos(p) {
   } else { meMarker.setLatLng(ll); meCircle.setLatLng(ll).setRadius(lastPos.acc); }
   const f = $('#fabLocate'); f.classList.remove('wait'); f.classList.add('on');
   if (wantCenter) { wantCenter = false; map.setView(ll, Math.max(map.getZoom(), 17)); }
+  else if (walkHere() && $("#sheet").hidden && !map.getBounds().pad(-0.25).contains(ll)) map.panTo(ll, { animate: true }); // con un tramo en marcha, el mapa acompaña
+  updateLivePK();
 }
 function startWatch() {
   if (!navigator.geolocation) { toast('Este dispositivo no ofrece posición GPS.'); return false; }
   if (watchId === null) {
-    watchId = navigator.geolocation.watchPosition(onPos, e => { $('#fabLocate').classList.remove('wait'); toast(geoErr(e), 6000); },
+    watchId = navigator.geolocation.watchPosition(onPos, e => { $('#fabLocate').classList.remove('wait'); if (!(lastPos && Date.now() - lastPos.t < 30000)) toast(geoErr(e), 6000); }, // fallos pasajeros del GPS: no se avisa si hay posición reciente
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 });
   }
   return true;
@@ -1410,7 +1615,7 @@ let draft = null, draftMarker = null, recorder = null, recTimer = null;
 function openEditor(at) {
   const existing = at.note;
   draft = existing ? { ...existing, media: [...(existing.media || [])] }
-    : { id: uid(), obraId: settings.activeObra, lat: at.lat, lng: at.lng, acc: at.acc || null, src: at.src || 'gps', title: at.title || '', text: '', media: [], created: Date.now() };
+    : { id: uid(), obraId: settings.activeObra, lat: at.lat, lng: at.lng, acc: at.acc || null, src: at.src || 'gps', title: at.title || '', _autoTitle: at.title || '', text: '', media: [], created: Date.now() };
   renderEditor();
 }
 function syncDraft() {
@@ -1432,6 +1637,7 @@ function renderEditor() {
   const d = draft; if (!d) return;
   const isNew = !notes.has(d.id);
   const keepDraft = draft;
+  editorRerender = true;
   const b = openSheet(`<h2>${isNew ? 'Nueva anotación' : 'Editar anotación'}</h2>
     <div class="loc"><span>${fmtLL(d.lat, d.lng)}${d.acc ? ' · ±' + Math.round(d.acc) + ' m' : ''} · ${srcLabel(d.src)}</span>
       <button class="mini" data-a="gps">Usar mi posición</button></div>
@@ -1444,10 +1650,17 @@ function renderEditor() {
       <button class="btn" data-a="video">${ICON.video}Vídeo</button>
       <button class="btn ${recorder ? 'rec' : ''}" data-a="audio">${ICON.audio}<span id="recLbl">${recorder ? 'Detener' : 'Nota de voz'}</span></button>
       <button class="btn" data-a="gallery">${ICON.gallery}De la galería</button>
-      <button class="btn pri full" data-a="save">Guardar</button>
       ${isNew ? '' : '<button class="btn del full" data-a="delete">Eliminar anotación</button>'}
-    </div>`);
-  draft = keepDraft;
+    </div>
+    <div class="savebar"><button class="btn pri full" data-a="save">Guardar anotación</button></div>`);
+  draft = keepDraft; editorRerender = false;
+  addDictation($('#nText'));
+  const noteSnap = notes.has(d.id) ? JSON.stringify([notes.get(d.id).title, notes.get(d.id).text, (notes.get(d.id).media || []).length]) : null;
+  onSheetClose(() => { if (editorRerender || !draft) return; syncDraft();
+    const ch = noteSnap === null ? !!((draft.title || '').trim() && draft.title !== d._autoTitle || (draft.text || '').trim() || (draft.media || []).length) : noteSnap !== JSON.stringify([draft.title, draft.text, (draft.media || []).length]);
+    if (ch) storeDraft('note', { ...draft, media: [...draft.media] }); else clearDraft(d.id); });
+  storeDraft('note', { ...draft, media: [...draft.media] }, true);
+  let liveT; b.addEventListener('input', () => { clearTimeout(liveT); liveT = setTimeout(() => { if (!draft || !$('#nTitle')) return; syncDraft(); storeDraft('note', { ...draft, media: [...draft.media] }, true); }, 250); }); // copia continua por si la app se cierra de golpe
 
   if (!draftMarker) {
     draftMarker = L.marker([d.lat, d.lng], { icon: pinIcon('draft'), draggable: true, zIndexOffset: 2000 }).addTo(map);
@@ -1524,6 +1737,7 @@ async function saveDraft() {
   if (recorder) { toast('Detén la grabación antes de guardar.'); return; }
   syncDraft();
   const n = draft;
+  if (!n.title.trim() && !(n.text || '').trim() && !(n.media || []).length && !notes.has(n.id)) { toast('La anotación está vacía: escribe algo o añade una foto.', 4000); return; }
   if (!n.title.trim()) {
     const label = { photo: 'Foto', video: 'Vídeo', audio: 'Nota de voz', note: 'Anotación' }[noteType(n)];
     n.title = `${label} ${fmtDate(n.created)}`;
@@ -1532,13 +1746,15 @@ async function saveDraft() {
   try { await DB.put('notes', n); }
   catch (e) { toast('No se pudo guardar: ' + (e.message || 'almacenamiento lleno'), 7000); return; }
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
-  notes.set(n.id, n); drawNote(n);
-  closeSheet(); toast('Anotación guardada');
+  notes.set(n.id, n); drawNote(n); draft = null; clearDraft(n.id);
+  const wasHidden = !n.layerId && settings.notesVisible === false;
+  if (wasHidden) await setLayerVisible('notes', true);
+  closeSheet(); toast(wasHidden ? 'Anotación guardada. «Mis anotaciones» estaba oculta y se ha vuelto a mostrar.' : 'Anotación guardada', wasHidden ? 6000 : 3500);
   if (!$('#drawer').hidden) renderDrawer();
 }
 async function deleteNote(id) {
   if (!confirm('¿Eliminar esta anotación y sus archivos? No se puede deshacer.')) return;
-  await DB.del('notes', id);
+  await DB.del('notes', id); draft = null; clearDraft(id);
   notes.delete(id); removeNoteMarker(id);
   closeSheet(); toast('Anotación eliminada');
   if (!$('#drawer').hidden) renderDrawer();
@@ -1614,11 +1830,21 @@ function pointAtPK(f, d) {
   }
   return { ...v[v.length - 1] };
 }
+// Lee un PK escrito de cualquier forma habitual: «1+250», «1+250,5», «1250», «1.250» (miles), «1250 m», «PK 1+250».
 function parsePK(txt) {
-  const t = String(txt || '').trim().replace(/\s/g, '').replace(',', '.');
+  let t = String(txt || '').trim().toLowerCase().replace(/^p\.?\s*k\.?\s*/, '').replace(/\s*(m|metros?)$/, '').replace(/\s/g, '');
   if (!t) return NaN;
-  const m = /^(\d+)\+(\d+(?:\.\d+)?)$/.exec(t);
-  return m ? +m[1] * 1000 + +m[2] : +t;
+  let m = /^(\d+)\+(\d+(?:[.,]\d+)?)$/.exec(t);
+  if (m) return +m[1] * 1000 + parseFloat(m[2].replace(',', '.'));
+  if (/^\d{1,3}([.,]\d{3})+$/.test(t) && !/^0[.,]/.test(t)) return +t.replace(/[.,]/g, ''); // 1.250 / 1,250 → 1250 m
+  if (/^\d+(?:[.,]\d+)?$/.test(t)) return parseFloat(t.replace(',', '.'));
+  return NaN;
+}
+// Texto de ayuda para comprobar cómo se ha entendido un PK
+function pkReadBack(txt) {
+  const v = parsePK(txt); if (!String(txt || '').trim()) return '';
+  if (!isFinite(v)) return '⚠ No se entiende. Escribe por ejemplo 1+250 o 1250.';
+  return `= PK ${fmtPK(v)}${v > 0 && v < 10 && /[.,]/.test(txt) ? ' (¿querías decir ' + fmtPK(v * 1000) + '? escribe ' + Math.floor(v) + '+' + String(Math.round(v % 1 * 1000)).padStart(3, '0') + ')' : ''}`;
 }
 // Cotas del MDT05 del IGN (OGC API Coverages, CoverageJSON). Agrupa los puntos en ventanas de ~500 m.
 function covGrid(j) {
@@ -1744,13 +1970,16 @@ const fmtZ = z => z.toFixed(2).replace('.', ',') + ' m';
 async function computeSlope(f, rec, d0, d1, source) {
   const box = $('#slopeRes'); if (!box) return;
   const L0 = d1 - d0, step = Math.min(25, Math.max(5, L0 / 200));
-  const ds = []; for (let d = d0; d < d1; d += step) ds.push(d); ds.push(d1);
+  let ds = []; for (let d = d0; d < d1; d += step) ds.push(d); ds.push(d1);
+  // con cotas del KML se añaden los vértices: los cambios de pendiente caen exactamente donde están
+  if (source === 'kml') { const vs = vertexTable(f).map(v => v.d).filter(d => d > d0 && d < d1); if (vs.length < 20000) ds = [...new Set([...ds, ...vs].map(d => Math.round(d * 1000) / 1000))].sort((a, b) => a - b); }
   const pts = ds.map(d => pointAtPK(f, d));
   box.innerHTML = `<p class="hint">Obteniendo ${pts.length} cotas…</p>`;
   let res;
   try { res = await profileElevations(f, pts, source); }
   catch (e) { box.innerHTML = '<p class="hint">No se pudieron obtener las cotas del terreno. Comprueba la conexión y vuelve a intentarlo.</p>'; return; }
   const prof = ds.map((d, i) => ({ d, z: res.z[i] })).filter(p => p.z != null && isFinite(p.z));
+  prof.src = source === 'kml' ? 'kml' : 'dem';
   if (prof.length < 2) { box.innerHTML = '<p class="hint">No hay cotas suficientes para este tramo.</p>'; return; }
   const zi = prof[0].z, zf = prof[prof.length - 1].z, dz = zf - zi, len = prof[prof.length - 1].d - prof[0].d;
   const media = dz / len * 100;
@@ -1804,7 +2033,12 @@ let slopeScrollToClass = false;
 const SLOPE_COLORS = ['#2f9e44', '#f2c94c', '#f08c00', '#e03131', '#862e9c', '#343a40'];
 function slopeCells(prof) {
   const zAt = d => { for (let i = 1; i < prof.length; i++) if (prof[i].d >= d) { const a = prof[i - 1], b = prof[i]; return a.z + (b.z - a.z) * (d - a.d) / ((b.d - a.d) || 1); } return prof[prof.length - 1].z; };
-  const d0 = prof[0].d, d1 = prof[prof.length - 1].d, W = 20, st = Math.max(1, Math.min(5, (d1 - d0) / 500)), cells = [];
+  const d0 = prof[0].d, d1 = prof[prof.length - 1].d;
+  if (prof.src === 'kml') { // cotas del KML: el perfil es exacto, cada tramo entre puntos tiene su pendiente (sin suavizar)
+    const cells = []; for (let i = 1; i < prof.length; i++) { const a = prof[i - 1], b = prof[i]; if (b.d > a.d) cells.push({ a: a.d, b: b.d, s: (b.z - a.z) / (b.d - a.d) * 100 }); }
+    return { cells, zAt, d0, d1 };
+  }
+  const W = 20, st = Math.max(1, Math.min(5, (d1 - d0) / 500)), cells = []; // modelo del terreno: se suaviza en ventanas de 20 m
   for (let d = d0; d < d1 - 1e-6; d += st) {
     const e = Math.min(d1, d + st), m = (d + e) / 2, a = Math.max(d0, m - W / 2), b = Math.min(d1, m + W / 2);
     cells.push({ a: d, b: e, s: b > a ? (zAt(b) - zAt(a)) / (b - a) * 100 : 0 });
@@ -1856,14 +2090,14 @@ function slopeClasses(f, prof, fromUser) {
     </table>
     <details class="tramos"><summary>Ver los ${runs.length} tramos con sus PK</summary><table class="attrs"><tr><th>PK</th><th>Long.</th><th>Pend.</th><th>Rango</th></tr>
       ${runs.map(r => `<tr><td>${fmtPK(r.a)} – ${fmtPK(r.b)}</td><td>${fmtLen(r.len)}</td><td>${fmtPct(r.s)}</td><td><span class="dot" style="background:${SLOPE_COLORS[r.k]}"></span>${labels[r.k]}</td></tr>`).join('')}</table></details>
-    <p class="hint">Rangos en valor absoluto (subidas y bajadas por igual), con la pendiente medida en ventanas de 20 m. Los tramos de menos de ${n(minL)} m se unen al vecino. Colores en el mapa: ${tot.map(t => `<span class="dot" style="background:${SLOPE_COLORS[t.k]}"></span>${t.lb.toLowerCase()}`).join(' · ')}.</p>
+    <p class="hint">Rangos en valor absoluto (subidas y bajadas por igual), con la pendiente ${prof.src === 'kml' ? 'exacta de cada tramo entre vértices (cotas del KML)' : 'del terreno medida en ventanas de 20 m'}. Los tramos de menos de ${n(minL)} m se unen al vecino. Colores en el mapa: ${tot.map(t => `<span class="dot" style="background:${SLOPE_COLORS[t.k]}"></span>${t.lb.toLowerCase()}`).join(' · ')}.</p>
     <div class="acts"><button class="btn" data-a="clcopy">${ICON.copy}Copiar</button><button class="btn" data-a="clcsv">CSV para Excel</button><button class="btn" data-a="clkmz">KMZ coloreado</button></div>`;
   const summary = `${f.name} · PK ${fmtPK(d0)} a ${fmtPK(d1)} · ${fmtLen(L0)}\n` + tot.map(t => `${t.lb}: ${fmtLen(t.len)} (${pc(t.len)}) · ${t.n} tramos`).join('\n')
     + `\nPendiente media: ${fmtPct(mean)}\nPendiente media absoluta: ${meanAbs.toFixed(2).replace('.', ',')} %\nDesnivel medio: ${perKm.toFixed(1).replace('.', ',')} m/km (+${up.toFixed(1).replace('.', ',')} / −${down.toFixed(1).replace('.', ',')} m)`;
   box.querySelector('[data-a=clcopy]').onclick = () => copyText(summary);
   const base = `pendientes_${safeName(f.name)}`;
   box.querySelector('[data-a=clcsv]').onclick = () => {
-    const q = v => `"${String(v).replace(/"/g, '""')}"`, d = v => (Math.round(v * 100) / 100).toString().replace('.', ',');
+    const q = csvQ, d = v => (Math.round(v * 100) / 100).toString().replace('.', ',');
     const rows = [['resumen'], ['rango', 'longitud_m', 'porcentaje', 'n_tramos']].concat(tot.map(t => [t.lb, d(t.len), d(t.len / L0 * 100), t.n]))
       .concat([[], ['pendiente_media_%', d(mean)], ['pendiente_media_absoluta_%', d(meanAbs)], ['desnivel_medio_m_km', d(perKm)], ['subida_acumulada_m', d(up)], ['bajada_acumulada_m', d(down)], [],
         ['tramos'], ['pk_inicio', 'pk_fin', 'longitud_m', 'pendiente_%', 'pendiente_abs_media_%', 'rango']])
@@ -1928,19 +2162,153 @@ function profileSVG(prof) {
   </svg></div>`;
 }
 
-/* ---------------- Actuaciones lineales sobre trazas (escolleras, badenes, cunetas…) ---------------- */
-const ACT_TYPES = [
-  ['Escollera', '#8d6e63'], ['Badén', '#00acc1'], ['Cuneta revestida', '#1e88e5'], ['Cuneta en tierra', '#a1887f'],
-  ['Caño / obra de drenaje', '#3949ab'], ['Muro', '#757575'], ['Firme / pavimento', '#455a64'], ['Barrera / bionda', '#e53935'],
-  ['Arqueta / pozo', '#8e24aa'], ['Paso salvacunetas', '#00897b'], ['Reperfilado / desbroce', '#7cb342'], ['Otro', '#f4511e'],
+/* ---------------- Actuaciones sobre las trazas (caminos) ----------------
+   Catálogo por familias: cada tipo indica qué datos se piden (ancho, espesor, altura…) y con ellos se calculan
+   las mediciones (longitud, superficie, volumen, peso, unidades). Densidades orientativas para pasar m³ a t. */
+const ACT_FIELDS = {
+  w: { l: 'Ancho', u: 'm', ph: 'p. ej. 4,0' },
+  e: { l: 'Espesor de capa', u: 'cm', ph: 'p. ej. 20' },
+  h: { l: 'Altura media', u: 'm', ph: 'p. ej. 2,0' },
+  b: { l: 'Anchura media de la sección', u: 'm', ph: 'p. ej. 1,5' },
+  S: { l: 'Sobreancho máximo', u: 'm', ph: 'p. ej. 3,0' },
+  n: { l: 'Unidades', u: 'ud', ph: 'p. ej. 1' },
+  dia: { l: 'Diámetro', u: 'mm', ph: 'p. ej. 600' },
+  lt: { l: 'Longitud de cada tubo', u: 'm', ph: 'p. ej. 6' },
+  dot: { l: 'Dotación', u: 'kg/m²', ph: 'p. ej. 1,2' },
+  pct: { l: 'Dotación de conglomerante', u: '%', ph: 'p. ej. 3' },
+  area: { l: 'Superficie', u: 'm²', ph: 'medida a mano' },
+  vol: { l: 'Volumen', u: 'm³', ph: 'medido a mano' },
+};
+// Valores admitidos (para avisar de errores de tecleo: «-3», «99999999»…)
+const ACT_RANGE = { w: [0.1, 60], e: [0.5, 150], h: [0.1, 40], b: [0.05, 40], S: [0.1, 60], n: [1, 100000], dia: [50, 5000], lt: [0.5, 200], dot: [0.05, 20], pct: [0.5, 30], area: [0.1, 1e6], vol: [0.01, 1e6] };
+// [nombre, color, campos, opciones] · opciones: road (el ancho por defecto es el del camino), dens (t/m³), mat (lista de materiales/tipos), hint
+const ACT_CATS = [
+  { id: 'veg', name: 'Desbroce y limpieza', items: [
+    ['Desbroce de márgenes', '#7cb342', ['w'], { hint: 'Ancho de la franja desbrozada en cada margen', mat: ['Manual', 'Mecanizado'] }],
+    ['Desbroce de la traza', '#9ccc65', ['w'], { road: true, mat: ['Manual', 'Mecanizado'] }],
+    ['Tala y poda de arbolado', '#558b2f', ['n'], { hint: 'Número de árboles' }],
+    ['Limpieza de cunetas', '#8bc34a', [], { hint: 'Se mide en metros de cuneta. Ambos márgenes cuenta doble.' }],
+    ['Limpieza de obra de drenaje', '#43a047', ['n'], {}],
+  ] },
+  { id: 'dem', name: 'Demoliciones y firme existente', items: [
+    ['Demolición de firme existente', '#6d4c41', ['w', 'e'], { road: true, mat: ['Hormigón', 'Aglomerado asfáltico', 'Tratamiento superficial', 'Zahorra'] }],
+    ['Fresado de firme asfáltico', '#5d4037', ['w', 'e'], { road: true }],
+    ['Machacado y escarificado de firme', '#8d6e63', ['w', 'e'], { road: true, hint: 'Escarificado y machacado del firme existente para reutilizarlo' }],
+    ['Demolición de obra de fábrica', '#4e342e', ['n', 'vol'], { mat: ['Caño / tubo', 'Muro', 'Badén', 'Cuneta', 'Arqueta', 'Otra'] }],
+  ] },
+  { id: 'exp', name: 'Explanada y subbase', items: [
+    ['Refino y planeo sin aporte', '#a1887f', ['w'], { road: true, hint: 'Perfilado, refino y compactación de la explanada sin aportar material' }],
+    ['Escarificado y compactación', '#bcaaa4', ['w'], { road: true }],
+    ['Excavación / desmonte', '#795548', ['w', 'h'], { mat: ['Terreno compacto', 'Tránsito', 'Roca'] }],
+    ['Terraplén / relleno', '#a67c52', ['w', 'h'], { mat: ['Material de la excavación', 'Material de préstamo'] }],
+    ['Estabilización de suelos', '#c0a16b', ['w', 'e', 'pct'], { road: true, mat: ['Con cal', 'Con cemento', 'Mecánica'] }],
+    ['Subbase de zahorra natural', '#d4b483', ['w', 'e'], { road: true, dens: 2.1 }],
+    ['Otra actuación en la explanada', '#9e9d24', ['w'], { road: true }],
+  ] },
+  { id: 'firme', name: 'Firmes y pavimentos', items: [
+    ['Zahorra artificial', '#b08d3c', ['w', 'e'], { road: true, dens: 2.25, mat: ['ZA 0/32', 'ZA 0/20', 'Otra'] }],
+    ['Pavimento de hormigón', '#90a4ae', ['w', 'e'], { road: true, dens: 2.4, mat: ['HM-20', 'HM-25', 'HF (con fibras)', 'HA con mallazo'] }],
+    ['Aglomerado asfáltico en caliente', '#263238', ['w', 'e'], { road: true, dens: 2.4, mat: ['AC16 surf', 'AC22 bin', 'AC16 surf D/S', 'Otra mezcla'] }],
+    ['Aglomerado asfáltico en frío', '#455a64', ['w', 'e'], { road: true, dens: 2.3 }],
+    ['Tratamiento superficial', '#546e7a', ['w', 'dot'], { road: true, mat: ['Monocapa', 'Bicapa', 'Tricapa', 'Lechada bituminosa'], hint: 'Dotación de ligante (emulsión)' }],
+    ['Riego de imprimación / adherencia', '#78909c', ['w', 'dot'], { road: true, mat: ['Imprimación', 'Adherencia', 'Curado'] }],
+    ['Bacheo', '#37474f', ['area', 'e'], { mat: ['Con aglomerado', 'Con hormigón', 'Con zahorra'] }],
+  ] },
+  { id: 'dren', name: 'Drenaje', items: [
+    ['Cuneta en tierra', '#a1887f', [], { mat: ['Triangular', 'Trapecial'] }],
+    ['Cuneta revestida', '#1e88e5', ['b', 'e'], { dens: 2.4, mat: ['Hormigón triangular', 'Hormigón trapecial', 'Prefabricada'], hint: 'Anchura desarrollada y espesor del revestimiento' }],
+    ['Badén', '#00acc1', ['w', 'e'], { road: true, dens: 2.4, mat: ['Hormigón', 'Hormigón con escollera', 'Prefabricado'] }],
+    ['Caño / obra de drenaje', '#3949ab', ['n', 'dia', 'lt'], { mat: ['Tubo de hormigón', 'Tubo de PEAD / PVC', 'Marco', 'Bóveda'] }],
+    ['Paso salvacunetas', '#00897b', ['n', 'dia', 'lt'], {}],
+    ['Arqueta / pozo', '#8e24aa', ['n'], { mat: ['Arqueta de entrada', 'Arqueta de salida', 'Pozo'] }],
+    ['Boquilla / aletas', '#5e35b1', ['n'], {}],
+  ] },
+  { id: 'cont', name: 'Muros, escolleras y contención', items: [
+    ['Escollera', '#8d6e63', ['h', 'b'], { hint: 'Altura y anchura media: volumen = altura × anchura × longitud', mat: ['Piedra 300–500 kg', 'Piedra 500–1000 kg', 'Hormigonada'] }],
+    ['Muro', '#757575', ['h', 'b'], { mat: ['Hormigón armado', 'Mampostería', 'Gaviones', 'Bloque'] }],
+    ['Gaviones', '#9e9e9e', ['h', 'b'], {}],
+    ['Barrera / bionda', '#e53935', [], { mat: ['Bionda metálica', 'Barrera mixta madera-metal', 'Pretil'] }],
+  ] },
+  { id: 'punt', name: 'Sobreanchos y puntuales', items: [
+    ['Sobreancho / abanico', '#f9a825', ['S', 'e'], { forma: true, hint: 'Longitud = tramo de PK. Superficie según la forma: triangular ½·L·S, trapecial ¾·L·S, rectangular L·S' }],
+    ['Apartadero / zona de cruce', '#fbc02d', ['S', 'e'], { hint: 'Superficie = longitud × sobreancho' }],
+    ['Entronque / intersección', '#ff8f00', ['n', 'area'], {}],
+    ['Acceso a finca', '#ffb300', ['n'], {}],
+  ] },
+  { id: 'otros', name: 'Señalización y otros', items: [
+    ['Señalización vertical', '#d81b60', ['n'], { mat: ['Señal de peligro', 'Señal de prescripción', 'Cartel de obra', 'Hito'] }],
+    ['Otro', '#f4511e', ['w', 'e', 'n'], {}],
+  ] },
 ];
+const ACT_FORMS = { tri: ['Triangular', 0.5], trap: ['Trapecial', 0.75], rect: ['Rectangular', 1] };
+const ACT_PRIO = { alta: ['Alta', '#e03131'], media: ['Media', '#f08c00'], baja: ['Baja', '#2f9e44'] };
+const ACT_ITEMS = ACT_CATS.flatMap(c => c.items.map(([name, color, fields, o]) => ({ name, color, fields, ...o, cat: c.id, catName: c.name })));
+const ACT_LEGACY = { 'Firme / pavimento': '#455a64', 'Reperfilado / desbroce': '#7cb342' };  // tipos de versiones anteriores
+const ACT_TYPES = ACT_ITEMS.map(i => [i.name, i.color]).concat(Object.entries(ACT_LEGACY)); // (lo usan la exportación KMZ y otros módulos)
+const actItem = t => ACT_ITEMS.find(i => i.name === t) || { name: t, color: ACT_LEGACY[t] || '#f4511e', fields: [], cat: 'otros', catName: 'Señalización y otros', legacy: true };
 const SIDES = { izq: 'Margen izquierdo', der: 'Margen derecho', ambos: 'Ambos márgenes', eje: 'Eje / calzada' };
 const SIDE_ABBR = { izq: 'MI', der: 'MD', ambos: 'AM', eje: 'Eje' };
 const acts = new Map();
-const actColor = t => (ACT_TYPES.find(([n]) => n === t) || ACT_TYPES[ACT_TYPES.length - 1])[1];
+const actColor = t => actItem(t).color;
 const actTitle = a => `${a.type} ${SIDE_ABBR[a.side] || ''} · PK ${fmtPK(a.d0)}${a.d1 > a.d0 ? '–' + fmtPK(a.d1) : ''}`;
 const actsSorted = () => [...acts.values()].sort((a, b) => (a.traceName || '').localeCompare(b.traceName || '') || a.d0 - b.d0);
+const MEAS_DEC = { L: 1, area: 1, vol: 2, t: 1 }; // mismos decimales en pantalla, CSV, KMZ e informes
+const nf = (v, d = 2) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString('es-ES', { maximumFractionDigits: d });
+// Mediciones de una actuación a partir de su tramo y sus datos
+function actMeasure(a) {
+  const it = actItem(a.type), p = a.params || {}, L = Math.max(0, a.d1 - a.d0), sidesK = a.side === 'ambos' ? 2 : 1;
+  const v = k => (isFinite(p[k]) && p[k] > 0 ? +p[k] : null);
+  const m = { L, sides: sidesK };
+  if (it.fields.includes('S') && v('S')) m.area = L * v('S') * (it.forma ? (ACT_FORMS[p.forma || 'tri'] || ACT_FORMS.tri)[1] : 1) * sidesK; // un sobreancho en cada margen
+  else if (v('area')) m.area = v('area');
+  else if (it.fields.includes('w') && !it.fields.includes('h') && v('w')) m.area = L * v('w') * (it.road ? 1 : sidesK);
+  else if (it.fields.includes('b') && it.fields.includes('e') && v('b')) m.area = L * v('b') * sidesK;
+  if (v('vol')) m.vol = v('vol');
+  else if (it.fields.includes('h') && it.fields.includes('b') && v('h') && v('b')) m.vol = L * v('h') * v('b') * sidesK;
+  else if (it.fields.includes('h') && v('w') && v('h')) m.vol = L * v('w') * v('h');
+  else if (m.area && v('e')) m.vol = m.area * v('e') / 100;
+  if (m.vol && it.dens) m.t = m.vol * it.dens;
+  if (m.area && v('dot')) m.kg = m.area * v('dot');
+  if (v('n')) m.n = v('n'); else if (ACT_POINT.has(a.type) && (it.fields.includes('n') || !it.fields.some(k => ['area', 'vol'].includes(k)))) m.n = 1; // el bacheo (por superficie) no cuenta unidades // badén, entronque…: cada uno cuenta como 1 ud (pantalla, CSV, informe y BC3)
+  if (v('n') && v('lt')) m.tubo = v('n') * v('lt');
+  if (!it.fields.length || ['Limpieza de cunetas', 'Cuneta en tierra', 'Barrera / bionda'].includes(a.type)) m.Lm = L * sidesK;
+  return m;
+}
+function actFieldError(k, raw) {
+  if (raw === undefined || String(raw).trim() === '') return '';
+  const v = parseNum(raw), f = ACT_FIELDS[k], r = ACT_RANGE[k];
+  if (!isFinite(v)) return `${f.l}: «${raw}» no es un número.`;
+  if (r && (v < r[0] || v > r[1])) return `${f.l}: ${String(v).replace('.', ',')} ${f.u} no parece correcto (entre ${String(r[0]).replace('.', ',')} y ${r[1].toLocaleString('es-ES')} ${f.u}).`;
+  return '';
+}
+function actMeasRows(a) {
+  const m = actMeasure(a), r = [];
+  if (m.L > 0) r.push(['Longitud', fmtLen(m.L) + (m.Lm && m.sides > 1 ? ` (×2 márgenes = ${fmtLen(m.Lm)})` : '')]);
+  if (m.area) r.push(['Superficie', nf(m.area, MEAS_DEC.area) + ' m²']);
+  if (m.vol) r.push(['Volumen', nf(m.vol, MEAS_DEC.vol) + ' m³']);
+  if (m.t) r.push(['Peso estimado', nf(m.t, MEAS_DEC.t) + ` t (densidad ${nf(actItem(a.type).dens, 2)} t/m³)`]);
+  if (m.kg) r.push(['Ligante', nf(m.kg, 0) + ' kg']);
+  if (m.n) r.push(['Unidades', nf(m.n, 0) + ' ud']);
+  if (m.tubo) r.push(['Tubo', nf(m.tubo, 1) + ' m' + (a.params && a.params.dia ? ` Ø ${a.params.dia} mm` : '')]);
+  return r;
+}
+function actParamRows(a) {
+  const it = actItem(a.type), p = a.params || {}, r = [];
+  if (p.mat) r.push([it.name.includes('Demolición de obra') ? 'Elemento' : 'Tipo / material', p.mat]);
+  if (it.forma && ACT_FORMS[p.forma]) r.push(['Forma', ACT_FORMS[p.forma][0]]);
+  it.fields.forEach(k => { if (isFinite(p[k]) && p[k] > 0) r.push([ACT_FIELDS[k].l, nf(p[k], 2) + ' ' + ACT_FIELDS[k].u]); });
+  if (a.prio) r.push(['Prioridad', (ACT_PRIO[a.prio] || [a.prio])[0]]);
+  return r;
+}
 function featOf(a) { const e = layers.get(a.layerId); return e && e.feats ? { rec: e.rec, f: e.feats[a.featIdx] } : null; }
+// Ancho medio del camino en un tramo (o en un punto) según los anchos tomados
+function roadWidthAt(rec, fi, d0, d1) {
+  const data = rec && rec.widths && rec.widths[fi]; if (!data) return null;
+  const e = layers.get(rec.id), f = e && e.feats[fi]; if (!f) return null;
+  const segs = widthSegments(data, f); if (!segs.length) return null;
+  if (d1 > d0 + 0.5) { const st = widthStats(segs, d0, d1); return st ? st.mean : null; }
+  return widthAt(segs, d0);
+}
 function segmentCoords(f, d0, d1) {
   const a = pointAtPK(f, d0); if (d1 <= d0) return [[a.lat, a.lng]];
   const b = pointAtPK(f, d1);
@@ -1950,7 +2318,7 @@ function nearestTrace(ll) {
   let best = null;
   for (const e of layers.values()) {
     if (typeOf(e.rec) !== 'kml' || !e.rec.visible) continue;
-    e.feats.forEach(f => { if (f.type !== 'ln') return; const r = pkAt(f, ll); if (!best || r.off < best.off) best = { rec: e.rec, f, d: r.d, off: r.off }; });
+    e.feats.forEach((f, i) => { if (f.type !== 'ln' || isFeatHidden(e.rec, i)) return; const r = pkAt(f, ll); if (!best || r.off < best.off) best = { rec: e.rec, f, d: r.d, off: r.off }; });
   }
   return best;
 }
@@ -1965,12 +2333,18 @@ function offsetLatLngs(coords, px) {
   });
 }
 const actsLayer = L.layerGroup().addTo(map);
+function actClick(a) {
+  return e => { L.DomEvent.stop(e); if (drawing && !drawing.gps) return addDrawPt(L.latLng(e && e.latlng ? e.latlng : e)); if (slopePick || actPick || widthPick || offPick || calcPick) return slopePickPoint(e.latlng); if (measure) return addMeasurePt(e.latlng); viewAct(a.id, e && e.latlng); };
+}
 function drawActs() {
+  setTimeout(() => { try { updateSeguir(); } catch (e) { /* nada */ } }, 0);
   actsLayer.clearLayers();
   if (settings.actsVisible === false) return;
-  const z = map.getZoom(), off = z >= 15 ? 9 : 0, bounds = map.getBounds().pad(0.3);
+  const z = map.getZoom(), off = z >= 15 ? 9 : 0, bounds = map.getBounds().pad(0.3), hiddenCats = new Set(settings.actHideCats || []);
+  const placed = []; // etiquetas ya puestas (en píxeles): las que se montarían encima se omiten hasta acercar más
   for (const a of acts.values()) {
     if (!a.coords || !a.coords.length || !bounds.intersects(L.latLngBounds(a.coords))) continue;
+    if (hiddenCats.has(actItem(a.type).cat)) continue;
     const col = actColor(a.type), sides = a.side === 'ambos' ? [off, -off] : a.side === 'izq' ? [off] : a.side === 'der' ? [-off] : [0];
     sides.forEach(px => {
       let lyr;
@@ -1983,72 +2357,149 @@ function drawActs() {
         const ll = offsetLatLngs(c.length > 1 ? c : a.coords, px);
         lyr = L.circleMarker(ll[Math.floor(ll.length / 2)] || L.latLng(a.coords[0]), { radius: 7, color: '#fff', weight: 2, fillColor: col, fillOpacity: 1 });
       }
-      lyr.on('click', e => { L.DomEvent.stop(e); if (drawing && !drawing.gps) return addDrawPt(L.latLng(e && e.latlng ? e.latlng : e)); if (slopePick || actPick || widthPick || offPick || calcPick) return slopePickPoint(e.latlng); if (measure) return addMeasurePt(e.latlng); viewAct(a.id); });
+      lyr.on('click', actClick(a));
       lyr.addTo(actsLayer);
     });
-    if (z >= 17) {
+    if (z >= 16) { // etiqueta: también se puede tocar para abrir la actuación
       const mid = a.coords[Math.floor(a.coords.length / 2)];
       const lab = offsetLatLngs(a.coords.length > 1 ? a.coords : [mid, mid], (sides[0] || 0) + (sides[0] < 0 ? -22 : 22));
-      L.marker(lab[Math.floor(lab.length / 2)], { interactive: false, keyboard: false, pane: 'pk',
-        icon: L.divIcon({ className: 'act-label', html: `<span style="border-color:${col}">${esc(a.type)} ${SIDE_ABBR[a.side] || ''}</span>`, iconSize: [0, 0] }) }).addTo(actsLayer);
+      const at = lab[Math.floor(lab.length / 2)], pt = map.latLngToLayerPoint(at), wpx = Math.min(220, 7 * (a.type.length + 4));
+      if (placed.some(q => Math.abs(q.x - pt.x) < (q.w + wpx) / 2 && Math.abs(q.y - pt.y) < 22)) continue;
+      placed.push({ x: pt.x, y: pt.y, w: wpx });
+      const mk = L.marker(at, { keyboard: false, zIndexOffset: -500, riseOnHover: true,
+        icon: L.divIcon({ className: 'act-label clk', html: `<span style="border-color:${col}">${esc(a.type)} ${SIDE_ABBR[a.side] || ''}${a.prio === 'alta' ? ' ⚠' : ''}</span>`, iconSize: [0, 0] }) });
+      mk.on('click', actClick(a)); mk.addTo(actsLayer);
     }
   }
 }
 
 let actDraft = null;
+// margen más probable según el tipo: firmes y badenes ocupan la calzada; limpiezas de cunetas, los dos márgenes
+const defaultSideFor = (t, cur) => { const it = actItem(t); return it.road || ['Bacheo', 'Badén'].includes(t) ? 'eje' : ['Limpieza de cunetas', 'Desbroce de márgenes'].includes(t) ? 'ambos' : cur; };
 function openActEditor(o) {
-  if (o.act) actDraft = { ...o.act, media: [...(o.act.media || [])] };
+  if (o.act) actDraft = { ...o.act, params: { ...(o.act.params || {}) }, media: [...(o.act.media || [])] };
   else actDraft = { id: uid(), obraId: settings.activeObra, layerId: o.rec.id, featIdx: layers.get(o.rec.id).feats.indexOf(o.f), traceName: o.f.name, layerName: o.rec.name,
-    d0: o.d0, d1: o.d1, type: '', side: 'izq', text: '', media: [], created: Date.now(), coords: [] };
+    d0: o.d0, d1: o.d1, type: o.type || '', side: o.type ? defaultSideFor(o.type, 'izq') : 'izq', text: '', media: [], created: Date.now(), coords: [], params: {}, prio: '' };
   renderActEditor();
 }
 function syncAct() {
   if (!actDraft) return;
   const g = id => $('#' + id);
   if (g('aText')) actDraft.text = g('aText').value;
-  if (g('aOther') && actDraft.type === '__otro') actDraft.custom = g('aOther').value;
-  if (g('aPk0')) { const v = parsePK(g('aPk0').value); if (isFinite(v)) actDraft.d0 = v; }
-  if (g('aPk1')) { const v = parsePK(g('aPk1').value); if (isFinite(v)) actDraft.d1 = v; }
+  if (g('aOther') && actDraft.type === 'Otro') actDraft.custom = g('aOther').value;
+  // los PK solo se releen si se han cambiado a mano (así no se pierden los decimales del GPS)
+  // (se compara con el PK actual del borrador, no con el valor con que se abrió: volver a escribir el original también cuenta)
+  if (g('aPk0') && g('aPk0').value.trim() !== fmtPK(actDraft.d0)) { const v = parsePK(g('aPk0').value); if (isFinite(v)) actDraft.d0 = v; }
+  if (g('aPk1') && g('aPk1').value.trim() !== fmtPK(actDraft.d1)) { const v = parsePK(g('aPk1').value); if (isFinite(v)) actDraft.d1 = v; }
+  actDraft.params = actDraft.params || {};
+  document.querySelectorAll('[data-pf]').forEach(inp => { const v = parseNum(inp.value); actDraft.params[inp.dataset.pf] = isFinite(v) ? v : null; });
+  const mt = g('aMat'); if (mt) actDraft.params.mat = mt.value;
+}
+function actTypeSelect(cur, onlyLinear) {
+  const okT = t => ACT_ITEMS.some(i => i.name === t) && !(onlyLinear && (ACT_POINT.has(t) || t === 'Otro'));
+  const fav = (settings.actFav || []).filter(okT), rec = (settings.actRecent || []).filter(t => !fav.includes(t) && okT(t)).slice(0, 5);
+  const opt = t => `<option value="${esc(t)}" ${t === cur ? 'selected' : ''}>${esc(t)}</option>`;
+  return `<select id="aType"><option value="" ${cur ? '' : 'selected'}>— Elige el tipo de actuación —</option>
+    ${cur && !ACT_ITEMS.some(i => i.name === cur) && cur !== 'Otro' ? `<optgroup label="Actual">${opt(cur)}</optgroup>` : ''}
+    ${fav.length ? `<optgroup label="★ Favoritas">${fav.map(opt).join('')}</optgroup>` : ''}
+    ${rec.length ? `<optgroup label="Recientes">${rec.map(opt).join('')}</optgroup>` : ''}
+    ${ACT_CATS.map(c => { const its = c.items.map(([t]) => t).filter(t => !onlyLinear || okT(t)); return its.length ? `<optgroup label="${esc(c.name)}">${its.map(opt).join('')}</optgroup>` : ''; }).join('')}</select>`;
 }
 function renderActEditor() {
   const a = actDraft; if (!a) return;
   const ctx = featOf(a); const f = ctx && ctx.f;
   const isNew = !acts.has(a.id), keep = actDraft;
-  const len = Math.max(0, a.d1 - a.d0);
+  const len = Math.max(0, Math.min(a.d1, f ? f.length : a.d1) - a.d0), it = a.type ? actItem(a.type) : null, p = a.params || (a.params = {}); // longitud recortada al final de la traza
+  // ancho del camino por defecto (de los anchos tomados en la traza)
+  const rw = ctx ? roadWidthAt(ctx.rec, a.featIdx, Math.min(a.d0, a.d1), Math.max(a.d0, a.d1)) : null;
+  if (it && it.road && it.fields.includes('w') && !(p.w > 0) && rw) { p.w = Math.round(rw * 100) / 100; p._wAuto = true; }
+  const isFav = it && (settings.actFav || []).includes(it.name);
+  const fieldHtml = it ? it.fields.map(k => { const fd = ACT_FIELDS[k];
+    return `<div class="field"><label for="pf_${k}">${fd.l} (${fd.u})${k === 'w' && it.road && rw ? ` <button type="button" class="linkb" data-a="wroad">usar ancho del camino: ${nf(rw, 2)} m</button>` : ''}</label>
+      <input type="text" id="pf_${k}" data-pf="${k}" inputmode="decimal" placeholder="${fd.ph}" value="${isFinite(p[k]) && p[k] !== null ? String(p[k]).replace('.', ',') : ''}"></div>`; }).join('') : '';
+  editorRerender = true;
   const b = openSheet(`<h2>${isNew ? 'Nueva actuación' : 'Editar actuación'}</h2>
     <p class="sub">${esc(a.traceName)} · ${esc(a.layerName || '')}${f ? ' · longitud ' + fmtLen(f.length) : ''}</p>
-    <div class="field"><label>Tipo de actuación</label><div class="chips">${ACT_TYPES.map(([t, c]) => `<button type="button" class="chip ${a.type === t ? 'on' : ''}" data-type="${esc(t)}" style="--c:${c}">${esc(t)}</button>`).join('')}</div></div>
+    <h3 class="sh">1 · Qué</h3>
+    <div class="field"><label for="aType">Tipo de actuación</label><div class="row">${actTypeSelect(a.type)}${it && !it.legacy ? `<button type="button" class="mini ic fav ${isFav ? 'on' : ''}" data-a="fav" title="Favorita" aria-label="Marcar como favorita">${isFav ? '★' : '☆'}</button>` : ''}</div>
+      ${it ? `<p class="hint"><span class="dot" style="background:${it.color}"></span>${esc(it.catName)}${it.hint ? ' · ' + esc(it.hint) : ''}</p>` : ''}</div>
     ${a.type === 'Otro' ? `<div class="field"><input type="text" id="aOther" placeholder="¿Qué actuación es?" value="${esc(a.custom || '')}"></div>` : ''}
-    <div class="field"><label>Margen (según el sentido del PK)</label><div class="seg">${Object.entries(SIDES).map(([k, v]) => `<button type="button" class="${a.side === k ? 'on' : ''}" data-side="${k}">${esc(v.replace('Margen ', '').replace(' / calzada', ''))}</button>`).join('')}</div></div>
+    ${it && it.mat ? `<div class="field"><label for="aMat">Tipo / material</label><select id="aMat"><option value="">—</option>${it.mat.map(m => `<option ${p.mat === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select></div>` : ''}
+    ${it && it.forma ? `<div class="field"><label>Forma del sobreancho</label><div class="seg three">${Object.entries(ACT_FORMS).map(([k, [t]]) => `<button type="button" class="${(p.forma || 'tri') === k ? 'on' : ''}" data-forma="${k}">${t}</button>`).join('')}</div></div>` : ''}
+    <h3 class="sh">2 · Dónde</h3>
+    <div class="field"><label>Margen<span class="tech"> (según el sentido del PK)</span></label><div class="seg">${Object.entries(SIDES).map(([k, v]) => `<button type="button" class="${a.side === k ? 'on' : ''}" data-side="${k}">${esc(v.replace('Margen ', '').replace(' / calzada', ''))}</button>`).join('')}</div></div>
     <div class="pkrow">
-      <div class="field"><label for="aPk0">Desde PK</label><input type="text" id="aPk0" inputmode="decimal" value="${fmtPK(a.d0)}"></div>
-      <div class="field"><label for="aPk1">Hasta PK</label><input type="text" id="aPk1" inputmode="decimal" value="${fmtPK(a.d1)}"></div>
+      <div class="field"><label for="aPk0">Desde PK</label><input type="text" id="aPk0" inputmode="decimal" value="${fmtPK(a.d0)}" data-v="${fmtPK(a.d0)}"><small class="rb" id="aPk0rb"></small>
+        <div class="pkbtns"><button class="mini" data-a="gps0" aria-label="Inicio en mi posición">${ICON.locate}Aquí</button><button class="mini" data-a="map0" aria-label="Inicio tocando el mapa">${ICON.pin}Mapa</button></div></div>
+      <div class="field"><label for="aPk1">Hasta PK</label><input type="text" id="aPk1" inputmode="decimal" value="${fmtPK(a.d1)}" data-v="${fmtPK(a.d1)}"><small class="rb" id="aPk1rb"></small>
+        <div class="pkbtns"><button class="mini" data-a="gps1" aria-label="Fin en mi posición">${ICON.locate}Aquí</button><button class="mini" data-a="map1" aria-label="Fin tocando el mapa">${ICON.pin}Mapa</button></div></div>
     </div>
-    <div class="pkrow">
-      <div class="pkbtns"><button class="mini" data-a="gps0">Inicio: mi posición</button><button class="mini" data-a="map0">Inicio: tocar mapa</button></div>
-      <div class="pkbtns"><button class="mini" data-a="gps1">Fin: mi posición</button><button class="mini" data-a="map1">Fin: tocar mapa</button></div>
-    </div>
-    <div class="field row"><label for="aLen" class="grow">Longitud desde el inicio</label><input type="text" id="aLen" inputmode="decimal" placeholder="m" value="${len ? Math.round(len) : ''}" style="max-width:110px"><button class="mini" data-a="len">Aplicar</button></div>
-    <p class="hint">${len > 0 ? `Tramo de ${fmtLen(len)}.` : 'Ahora es una actuación puntual. Para un tramo, camina hasta el final y pulsa «Fin: mi posición», o escribe el PK final o la longitud.'}</p>
-    <div class="field"><textarea id="aText" rows="2" placeholder="Descripción, medidas u observaciones (p. ej. escollera de 2 m de altura, piedra de 300–500 kg)">${esc(a.text)}</textarea></div>
+    <p class="hint">${len > 0 ? `Tramo de ${fmtLen(len)}.` : 'Ahora es una actuación puntual. Para un tramo, camina hasta el final y pulsa «Aquí» junto a «Hasta PK», o escribe el PK final.'}</p>
+    ${fieldHtml ? `<h3 class="sh">3 · Medidas</h3><div class="pgrid">${fieldHtml}</div>` : ''}
+    ${it ? '<div class="meas" id="aMeas"></div>' : ''}
+    <h3 class="sh">${fieldHtml ? 4 : 3} · Observaciones y fotos</h3>
+    <div class="field"><label for="aText">Observaciones</label><textarea id="aText" rows="2" placeholder="p. ej. estado actual, causa, solución propuesta">${esc(a.text)}</textarea></div>
     <div class="media">${mediaHtml(a.media, true)}</div>
     <div class="acts">
       <button class="btn" data-a="photo">${ICON.photo}Foto</button>
       <button class="btn" data-a="video">${ICON.video}Vídeo</button>
-      <button class="btn pri full" data-a="save">Guardar actuación</button>
-      ${isNew ? '' : '<button class="btn del full" data-a="delete">Eliminar actuación</button>'}
-    </div>`);
+    </div>
+    <details class="more" id="aMore" ${a._moreOpen || a.prio ? 'open' : ''}><summary>Más opciones${a.prio ? ` · prioridad ${esc((ACT_PRIO[a.prio] || [a.prio])[0]).toLowerCase()}` : ''}</summary>
+      <div class="field"><span class="flabel">Prioridad</span><div class="seg">${[['', 'Sin indicar'], ...Object.entries(ACT_PRIO).map(([k, [t]]) => [k, t])].map(([k, t]) => `<button type="button" class="${(a.prio || '') === k ? 'on' : ''}" data-prio="${k}">${t}</button>`).join('')}</div></div>
+      <div class="field row"><label for="aLen" class="grow">Longitud desde el inicio (m)</label><input type="text" id="aLen" inputmode="decimal" placeholder="m" value="${len ? Math.round(len) : ''}"><button class="mini" data-a="len">Aplicar</button></div>
+      ${isNew ? '' : '<div class="acts"><button class="btn" data-a="dup">Duplicar en otro tramo</button><button class="btn del" data-a="delete">Eliminar actuación</button></div>'}
+    </details>
+    <div class="savebar">${a._walk && isNew ? '<div class="row2"><button class="btn pri" data-a="save">Guardar</button><button class="btn go" data-a="savecont">Guardar y seguir andando</button></div>' : '<button class="btn pri full" data-a="save">Guardar actuación</button>'}</div>`);
+  { const sc = $('#sheetBody [data-a=savecont]'); if (sc) sc.onclick = () => { if (!actDraft) return; actDraft._cont = actDraft._dir || 1; saveAct().then(ok => { if (!ok && actDraft && !$('#measWarn') && !$('#zeroWarn')) delete actDraft._cont; }); }; } // con un aviso pendiente se recuerda que hay que seguir
+  { const mo = $('#aMore'); if (mo) mo.ontoggle = () => { if (actDraft) actDraft._moreOpen = mo.open; }; }
+  editorRerender = false;
   actDraft = keep;
+  const snapOf = actKey, actSnap = acts.has(a.id) ? actKey(acts.get(a.id)) : null;
+  if (actSnap === null && !actDraft._init) actDraft._init = snapOf(actDraft); // cómo se abrió: si se cierra sin cambiar nada no es un borrador (salvo un tramo andando)
+  const actChanged = d => actSnap === null ? !!(d._walk || snapOf(d) !== d._init)
+    : actSnap !== actKey(d);
+  onSheetClose(() => { if (editorRerender || actPick || !actDraft) return; syncAct(); if (actChanged(actDraft)) storeDraft('act', { ...actDraft, params: { ...actDraft.params } }); else clearDraft(actDraft.id); });
+  storeDraft('act', { ...actDraft, params: { ...actDraft.params } }, true); // copia de trabajo por si la app se cierra de golpe
+  { let liveT; const live = () => { clearTimeout(liveT); liveT = setTimeout(() => { if (!actDraft || !$('#aText')) return; syncAct(); storeDraft('act', { ...actDraft, params: { ...actDraft.params } }, true); }, 250); }; b.addEventListener('input', live); b.addEventListener('change', live); }
+  const meas = () => { const box = $('#aMeas'); if (!box) return; syncAct(); const r = actMeasRows(actDraft);
+    box.innerHTML = (r.length ? `<table class="attrs">${r.map(([k, v]) => `<tr><td>${k}</td><td><b>${v}</b></td></tr>`).join('')}</table>` : '')
+      + (actDraft.d1 <= actDraft.d0 && actItem(actDraft.type).fields.some(k => ['w', 'b', 'S', 'h'].includes(k)) ? '<p class="hint">Actuación puntual: indica el PK final o la longitud para calcular superficie y volumen.</p>' : r.length ? '' : '<p class="hint">Rellena los datos para ver las mediciones.</p>'); };
+  meas();
+  addDictation($('#aText'));
+  b.querySelectorAll('[data-pf]').forEach(inp => inp.oninput = () => { if (inp.dataset.pf === 'w') delete actDraft.params._wAuto; inp.classList.toggle('bad', !!actFieldError(inp.dataset.pf, inp.value)); meas(); });
   if (f) showSlopeSegment(f, Math.min(a.d0, a.d1), Math.max(a.d0, a.d1));
   onSheetClose(() => setTimeout(() => { if (!actPick && ($('#sheet').hidden || !$('#aText'))) { slopeHL.clearLayers(); if (!$('#aText')) actDraft = actPick ? actDraft : null; } }, 0));
-  const setPK = (which, d) => { syncAct(); actDraft[which] = Math.max(0, Math.min(f ? f.length : d, d)); if (which === 'd0' && actDraft.d1 < actDraft.d0) actDraft.d1 = actDraft.d0; renderActEditor(); };
-  b.querySelectorAll('[data-type]').forEach(bt => bt.onclick = () => { syncAct(); actDraft.type = bt.dataset.type; renderActEditor(); });
-  b.querySelectorAll('[data-side]').forEach(bt => bt.onclick = () => { syncAct(); actDraft.side = bt.dataset.side; renderActEditor(); });
-  ['aPk0', 'aPk1'].forEach(id => $('#' + id).onchange = () => { syncAct(); renderActEditor(); });
+  const setPK = (which, d) => { syncAct(); d = Math.max(0, Math.min(f ? f.length : d, d));
+    if (which === 'd1' && d < actDraft.d0 && actDraft.d1 > actDraft.d0) which = 'd0'; // «Hasta» por debajo de «Desde» en un tramo: se alarga por ese lado
+    else if (which === 'd0' && d > actDraft.d1 && actDraft.d1 > actDraft.d0) which = 'd1';
+    actDraft[which] = d; if (which === 'd0' && actDraft.d1 < actDraft.d0) actDraft.d1 = actDraft.d0; if (actDraft.params._wAuto) delete actDraft.params.w; renderActEditor(); };
+  $('#aType').onchange = () => { syncAct(); const nt = $('#aType').value, old = actItem(actDraft.type); actDraft.type = nt;
+    if (!actDraft._sideSet && !acts.has(actDraft.id)) actDraft.side = defaultSideFor(nt, actDraft.side);
+    const ni = actItem(nt); if (old && old.mat && !(ni.mat || []).includes(actDraft.params.mat)) delete actDraft.params.mat; if (actDraft.params._wAuto) delete actDraft.params.w; renderActEditor(); };
+  const fv = b.querySelector('[data-a=fav]');
+  if (fv) fv.onclick = () => { syncAct(); const l = settings.actFav || []; settings.actFav = l.includes(actDraft.type) ? l.filter(x => x !== actDraft.type) : [...l, actDraft.type]; saveSettings(); renderActEditor(); };
+  const wr = b.querySelector('[data-a=wroad]'); if (wr) wr.onclick = () => { $('#pf_w').value = String(Math.round(rw * 100) / 100).replace('.', ','); meas(); };
+  b.querySelectorAll('[data-forma]').forEach(bt => bt.onclick = () => { syncAct(); actDraft.params.forma = bt.dataset.forma; renderActEditor(); });
+  b.querySelectorAll('[data-prio]').forEach(bt => bt.onclick = () => { syncAct(); actDraft.prio = bt.dataset.prio; renderActEditor(); });
+  b.querySelectorAll('[data-side]').forEach(bt => bt.onclick = () => { syncAct(); actDraft.side = bt.dataset.side; actDraft._sideSet = true; renderActEditor(); });
+  ['aPk0', 'aPk1'].forEach(id => { const el = $('#' + id);
+    el.oninput = () => { const v = parsePK(el.value); let t = el.value !== el.dataset.v ? pkReadBack(el.value) : '';
+      if (f && isFinite(v) && v > f.length + 0.5) t = `⚠ Pasa del final de la traza (${fmtPK(f.length)})`; // aviso al escribir, no solo al guardar
+      $('#' + id + 'rb').textContent = t; el.classList.toggle('bad', t.startsWith('⚠')); };
+    // sin volver a dibujar la ficha: así no se pierde el toque en «Guardar» justo después de escribir el PK
+    el.onchange = () => { if (!isFinite(parsePK(el.value))) { $('#' + id + 'rb').textContent = pkReadBack(el.value); return; } syncAct(); refreshActInline(); }; });
+  const refreshActInline = () => {
+    const d = actDraft; if (!d) return;
+    const lo = Math.min(d.d0, d.d1), hi = Math.max(d.d0, d.d1), ln = Math.max(0, Math.min(hi, f ? f.length : hi) - lo);
+    if (f) showSlopeSegment(f, lo, Math.min(hi, f.length));
+    const al = $('#aLen'); if (al) al.value = ln ? Math.round(ln) : '';
+    if (d.params._wAuto && ctx) { const nw = roadWidthAt(ctx.rec, d.featIdx, lo, hi); if (nw) { d.params.w = Math.round(nw * 100) / 100; const wi = $('#pf_w'); if (wi) wi.value = String(d.params.w).replace('.', ','); } }
+    meas();
+  };
   const gps = which => async () => {
     if (!f) { toast('La traza de esta actuación ya no está cargada.'); return; }
     toast('Obteniendo posición GPS…', 2000);
-    try { const p = await getPos(); const r = pkAt(f, L.latLng(p.lat, p.lng)); if (r.off > 40) toast(`Estás a ${Math.round(r.off)} m de la traza: se usa el punto más cercano.`, 5000); setPK(which, r.d); }
+    try { const p2 = await getPos(); const r = pkAt(f, L.latLng(p2.lat, p2.lng)); if (r.off > 40) toast(`Estás a ${Math.round(r.off)} m de la traza: se usa el punto más cercano.`, 5000); setPK(which, r.d); }
     catch (e) { toast(geoErr(e), 6000); }
   };
   b.querySelector('[data-a=gps0]').onclick = gps('d0');
@@ -2062,8 +2513,8 @@ function renderActEditor() {
   b.querySelector('[data-a=map0]').onclick = pick('d0');
   b.querySelector('[data-a=map1]').onclick = pick('d1');
   b.querySelector('[data-a=len]').onclick = () => { syncAct(); const v = parseFloat(($('#aLen').value || '').replace(',', '.')); if (!(v >= 0)) { toast('Escribe la longitud en metros.'); return; } setPK('d1', actDraft.d0 + v); };
-  const stampAt = () => { const p = f ? pointAtPK(f, actDraft.d0) : { lat: actDraft.coords[0][0], lng: actDraft.coords[0][1] };
-    const base = lastPos && Date.now() - lastPos.t < 60000 ? { lat: lastPos.lat, lng: lastPos.lng, acc: lastPos.acc } : { lat: p.lat, lng: p.lng };
+  const stampAt = () => { const pp = f ? pointAtPK(f, actDraft.d0) : { lat: actDraft.coords[0][0], lng: actDraft.coords[0][1] };
+    const base = lastPos && Date.now() - lastPos.t < 60000 ? { lat: lastPos.lat, lng: lastPos.lng, acc: lastPos.acc } : { lat: pp.lat, lng: pp.lng };
     return { ...base, label: `${actDraft.type || 'Actuación'} ${SIDE_ABBR[actDraft.side] || ''} · PK ${fmtPK(actDraft.d0)}${actDraft.d1 > actDraft.d0 ? '–' + fmtPK(actDraft.d1) : ''} · ${actDraft.traceName}` }; };
   const addMediaAct = async files => {
     syncAct();
@@ -2078,7 +2529,9 @@ function renderActEditor() {
   b.querySelector('[data-a=photo]').onclick = () => { syncAct(); capture('inPhoto', addMediaAct); };
   b.querySelector('[data-a=video]').onclick = () => { syncAct(); capture('inVideo', addMediaAct); };
   b.querySelectorAll('[data-rm]').forEach(el => el.onclick = () => { syncAct(); actDraft.media.splice(+el.dataset.rm, 1); renderActEditor(); });
-  b.querySelector('[data-a=save]').onclick = saveAct;
+  b.querySelector('[data-a=save]').onclick = () => { if (actDraft) delete actDraft._cont; saveAct(); };
+  const dup = b.querySelector('[data-a=dup]');
+  if (dup) dup.onclick = () => { syncAct(); const src = actDraft; actDraft = { ...src, id: uid(), media: [], created: Date.now(), updated: undefined, params: { ...src.params } }; toast('Copia lista: cambia los PK y guarda.', 4000); renderActEditor(); };
   const del = b.querySelector('[data-a=delete]'); if (del) del.onclick = () => deleteAct(a.id);
 }
 let actPick = null;
@@ -2088,59 +2541,118 @@ slopePickPoint = function (ll) { // también atiende la selección de inicio/fin
   const ctx = featOf(actDraft); const r = pkAt(ctx.f, L.latLng(ll));
   const which = actPick; actPick = null; $('#pickBar').hidden = true;
   actDraft[which] = r.d; if (actDraft.d1 < actDraft.d0) [actDraft.d0, actDraft.d1] = [actDraft.d1, actDraft.d0];
+  if (actDraft.params && actDraft.params._wAuto) delete actDraft.params.w;
   renderActEditor();
 };
 async function saveAct() {
   syncAct();
-  const a = actDraft;
+  const a = actDraft; if (!a) return false;
   if (a.type === 'Otro') a.type = (a.custom || '').trim() || 'Otro';
   if (!a.type) { toast('Elige el tipo de actuación.'); return; }
+  for (const inp of document.querySelectorAll('[data-pf]')) { const er = actFieldError(inp.dataset.pf, inp.value); if (er) { inp.classList.add('bad'); inp.focus(); toast(er, 6000); return; } }
+  if (!isFinite(a.d0) || !isFinite(a.d1)) { toast('Revisa los PK: escribe por ejemplo 1+250.'); return; }
   if (a.d1 < a.d0) [a.d0, a.d1] = [a.d1, a.d0];
   const ctx = featOf(a);
-  if (ctx && ctx.f) { a.d0 = Math.max(0, a.d0); a.d1 = Math.min(ctx.f.length, a.d1); a.coords = segmentCoords(ctx.f, a.d0, a.d1); }
+  if (ctx && ctx.f) {
+    const Lf = ctx.f.length;
+    if (a.d0 > Lf + 0.5) { toast(`El PK inicial ${fmtPK(a.d0)} está fuera de la traza, que acaba en ${fmtPK(Lf)}.`, 6000); return; }
+    if (a.d1 > Lf + 0.5 && !confirm(`El PK final ${fmtPK(a.d1)} pasa del final de la traza (${fmtPK(Lf)}). ¿Guardar la actuación hasta el final de la traza?`)) return;
+    a.d0 = Math.max(0, Math.min(Lf, a.d0)); a.d1 = Math.max(a.d0, Math.min(Lf, a.d1)); a.coords = segmentCoords(ctx.f, a.d0, a.d1);
+  }
+  { const pp = a.params || {}, puntual = ACT_POINT.has(a.type) || pp.area > 0 || pp.vol > 0 || pp.n > 0; // un tramo de milímetros no cuenta como puntual
+    if (a.d1 - a.d0 < 0.5 && !puntual && a._zeroOk !== a.d0 + '|' + a.d1) { // aviso dentro de la ficha, con su propio botón (no se guarda con toques repetidos en «Guardar»)
+      const f1 = $('#aPk1'); if (f1) { f1.classList.add('bad'); setTimeout(() => f1.scrollIntoView({ block: 'start' }), 50); }
+      let w = $('#zeroWarn'); if (!w) { const sb = $('#sheetBody .savebar'); sb.insertAdjacentHTML('afterbegin', '<div class="fwarn" id="zeroWarn" role="alert"></div>'); w = $('#zeroWarn'); } // dentro de la barra fija: siempre a la vista
+      w.innerHTML = `<b>«${esc(a.type)}» tiene 0 m</b>: el PK final es igual al inicial (${fmtPK(a.d0)}). Escribe el PK final arriba o, si de verdad es puntual:<div class="row"><button type="button" class="mini" data-a="save0">Guardar con 0 m</button></div>`;
+      const t0 = Date.now(); w.querySelector('[data-a=save0]').onclick = () => { if (Date.now() - t0 < 600 || !actDraft) return; actDraft._zeroOk = actDraft.d0 + '|' + actDraft.d1; saveAct(); };
+      w.scrollIntoView({ block: 'nearest' }); return; } }
+  { const it = actItem(a.type), mf = it.fields.filter(k => ['w', 'e', 'h', 'b', 'S', 'n'].includes(k));
+    if (mf.length && !mf.some(k => a.params && a.params[k] > 0) && !ACT_POINT.has(a.type) && a._noMeasOk !== true && !a._noMeasChain && $('#aText')) {
+      const f0 = $('#pf_' + mf[0]); if (f0) { f0.classList.add('bad'); f0.scrollIntoView({ block: 'center' }); }
+      let w = $('#measWarn'); if (!w) { $('#sheetBody .savebar').insertAdjacentHTML('afterbegin', '<div class="fwarn" id="measWarn" role="alert"></div>'); w = $('#measWarn'); }
+      w.innerHTML = `<b>Sin medidas</b>: no saldrá superficie ni volumen. Escribe ${mf.map(k => ACT_FIELDS[k].l.toLowerCase()).join(' / ')} o:<div class="row"><button type="button" class="mini" data-a="savenm">Guardar sin medidas</button></div>`;
+      const t0 = Date.now(); w.querySelector('[data-a=savenm]').onclick = () => { if (Date.now() - t0 < 600 || !actDraft) return; actDraft._noMeasOk = true; saveAct(); };
+      return; } }
+  const cont = a._cont, fromSplit = a._split, noMeasUsed = a._noMeasOk === true || !!a._noMeasChain; delete a._cont; delete a._split; delete a._noMeasChain; delete a._dir; delete a._noMeasOk; delete a._zeroWarn; delete a._zeroOk; delete a._moreOpen; delete a._init; delete a._walk; if (a.params) { delete a.params._wAuto; Object.keys(a.params).forEach(k => { if (a.params[k] === null || a.params[k] === '') delete a.params[k]; }); }
   a.updated = Date.now();
+  hideUndo(); // solo cuando de verdad se guarda (un toque fallido no borra el «Deshacer»)
   try { await DB.put('acts', a); } catch (e) { toast('No se pudo guardar: ' + (e.message || 'almacenamiento lleno'), 7000); return; }
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
-  acts.set(a.id, a); actDraft = null; slopeHL.clearLayers();
+  if (ACT_ITEMS.some(i => i.name === a.type)) { settings.actRecent = [a.type, ...(settings.actRecent || []).filter(t => t !== a.type)].slice(0, 8); saveSettings(); }
+  acts.set(a.id, a); actDraft = null; slopeHL.clearLayers(); clearDraft(a.id);
   closeSheet(); drawActs(); toast(`Guardada: ${actTitle(a)}`);
   if (!$('#drawer').hidden) renderDrawer();
+  if (cont) { // «Guardar y seguir andando»: el siguiente tramo empieza en el PK guardado (corregido o no)
+    buzz(40); const go = await continueWalk(a, cont === -1 ? a.d0 : a.d1, { noMeas: noMeasUsed });
+    if (!fromSplit) showUndo(`Guardado: ${a.type} ${fmtPK(a.d0)}–${fmtPK(a.d1)}${go ? '. Sigue el siguiente tramo.' : ''}`, async () => { // mismo «Deshacer» que desde la barra
+      if (a.obraId !== settings.activeObra) { toast('Ese tramo es de otra obra.'); return; }
+      await DB.del('acts', a.id); acts.delete(a.id); drawActs(); const st = cont === -1 ? a.d1 : a.d0;
+      walkAct = { draft: { ...a, id: uid(), d0: st, d1: st, media: [], text: '', created: Date.now(), coords: [], params: { ...(a.params || {}) } }, t: Date.now(), shown: Date.now() };
+      await DB.put('kv', walkAct, 'walk').catch(() => {}); showWalkBar(); keepAwake(true); }); }
+  return true;
 }
-async function deleteAct(id) {
-  if (!confirm('¿Eliminar esta actuación y sus fotos? No se puede deshacer.')) return;
-  await DB.del('acts', id); acts.delete(id); actDraft = null; slopeHL.clearLayers();
-  closeSheet(); drawActs(); toast('Actuación eliminada');
+async function deleteAct(id) { // sin pregunta: se puede deshacer unos segundos
+  const old = acts.get(id); if (!old) return;
+  await DB.del('acts', id); acts.delete(id); actDraft = null; slopeHL.clearLayers(); clearDraft(id);
+  closeSheet(); drawActs(); showUndo(`Actuación eliminada: ${old.type}`, async () => { if (old.obraId !== settings.activeObra) { toast('Esa actuación es de otra obra.'); return; } await DB.put('acts', old); acts.set(old.id, old); drawActs(); if (!$('#drawer').hidden) renderDrawer(); toast('Actuación recuperada'); });
   if (!$('#drawer').hidden) renderDrawer();
 }
-function viewAct(id) {
+function viewAct(id, at) {
   const a = acts.get(id); if (!a) return;
-  const p0 = a.coords[0], p1 = a.coords[a.coords.length - 1], col = actColor(a.type);
+  const ctx0 = featOf(a), dHere = ctx0 && ctx0.f && at ? Math.max(0, Math.min(ctx0.f.length, pkAt(ctx0.f, L.latLng(at)).d)) : a.d0; // PK del punto tocado
+  const p0 = a.coords[0], p1 = a.coords[a.coords.length - 1], col = actColor(a.type), it = actItem(a.type);
+  const mr = actMeasRows(a), pr = actParamRows(a);
   const b = openSheet(`<h2><span class="dot" style="background:${col}"></span>${esc(a.type)}</h2>
-    <p class="sub">${esc(SIDES[a.side] || '')} · ${esc(a.traceName)} · ${fmtDate(a.created)}</p>
-    <div class="slope-main"><span style="color:${col}">PK ${fmtPK(a.d0)}${a.d1 > a.d0 ? ' – ' + fmtPK(a.d1) : ''}</span><small>${a.d1 > a.d0 ? 'longitud ' + fmtLen(a.d1 - a.d0) : 'actuación puntual'}</small></div>
+    <p class="sub">${esc(it.catName)} · ${esc(SIDES[a.side] || '')} · ${esc(a.traceName)} · ${fmtDate(a.created)}</p>
+    <div class="slope-main"><span style="color:${col}">PK ${fmtPK(a.d0)}${a.d1 > a.d0 ? ' – ' + fmtPK(a.d1) : ''}</span><small>${a.d1 > a.d0 ? 'longitud ' + fmtLen(a.d1 - a.d0) : 'actuación puntual'}${a.prio ? ` · prioridad <b style="color:${(ACT_PRIO[a.prio] || ['', '#888'])[1]}">${(ACT_PRIO[a.prio] || [a.prio])[0].toLowerCase()}</b>` : ''}</small></div>
+    ${mr.length ? `<h3 class="sh">Mediciones</h3><table class="attrs meas">${mr.map(([k, v]) => `<tr><td>${k}</td><td><b>${v}</b></td></tr>`).join('')}</table>` : ''}
+    ${pr.length ? `<h3 class="sh">Datos</h3><table class="attrs">${pr.map(([k, v]) => `<tr><td>${k}</td><td>${esc(String(v))}</td></tr>`).join('')}</table>` : ''}
+    ${it.fields.length && !actMeasRows(a).some(([k]) => k !== 'Longitud') ? `<p class="hint">${a.d1 <= a.d0 && Object.keys(a.params || {}).length ? 'Es una actuación puntual: para calcular superficie o volumen indica su longitud (PK final).' : 'Sin datos para calcular mediciones. Pulsa «Editar» y rellena ancho, espesor…'}</p>` : ''}
     ${a.text ? `<div class="desc">${esc(a.text)}</div>` : ''}
     <div class="media">${mediaHtml(a.media || [], false)}</div>
     <div class="acts">
       ${goBtn(p0[0], p0[1], 'Ir al inicio', a.d1 > a.d0 ? '' : 'full')}${a.d1 > a.d0 ? goBtn(p1[0], p1[1], 'Ir al final') : ''}
-      <button class="btn" data-a="edit">Editar / añadir fotos</button>
+      <button class="btn pri" data-a="edit">Editar / añadir fotos</button>
       <button class="btn" data-a="copy">${ICON.copy}Copiar</button>
+      ${featOf(a) && featOf(a).f ? `<button class="btn go full" data-a="newhere">${ICON.road}Otra actuación en el PK ${fmtPK(dHere)}</button><button class="btn" data-a="trace">Ficha de la traza (anchos, pendiente…)</button>` : '<p class="hint">La traza de esta actuación no está cargada. Al volver a cargar su KML se enlaza sola.</p>'}
     </div>`, 'view');
   const ctx = featOf(a); if (ctx && ctx.f) showSlopeSegment(ctx.f, a.d0, Math.max(a.d1, a.d0 + 0.1));
   onSheetClose(() => setTimeout(() => { if (!$('#aText')) slopeHL.clearLayers(); }, 0));
   b.querySelectorAll('img[data-full]').forEach(img => img.onclick = () => showPhoto(img.src));
   b.querySelector('[data-a=edit]').onclick = () => openActEditor({ act: a });
-  b.querySelector('[data-a=copy]').onclick = () => copyText(`${a.type} (${SIDES[a.side]}) · ${a.traceName} · PK ${fmtPK(a.d0)} a ${fmtPK(a.d1)} · ${fmtLen(a.d1 - a.d0)}${a.text ? ' · ' + a.text : ''}`);
+  const nh = b.querySelector('[data-a=newhere]'); if (nh) nh.onclick = () => { const c = featOf(a); openActEditor({ rec: c.rec, f: c.f, d0: dHere, d1: dHere }); };
+  const tr = b.querySelector('[data-a=trace]'); if (tr) tr.onclick = () => { const c = featOf(a), q = pointAtPK(c.f, dHere); featureSheet(c.f, L.latLng(q.lat, q.lng), c.rec); };
+  b.querySelector('[data-a=copy]').onclick = () => copyText(`${a.type} (${SIDES[a.side]}) · ${a.traceName} · PK ${fmtPK(a.d0)} a ${fmtPK(a.d1)} · ${fmtLen(a.d1 - a.d0)}${pr.length ? ' · ' + pr.map(([k, v]) => `${k}: ${v}`).join(', ') : ''}${mr.length ? ' · ' + mr.map(([k, v]) => `${k}: ${v}`).join(', ') : ''}${a.text ? ' · ' + a.text : ''}`);
+}
+// Resumen de mediciones por tipo de actuación
+function actsSummary(list) {
+  const m = new Map();
+  list.forEach(a => { const k = a.type, r = m.get(k) || { type: k, n: 0, L: 0, area: 0, vol: 0, t: 0, kg: 0, ud: 0, tubo: 0 }, x = actMeasure(a);
+    r.n++; r.L += x.Lm || x.L; r.area += x.area || 0; r.vol += x.vol || 0; r.t += x.t || 0; r.kg += x.kg || 0; r.ud += x.n || 0; r.tubo += x.tubo || 0; m.set(k, r); });
+  return [...m.values()].sort((a, b) => ACT_ITEMS.findIndex(i => i.name === a.type) - ACT_ITEMS.findIndex(i => i.name === b.type));
+}
+function summaryTableHtml(sum, escf = esc) {
+  const c = (v, d) => (v ? nf(v, d) : '');
+  return `<table class="attrs sumt"><tr><th>Actuación</th><th>Nº</th><th>m</th><th>m²</th><th>m³</th><th>t</th><th>ud</th></tr>${sum.map(r => `<tr><td><span class="dot" style="background:${actColor(r.type)}"></span>${escf(r.type)}</td><td>${r.n}</td><td>${c(r.L, MEAS_DEC.L)}</td><td>${c(r.area, MEAS_DEC.area)}</td><td>${c(r.vol, MEAS_DEC.vol)}</td><td>${c(r.t, MEAS_DEC.t)}</td><td>${c(r.ud, 0)}</td></tr>`).join('')}</table>`;
 }
 function actList() {
   const list = actsSorted();
   const byTrace = new Map(); list.forEach(a => { const k = a.traceName || 'Traza'; byTrace.set(k, [...(byTrace.get(k) || []), a]); });
-  const totals = new Map(); list.forEach(a => totals.set(a.type, (totals.get(a.type) || 0) + (a.d1 - a.d0)));
-  const b = openSheet(`<h2>Actuaciones</h2><p class="sub">${list.length} actuaciones en ${byTrace.size} trazas</p>
-    ${list.length ? `<table class="attrs"><tr><td><b>Tipo</b></td><td><b>Longitud total</b></td></tr>${[...totals].map(([t, l]) => `<tr><td><span class="dot" style="background:${actColor(t)}"></span>${esc(t)}</td><td>${fmtLen(l)}</td></tr>`).join('')}</table>` : '<p class="empty">Todavía no hay actuaciones. Toca una traza y pulsa «Nueva actuación en esta traza».</p>'}
-    ${[...byTrace].map(([t, arr]) => `<h3 class="sh">${esc(t)}</h3>${arr.map(a => `<div class="nrow" data-act="${a.id}"><span class="dot" style="background:${actColor(a.type)}"></span>
-      <span class="t"><b>${esc(a.type)} · ${SIDE_ABBR[a.side] || ''}</b><small>PK ${fmtPK(a.d0)}${a.d1 > a.d0 ? '–' + fmtPK(a.d1) + ' · ' + fmtLen(a.d1 - a.d0) : ' · puntual'} · ${(a.media || []).length} fotos</small></span></div>`).join('')}`).join('')}
-    ${list.length ? `<div class="acts"><button class="btn full" data-a="csv">Exportar a Excel (CSV)</button></div>` : ''}`);
+  const hid = new Set(settings.actHideCats || []);
+  const cats = ACT_CATS.map(c => ({ ...c, n: list.filter(a => actItem(a.type).cat === c.id).length })).filter(c => c.n);
+  const b = openSheet(`<h2>Actuaciones</h2><p class="sub">${plural(list.length, 'actuación', 'actuaciones')} en ${plural(byTrace.size, 'traza', 'trazas')}</p>
+    ${list.length ? `<h3 class="sh">Resumen de mediciones</h3>${summaryTableHtml(actsSummary(list))}
+      <h3 class="sh">Ver en el mapa</h3><div class="chips">${cats.map(c => `<button type="button" class="chip ${hid.has(c.id) ? '' : 'on'}" data-hc="${c.id}" style="--c:${c.items[0][1]}">${esc(c.name)} (${c.n})</button>`).join('')}</div>`
+      : '<p class="empty">Todavía no hay actuaciones. Toca una traza y pulsa «Nueva actuación en esta traza».</p>'}
+    ${[...byTrace].map(([t, arr]) => `<details class="tgroup" open><summary>${esc(t)} <small>${arr.length}</small></summary>${ACT_CATS.map(c => { const xs = arr.filter(a => actItem(a.type).cat === c.id); return xs.length ? `<div class="cgroup"><div class="cname">${esc(c.name)}</div>${xs.map(a => { const mr = actMeasRows(a).filter(([k]) => k !== 'Longitud').map(([, v]) => v.split(' (')[0]).slice(0, 2).join(' · ');
+      return `<div class="nrow" data-act="${a.id}"><span class="dot" style="background:${actColor(a.type)}"></span>
+      <span class="t"><b>${esc(a.type)} · ${SIDE_ABBR[a.side] || ''}${a.prio === 'alta' ? ' <span class="prio">alta</span>' : ''}</b><small>PK ${fmtPK(a.d0)}${a.d1 > a.d0 ? '–' + fmtPK(a.d1) + ' · ' + fmtLen(a.d1 - a.d0) : ' · puntual'}${mr ? ' · ' + mr : ''} · ${(a.media || []).length} fotos</small></span></div>`; }).join('')}</div>` : ''; }).join('')}</details>`).join('')}
+    ${list.length ? `<div class="acts"><button class="btn pri full" data-a="rep">${ICON.note}Informe de la visita</button><button class="btn" data-a="csv">Exportar a Excel (CSV)</button><button class="btn" data-a="bc3">Exportar a BC3</button></div>` : ''}`);
   b.querySelectorAll('[data-act]').forEach(r => r.onclick = () => { const a = acts.get(r.dataset.act); map.fitBounds(L.latLngBounds(a.coords).pad(0.4), { maxZoom: 18 }); viewAct(a.id); });
+  b.querySelectorAll('[data-hc]').forEach(c => c.onclick = () => { const s = new Set(settings.actHideCats || []); s.has(c.dataset.hc) ? s.delete(c.dataset.hc) : s.add(c.dataset.hc); settings.actHideCats = [...s]; saveSettings(); drawActs(); actList(); });
   const c = b.querySelector('[data-a=csv]'); if (c) c.onclick = exportActsCSV;
+  const rp = b.querySelector('[data-a=rep]'); if (rp) rp.onclick = () => visitReportSheet();
+  const bb = b.querySelector('[data-a=bc3]'); if (bb) bb.onclick = () => bc3Sheet();
 }
 async function exportActsCSV() {
   const list = actsSorted();
@@ -2151,12 +2663,15 @@ async function exportActsCSV() {
   catch (e) { if (!/cancel/i.test(e.message || '')) toast('No se pudo exportar: ' + (e.message || e), 6000); }
 }
 function actsCSV(list) {
-  const n = v => String(v).replace('.', ',');
-  const q = v => `"${String(v ?? '').replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`;
-  const rows = [['Traza', 'Capa', 'Tipo', 'Margen', 'PK inicio', 'PK fin', 'Longitud (m)', 'Descripción', 'Fotos', 'Fecha', 'Lat inicio', 'Lon inicio', 'Lat fin', 'Lon fin']];
-  list.forEach(a => { const p0 = a.coords[0], p1 = a.coords[a.coords.length - 1];
-    rows.push([a.traceName, a.layerName, a.type, SIDES[a.side], fmtPK(a.d0), fmtPK(a.d1), n(Math.round((a.d1 - a.d0) * 10) / 10), a.text, (a.media || []).length, fmtDate(a.created), n(p0[0].toFixed(6)), n(p0[1].toFixed(6)), n(p1[0].toFixed(6)), n(p1[1].toFixed(6))]); });
-  return '\ufeff' + rows.map(r => r.map(q).join(';')).join('\r\n');
+  const n = (v, d = 2) => (v === null || v === undefined || v === '' ? '' : String(Math.round(v * 10 ** d) / 10 ** d).replace('.', ','));
+  const c6 = v => v.toFixed(6).replace('.', ',');
+  const q = csvQ;
+  const rows = [['Traza', 'Capa', 'Familia', 'Tipo', 'Material / tipo', 'Margen', 'PK inicio', 'PK fin', 'Longitud (m)', 'Ancho (m)', 'Espesor (cm)', 'Altura (m)', 'Anchura sección (m)', 'Sobreancho (m)', 'Unidades', 'Diámetro (mm)',
+    'Superficie (m²)', 'Volumen (m³)', 'Peso (t)', 'Ligante (kg)', 'Prioridad', 'Descripción', 'Fotos', 'Fecha', 'Lat inicio', 'Lon inicio', 'Lat fin', 'Lon fin']];
+  list.forEach(a => { const p0 = a.coords[0], p1 = a.coords[a.coords.length - 1], p = a.params || {}, m = actMeasure(a);
+    rows.push([a.traceName, a.layerName, actItem(a.type).catName, a.type, p.mat || '', SIDES[a.side], fmtPK(a.d0), fmtPK(a.d1), n(m.Lm || m.L, MEAS_DEC.L), n(p.w), n(p.e), n(p.h), n(p.b), n(p.S), n(m.n, 0), n(p.dia),
+      n(m.area, MEAS_DEC.area), n(m.vol, MEAS_DEC.vol), n(m.t, MEAS_DEC.t), n(m.kg, 0), a.prio ? (ACT_PRIO[a.prio] || [a.prio])[0] : '', a.text, (a.media || []).length, fmtDate(a.created), c6(p0[0]), c6(p0[1]), c6(p1[0]), c6(p1[1])]); });
+  return '﻿' + rows.map(r => r.map(q).join(';')).join('\r\n');
 }
 
 /* ---------------- Obras: cada obra agrupa sus capas, anotaciones, fotos y actuaciones ---------------- */
@@ -2171,7 +2686,7 @@ async function clearMapData() {
 }
 async function loadObra(id, fit) {
   closeSheet(); await clearMapData();
-  settings.activeObra = id; saveSettings(); updateObraLabel(); loadAfecLast();
+  settings.activeObra = id; saveSettings(); updateObraLabel(); loadAfecLast(); showWalkBar(); if (refreshPending()) showDraftBar(); else { const db = $('#draftBar'); if (db) db.hidden = true; }
   const recs = (await DB.all('layers')).filter(r => r.obraId === id).sort((a, b) => a.created - b.created);
   recs.forEach((r, i) => { if (r.order == null) r.order = i + 1; if (!r.type) r.type = 'kml'; });
   for (const rec of recs) { try { registerLayer(rec); } catch (e) { console.error(e); } }
@@ -2206,6 +2721,7 @@ async function deleteObraData(id) {
   for (const x of n.filter(x => x.obraId === id)) await DB.del('notes', x.id);
   for (const x of a.filter(x => x.obraId === id)) await DB.del('acts', x.id);
   await DB.del('kv', 'ficha:' + id).catch(() => {}); delete fichaCache[id];
+  for (const [k, d] of Object.entries(drafts)) if (d.data && d.data.obraId === id) delete drafts[k]; await DB.put('kv', drafts, 'drafts').catch(() => {}); refreshPending();
 }
 async function obrasSheet() {
   const list = [...obras.values()].sort((a, b) => a.name.localeCompare(b.name));
@@ -2213,12 +2729,13 @@ async function obrasSheet() {
   const b = openSheet(`<h2>Obras</h2><p class="sub">Cada obra guarda sus propias capas, anotaciones, fotos y actuaciones</p>
     <div class="obras">${list.map((o, i) => { const c = counts[i], act = o.id === settings.activeObra;
       return `<div class="obra ${act ? 'on' : ''}">
-        <button class="otitle" data-open="${o.id}" type="button"><b>${esc(o.name)}</b><small>${c.layers} capas · ${c.notes} anotaciones · ${c.acts} actuaciones${act ? ' · <em>activa</em>' : ''}</small></button>
+        <button class="otitle" data-open="${o.id}" type="button"><b>${esc(o.name)}</b><small>${plural(c.layers, 'capa', 'capas')} · ${plural(c.notes, 'anotación', 'anotaciones')} · ${c.acts} actuaciones${act ? ' · <em>activa</em>' : ''}</small></button>
         <div class="row"><button class="mini" data-share="${o.id}">Exportar / compartir</button><button class="mini" data-ren="${o.id}">Renombrar</button>${list.length > 1 ? `<button class="mini del" data-delo="${o.id}">Eliminar</button>` : ''}</div>
       </div>`; }).join('')}</div>
     <h3 class="sh">Nueva obra</h3>
     <div class="field row"><input type="text" id="newObra" placeholder="Nombre (p. ej. Modernización regadío Cuevas del Campo)"><button class="mini" data-a="create">Crear</button></div>
-    <div class="acts"><button class="btn full" data-a="import">${ICON.folder}Importar obra (paquete .zip)</button></div>
+    <div class="acts"><button class="btn pri full" data-a="backup">Copia de seguridad de todas las obras</button><button class="btn full" data-a="import">${ICON.folder}Importar obra (paquete .zip)</button></div>
+    <p class="hint">${settings.lastBackup ? `Última copia: ${fmtDate(settings.lastBackup)}.` : '<b>Aún no has hecho ninguna copia de seguridad.</b>'} ${NATIVE ? 'Las copias se guardan en <b>Documentos › OBRA-GIS</b> y no se borran al desinstalar la app.' : 'Las copias se guardan en Descargas.'} Haz una antes de actualizar o desinstalar la app.</p>
     <p class="hint">«Exportar / compartir» crea un .zip con toda la obra: capas, KML originales, anotaciones, actuaciones, fotos, vídeos y notas de voz. Al abrir ese .zip en otro móvil con OBRA-GIS, la obra aparece completa.</p>`);
   b.querySelectorAll('[data-open]').forEach(bt => bt.onclick = () => loadObra(bt.dataset.open, true).then(() => toast(`Obra activa: ${obras.get(bt.dataset.open).name}`)));
   b.querySelectorAll('[data-share]').forEach(bt => bt.onclick = () => exportObraPackage(bt.dataset.share));
@@ -2239,34 +2756,47 @@ async function obrasSheet() {
     const o = await createObra(name); await loadObra(o.id); toast(`Obra «${o.name}» creada. Ya puedes importar sus KML y capas.`, 5000);
   };
   b.querySelector('[data-a=import]').onclick = () => $('#inObra').click();
+  b.querySelector('[data-a=backup]').onclick = async () => { await backupAllObras(); obrasSheet(); };
 }
 
 // Paquete de obra (.zip): estructura de carpetas legible desde QGIS, Excel o Google Earth
 const MIME_EXT = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', mp4: 'video/mp4', webm: 'video/webm', m4a: 'audio/mp4', ogg: 'audio/ogg' };
-async function exportObraPackage(id) {
+async function exportObraPackage(id, opts = {}) {
+  try { return await buildObraPackage(id, opts); }
+  catch (e) { console.error(e); toast('No se pudo exportar la obra: ' + (e.message || e), 8000); return null; }
+}
+async function buildObraPackage(id, opts = {}) {
   const o = obras.get(id); if (!o) return;
   toast('Preparando el paquete de la obra…', 15000);
   const [L0, N0, A0] = await Promise.all([DB.all('layers'), DB.all('notes'), DB.all('acts')]);
   const lays = L0.filter(x => x.obraId === id), nts = N0.filter(x => x.obraId === id), ats = A0.filter(x => x.obraId === id);
   const zip = new JSZip(), root = `OBRA-GIS_${safeName(o.name)}`, Z = zip.folder(root);
   const layerName = lid => { const l = lays.find(x => x.id === lid); return l ? l.name : 'Mis anotaciones'; };
+  const usedPaths = new Set();
   const media = (owner, list, dir) => (list || []).map((m, i) => {
-    const path = `multimedia/${dir}/${safeName(owner)}_${i + 1}.${extFor(m)}`; Z.file(path, m.blob);
-    return { archivo: path, tipo: { photo: 'foto', video: 'video', audio: 'audio' }[m.kind], mime: m.mime };
-  });
+    if (!m || !(m.blob instanceof Blob)) return null;
+    // nombre único: el texto se acorta, pero se añade un contador si ya existe (antes se pisaban fotos de nombres largos)
+    const base = `multimedia/${dir}/${safeName(owner).slice(0, 48)}`; let path, k = 0;
+    do { path = `${base}${k ? '_' + k : ''}_${i + 1}.${extFor(m)}`; k++; } while (usedPaths.has(path));
+    usedPaths.add(path); Z.file(path, m.blob, { compression: 'STORE' }); // las fotos ya van comprimidas
+    return { archivo: path, tipo: { photo: 'foto', video: 'video', audio: 'audio' }[m.kind], mime: m.mime, fecha: m.t ? new Date(m.t).toISOString() : undefined };
+  }).filter(Boolean);
   const capas = lays.map(r => {
-    const c = { id: r.id, tipo: r.type || 'kml', nombre: r.name, carpeta: folderOf(r), orden: r.order || 0, visible: !!r.visible, opacidad: r.opacity ?? 1 };
-    if (c.tipo === 'kml') { c.archivo = `capas/kml/${safeName(r.name)}_${r.id}.kml`; c.color = r.color; Z.file(c.archivo, r.text); if (r.widths && Object.keys(r.widths).length) c.anchos = r.widths; if (r.pkStep) c.pk_cada_m = r.pkStep; }
+    const c = { id: r.id, tipo: r.type || 'kml', nombre: r.name, carpeta: folderOf(r), orden: r.order || 0, visible: !!r.visible, opacidad: r.opacity ?? 1, creada: new Date(r.created || Date.now()).toISOString() };
+    if (r.drawn) c.dibujada = true;
+    if (c.tipo === 'kml') { c.archivo = `capas/kml/${safeName(r.name)}_${r.id}.kml`; c.color = r.color; Z.file(c.archivo, r.text); if (r.widths && Object.keys(r.widths).length) c.anchos = r.widths; if (r.pkStep) c.pk_cada_m = r.pkStep; if (r.hiddenFeats && r.hiddenFeats.length) c.elementos_ocultos = r.hiddenFeats; }
     if (c.tipo === 'wms') Object.assign(c, { servicio: r.kind, url: r.url, capas_wms: r.layers, consulta: r.info || '', cobertura: r.cover || '', atribucion: r.attribution || '', zoom_max_nativo: r.maxNative || null });
     return c;
   });
   const notePts = nts.map(n => ({ type: 'Feature', geometry: { type: 'Point', coordinates: [n.lng, n.lat] },
     properties: { id: n.id, titulo: n.title, texto: n.text || '', fecha: new Date(n.created).toISOString(), origen_posicion: n.src || '', precision_m: n.acc ?? null,
       altitud_m: n.alt ?? null, orientacion_grados: n.dir ?? null, capa: layerName(n.layerId), capa_id: n.layerId || null, ficha: n.ficha || undefined, multimedia: media(n.title + '_' + n.id.slice(-4), n.media, n.layerId ? 'fotos_importadas' : 'anotaciones') } }));
-  const actFeats = ats.map(a => ({ type: 'Feature',
+  const actFeats = ats.filter(a => a.coords && a.coords.length).map(a => ({ type: 'Feature',
     geometry: a.coords.length > 1 && a.d1 > a.d0 ? { type: 'LineString', coordinates: a.coords.map(c => [c[1], c[0]]) } : { type: 'Point', coordinates: [a.coords[0][1], a.coords[0][0]] },
     properties: { id: a.id, tipo: a.type, margen: SIDES[a.side] || '', margen_cod: a.side, pk_inicio: fmtPK(a.d0), pk_fin: fmtPK(a.d1), pk_inicio_m: +a.d0.toFixed(2), pk_fin_m: +a.d1.toFixed(2),
       longitud_m: +(a.d1 - a.d0).toFixed(2), traza: a.traceName, capa: a.layerName, capa_id: a.layerId, elemento: a.featIdx, descripcion: a.text || '', fecha: new Date(a.created).toISOString(),
+      familia: actItem(a.type).catName, parametros: a.params || {}, prioridad: a.prio ? (ACT_PRIO[a.prio] || [a.prio])[0] : '', prioridad_cod: a.prio || '', actualizada: a.updated ? new Date(a.updated).toISOString() : null,
+      mediciones: Object.fromEntries(Object.entries(actMeasure(a)).filter(([k, v]) => k !== 'sides' && v).map(([k, v]) => [{ L: 'longitud_m', Lm: 'longitud_total_m', area: 'superficie_m2', vol: 'volumen_m3', t: 'peso_t', kg: 'ligante_kg', n: 'unidades', tubo: 'tubo_m' }[k] || k, +v.toFixed(2)])),
       multimedia: media(`${a.type}_PK${fmtPK(a.d0)}_${a.id.slice(-4)}`, a.media, 'actuaciones') } }));
   const fc = features => JSON.stringify({ type: 'FeatureCollection', crs: { type: 'name', properties: { name: 'urn:ogc:def:crs:OGC:1.3:CRS84' } }, features }, null, 1);
   Z.file('datos/anotaciones.geojson', fc(notePts.filter(f => !f.properties.capa_id)));
@@ -2281,8 +2811,8 @@ async function exportObraPackage(id) {
   const nFichas = await fichaPackExport(Z, id);
   Z.file('datos/actuaciones.csv', actsCSV(ats.sort((a, b) => (a.traceName || '').localeCompare(b.traceName || '') || a.d0 - b.d0)));
   Z.file('obra.json', JSON.stringify({ formato: 'OBRA-GIS', version: 1, app_version: APP_VERSION, exportado: new Date().toISOString(),
-    obra: { id: o.id, nombre: o.name, descripcion: o.desc || '', creada: new Date(o.created).toISOString() },
-    sistema_referencia: 'WGS84 / ETRS89 geográficas (EPSG:4326)', capas,
+    obra: { id: o.srcId || o.id, nombre: o.name, descripcion: o.desc || '', creada: new Date(o.created).toISOString() },
+    sistema_referencia: 'WGS84 / ETRS89 geográficas (EPSG:4326)', capas, bc3: settings.bc3Map || undefined,
     resumen: { capas: capas.length, anotaciones: notePts.length, actuaciones: actFeats.length, fichas_inspeccion: nFichas } }, null, 2));
   Z.file('LEEME.txt', [`OBRA-GIS · ${o.name}`, `Exportado el ${fmtDate(Date.now())}`, '',
     'obra.json                    Datos de la obra y lista de capas (carpeta, orden, estilo, servicios WMS)',
@@ -2302,37 +2832,65 @@ async function exportObraPackage(id) {
     'Para cargar la obra completa en otro móvil: abre este .zip con OBRA-GIS (Compartir → OBRA-GIS, o Obras → Importar obra).',
     'Los GeoJSON se abren directamente en QGIS (coordenadas EPSG:4326).'].join('\r\n'));
   const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/zip', compression: 'DEFLATE', compressionOptions: { level: 5 } });
-  const name = `${root}_${new Date().toISOString().slice(0, 10)}.zip`;
-  try { await saveBlob(blob, name); toast(`Paquete listo: ${name} (${(blob.size / 1048576).toFixed(1).replace('.', ',')} MB)`, 6000); }
-  catch (e) { if (!/cancel/i.test(e.message || '')) toast('No se pudo exportar: ' + (e.message || e), 6000); }
+  const name = `${root}_${stamp()}_${o.id.replace(/[^a-z0-9]/gi, '').slice(-4)}.zip`; // único aunque dos obras se llamen casi igual
+  if (opts.blobOnly) return { blob, name };
+  try {
+    const r = await saveBlob(blob, name, opts);
+    if (!opts.quiet) toast(`Paquete listo: ${name} (${(blob.size / 1048576).toFixed(1).replace('.', ',')} MB)${r && r.where === 'DOCUMENTS' ? ' · en Documentos › OBRA-GIS' : ''}`, 7000);
+    return { name, size: blob.size, where: r && r.where };
+  } catch (e) { if (!/cancel/i.test(e.message || '')) toast('No se pudo exportar: ' + (e.message || e), 8000); return null; }
+}
+// Copia de seguridad de todas las obras (un paquete por obra). Imprescindible antes de desinstalar o cambiar de móvil.
+async function backupAllObras() {
+  const ids = [...obras.keys()]; if (!ids.length) return;
+  toast(`Copia de seguridad de ${ids.length} obra${ids.length > 1 ? 's' : ''}…`, 20000);
+  let ok = 0, where = '';
+  for (const id of ids) { const r = await exportObraPackage(id, { share: false, quiet: true }); if (r) { ok++; where = r.where; } }
+  settings.lastBackup = Date.now(); saveSettings();
+  toast(ok === ids.length ? `Copia hecha: ${ok} paquete${ok > 1 ? 's' : ''} ${where === 'DOCUMENTS' ? 'en Documentos › OBRA-GIS' : where === 'DOWNLOAD' ? 'en Descargas' : 'guardados'}. Para restaurar: Obras → Importar obra.` : `Solo se copiaron ${ok} de ${ids.length} obras.`, 9000);
 }
 async function isObraPackage(file) {
   try { const zip = await JSZip.loadAsync(file); return zip.file(/(^|\/)obra\.json$/)[0] ? zip : null; } catch (e) { return null; }
 }
+// La importación no toca nada de lo que ya hay hasta terminar bien: se lee y valida todo el paquete,
+// se escribe como obra nueva y solo al final, si se eligió «Reemplazar», se borra la obra antigua.
 async function importObraPackage(file, zipIn) {
-  const zip = zipIn || await JSZip.loadAsync(file);
-  const entry = zip.file(/(^|\/)obra\.json$/)[0];
-  if (!entry) { toast('Este .zip no es un paquete de obra de OBRA-GIS.'); return; }
-  const pre = entry.name.replace(/obra\.json$/, '');
-  const meta = JSON.parse(await entry.async('string'));
-  if (meta.formato !== 'OBRA-GIS') { toast('Este .zip no es un paquete de obra de OBRA-GIS.'); return; }
-  const exists = obras.get(meta.obra.id);
+  const fname = file && file.name ? `«${file.name}»` : 'El paquete';
+  let zip, meta, pre;
+  try {
+    zip = zipIn || await JSZip.loadAsync(file);
+    const entry = zip.file(/(^|\/)obra\.json$/)[0];
+    if (!entry) { toast(`${fname} no es un paquete de obra de OBRA-GIS.`, 6000); return; }
+    pre = entry.name.replace(/obra\.json$/, '');
+    meta = JSON.parse(await entry.async('string'));
+    if (meta.formato !== 'OBRA-GIS' || !meta.obra || !meta.obra.id) throw new Error('obra.json no tiene el formato de OBRA-GIS');
+    for (const path of ['datos/anotaciones.geojson', 'datos/fotos_importadas.geojson', 'datos/actuaciones.geojson', 'datos/recursos.geojson']) { // comprobar antes de escribir nada
+      const f = zip.file(pre + path); if (f) { const j = JSON.parse(await f.async('string')); if (!Array.isArray(j.features)) throw new Error(path + ' no es un GeoJSON válido'); }
+    }
+  } catch (e) { toast(`${fname} está dañado y no se ha importado (${e.message || e}). No se ha cambiado nada.`, 8000); return; }
+  // la obra se reconoce por su identificador original (srcId), aunque ya se haya reemplazado antes
+  const exists = obras.get(meta.obra.id) || [...obras.values()].find(x => x.srcId === meta.obra.id);
   const mode = exists ? await askImportMode(exists.name) : 'new';
   if (!mode) return;
   toast('Importando la obra…', 15000);
-  const obraId = mode === 'replace' ? meta.obra.id : (exists ? uid() : meta.obra.id);
-  if (mode === 'replace') await deleteObraData(obraId);
+  const obraId = exists ? uid() : meta.obra.id;
   const o = { id: obraId, name: mode === 'copy' ? meta.obra.nombre + ' (copia)' : meta.obra.nombre, desc: meta.obra.descripcion || '', created: Date.parse(meta.obra.creada) || Date.now() };
+  if (exists && mode === 'replace') o.srcId = meta.obra.id;
+  if (meta.bc3 && typeof meta.bc3 === 'object') { const m0 = { ...(settings.bc3Map || {}) }; for (const [t, v] of Object.entries(meta.bc3)) if (!m0[t] && v && typeof v === 'object') if (t !== '__proto__' && t.length < 200) m0[t] = { code: typeof v.code === 'string' ? bc3Code(v.code) || undefined : undefined, unit: isUnit(v.unit) ? v.unit : undefined, price: typeof v.price === 'number' && isFinite(v.price) && v.price >= 0 && v.price < 1e9 ? v.price : undefined, summary: typeof v.summary === 'string' ? v.summary.slice(0, 200) : undefined }; settings.bc3Map = m0; saveSettings(); }
+  let nN = 0, nA = 0;
+  try {
   await DB.put('obras', o); obras.set(o.id, o);
   const idMap = {};
   for (const c of meta.capas || []) {
     const nid = uid(); idMap[c.id] = nid;
-    const base = { id: nid, obraId, type: c.tipo, name: c.nombre, folder: c.carpeta, order: c.orden, visible: c.visible, opacity: c.opacidad, created: Date.now() };
+    const base = { id: nid, obraId, type: c.tipo, name: c.nombre, folder: c.carpeta, order: c.orden, visible: c.visible, opacity: c.opacidad, created: Date.parse(c.creada) || Date.now() };
+    if (c.dibujada) base.drawn = true;
     if (c.tipo === 'kml') { const f = zip.file(pre + c.archivo); if (!f) continue; Object.assign(base, { text: await f.async('string'), color: c.color || PALETTE[0] }); }
     if (c.tipo === 'wms') Object.assign(base, { kind: c.servicio, url: c.url, layers: c.capas_wms, info: c.consulta, cover: c.cobertura, attribution: c.atribucion, maxNative: c.zoom_max_nativo || undefined });
     if (c.tipo === 'photos') base.order = 0;
     if (c.anchos) base.widths = c.anchos;
     if (c.pk_cada_m) base.pkStep = c.pk_cada_m;
+    if (c.elementos_ocultos) base.hiddenFeats = c.elementos_ocultos;
     if (DEFAULT_FOLDER[c.tipo] === c.carpeta) delete base.folder;
     await DB.put('layers', base);
   }
@@ -2342,12 +2900,11 @@ async function importObraPackage(file, zipIn) {
       const f = zip.file(pre + m.archivo); if (!f) continue;
       const ext = m.archivo.split('.').pop().toLowerCase();
       const kind = { foto: 'photo', video: 'video', audio: 'audio' }[m.tipo] || 'photo';
-      out.push({ id: uid(), kind, blob: new Blob([await f.async('arraybuffer')], { type: m.mime || MIME_EXT[ext] || '' }), mime: m.mime || MIME_EXT[ext] || '', t: Date.now() });
+      out.push({ id: uid(), kind, blob: new Blob([await f.async('arraybuffer')], { type: m.mime || MIME_EXT[ext] || '' }), mime: m.mime || MIME_EXT[ext] || '', t: Date.parse(m.fecha) || Date.now() });
     }
     return out;
   };
   const readFC = async path => { const f = zip.file(pre + path); return f ? JSON.parse(await f.async('string')).features || [] : []; };
-  let nN = 0, nA = 0;
   for (const ft of [...await readFC('datos/anotaciones.geojson'), ...await readFC('datos/fotos_importadas.geojson')]) {
     const p = ft.properties, [lng, lat] = ft.geometry.coordinates;
     await DB.put('notes', { id: uid(), obraId, layerId: p.capa_id ? idMap[p.capa_id] || null : null, lat, lng, title: p.titulo, text: p.texto, created: Date.parse(p.fecha) || Date.now(),
@@ -2357,7 +2914,7 @@ async function importObraPackage(file, zipIn) {
     const p = ft.properties, g = ft.geometry;
     const coords = g.type === 'LineString' ? g.coordinates.map(c => [c[1], c[0]]) : [[g.coordinates[1], g.coordinates[0]]];
     await DB.put('acts', { id: uid(), obraId, layerId: idMap[p.capa_id] || null, featIdx: p.elemento, traceName: p.traza, layerName: p.capa, d0: p.pk_inicio_m, d1: p.pk_fin_m,
-      type: p.tipo, side: p.margen_cod || 'izq', text: p.descripcion, created: Date.parse(p.fecha) || Date.now(), coords, media: await readMedia(p.multimedia) }); nA++;
+      type: p.tipo, side: p.margen_cod || 'izq', text: p.descripcion, created: Date.parse(p.fecha) || Date.now(), updated: Date.parse(p.actualizada) || undefined, params: cleanActParams(p.parametros), prio: ACT_PRIO[p.prioridad_cod] ? p.prioridad_cod : '', coords, media: await readMedia(p.multimedia) }); nA++;
   }
   const afj = zip.file(pre + 'informes/afecciones.json');
   if (afj) { try { const r = JSON.parse(await afj.async('string')); r.rows.forEach(x => { x.layerId = idMap[x.layerId] || x.layerId; }); r.targets.forEach(x => { x.layerId = idMap[x.layerId] || x.layerId; }); await DB.put('kv', r, 'afec:' + obraId); delete afecLastCache[obraId]; } catch (e) { /* informe no válido */ } }
@@ -2367,9 +2924,33 @@ async function importObraPackage(file, zipIn) {
     await DB.put('resources', r); resources.set(r.id, r); drawResource(r);
   }
   await fichaPackImport(zip, pre, obraId, idMap);
+  } catch (e) {
+    console.error(e);
+    try { await deleteObraData(obraId); await DB.del('obras', obraId); } catch (e2) { /* nada */ }
+    obras.delete(obraId);
+    toast(`No se pudo importar ${fname}: ${e.message || e}. ${exists ? 'La obra que tenías sigue intacta.' : 'No se ha creado ninguna obra.'}`, 9000);
+    return;
+  }
+  if (mode === 'replace' && exists) { // ya está todo dentro: ahora sí se quita la versión antigua
+    await deleteObraData(exists.id); await DB.del('obras', exists.id); obras.delete(exists.id);
+    try { const afOld = await DB.get('kv', 'afec:' + exists.id); if (afOld && !(await DB.get('kv', 'afec:' + obraId))) await DB.put('kv', afOld, 'afec:' + obraId); } catch (e) { /* nada */ }
+  }
+  // una obra vacía con el mismo nombre (p. ej. «Mi primera obra» de una instalación nueva) sobra: se quita
+  for (const x of [...obras.values()]) {
+    if (x.id === obraId || x.name !== o.name) continue;
+    const c = await obraCounts(x.id); if (c.layers || c.notes || c.acts) continue;
+    await deleteObraData(x.id); await DB.del('obras', x.id); obras.delete(x.id);
+  }
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
   await loadObra(obraId, true);
   toast(`Obra «${o.name}» importada: ${(meta.capas || []).length} capas, ${nN} anotaciones y ${nA} actuaciones.`, 7000);
+}
+function cleanActParams(p) {
+  const out = {}; if (!p || typeof p !== 'object') return out;
+  Object.entries(p).forEach(([k, v]) => { if (ACT_FIELDS[k] && isFinite(v) && v > 0) out[k] = +v; });
+  if (typeof p.mat === 'string') out.mat = p.mat.slice(0, 80);
+  if (ACT_FORMS[p.forma]) out.forma = p.forma;
+  return out;
 }
 function askImportMode(name) {
   return new Promise(res => {
@@ -2390,7 +2971,14 @@ function askImportMode(name) {
    · «changes»: puntos de cambio; cada ancho vale desde su PK hasta el siguiente cambio (o el final). */
 const fmtW = w => (Math.round(w * 100) / 100).toFixed(2).replace('.', ',') + ' m';
 const fmtArea = a => (a >= 10000 ? (a / 10000).toFixed(3).replace('.', ',') + ' ha' : thousands(a) + ' m²');
-const parseNum = t => { const v = parseFloat(String(t || '').replace(',', '.')); return isFinite(v) ? v : NaN; };
+// Lee un número escrito a mano: «4,5», «4.5», «4,5 m», «1.234,5» (miles con punto), «20cm». Devuelve NaN si no hay número.
+const parseNum = t => {
+  let x = String(t ?? '').trim().toLowerCase().replace(/\s+/g, '').replace(/(m²|m2|m³|m3|cm|mm|kg\/m²|kg|ud|uds|m|t|%)$/, '');
+  if (!x) return NaN;
+  if (x.includes('.') && x.includes(',')) x = x.replace(/\./g, '').replace(',', '.'); else x = x.replace(',', '.');
+  if (!/^[-+]?\d*\.?\d+(e[-+]?\d+)?$/.test(x)) return NaN;
+  const v = parseFloat(x); return isFinite(v) ? v : NaN;
+};
 function widthSegments(data, f) {
   const pts = (data.points || []).filter(p => isFinite(p.w) && p.w > 0 && isFinite(p.d)).sort((a, b) => a.d - b.d);
   const segs = [];
@@ -2508,8 +3096,8 @@ function renderWidthSheet() {
   onSheetClose(() => setTimeout(() => { if (!widthPick && !$('#wRes')) slopeHL.clearLayers(); }, 0));
   b.querySelectorAll('[data-wmode]').forEach(bt => bt.onclick = () => {
     syncWidth(); if (d.mode === bt.dataset.wmode) return;
-    if (d.points.some(p => p.w > 0) && !confirm('Al cambiar de forma de toma de datos se vacía la lista actual. ¿Continuar?')) return;
-    d.mode = bt.dataset.wmode; d.points = d.mode === 'changes' ? [] : d.points; renderWidthSheet();
+    if (d.points.some(p => p.w > 0) && !confirm(bt.dataset.wmode === 'changes' ? 'Los anchos tomados se conservan, pero cada uno pasará a valer desde su PK hasta el siguiente (sin transición entre ellos). El ancho medio puede cambiar. ¿Continuar?' : 'Los anchos tomados se conservan, pero entre dos puntos el ancho pasará a variar de forma gradual. El ancho medio puede cambiar. ¿Continuar?')) return;
+    d.mode = bt.dataset.wmode; renderWidthSheet();
   });
   b.querySelectorAll('[data-wi]').forEach(inp => inp.onchange = () => { syncWidth(); $('#wRes').innerHTML = widthResultsHtml(widthStats(widthSegments(d, f), ...rangeOf(f)), d, f); });
   b.querySelectorAll('[data-wdel]').forEach(bt => bt.onclick = () => { syncWidth(); d.points.splice(+bt.dataset.wdel, 1); renderWidthSheet(); });
@@ -2586,7 +3174,7 @@ slopePickPoint = function (ll) {
   wDraft._wcPk = fmtPK(r.d); renderWidthSheet(); const w = $('#wcW'); if (w) w.focus();
 };
 function widthsExport(recs) {
-  const n = v => String(v).replace('.', ','), q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const n = v => String(v).replace('.', ','), q = csvQ;
   const rows = [['Capa', 'Traza', 'Forma de toma', 'PK inicio', 'PK fin', 'Ancho inicio (m)', 'Ancho fin (m)', 'Longitud (m)', 'Superficie (m2)']];
   const polys = [];
   recs.forEach(r => {
@@ -2595,7 +3183,7 @@ function widthsExport(recs) {
       const f = feats[+fi]; if (!f) return;
       const segs = widthSegments(data, f), st = widthStats(segs); if (!st) return;
       segs.forEach(s => rows.push([r.name, f.name, data.mode === 'changes' ? 'Cambios de ancho' : `Cada ${data.interval} m`, fmtPK(s.a), fmtPK(s.b), n(s.wa), n(s.wb), n((s.b - s.a).toFixed(2)), n(((s.wa + s.wb) / 2 * (s.b - s.a)).toFixed(2))]));
-      rows.push([r.name, f.name, 'TOTAL', fmtPK(st.from), fmtPK(st.to), n(st.min.toFixed(2)) + ' mín', n(st.max.toFixed(2)) + ' máx', n(st.len.toFixed(2)), n(st.area.toFixed(2))]);
+      rows.push([r.name, f.name, 'TOTAL (ancho inicio = mínimo, ancho fin = máximo)', fmtPK(st.from), fmtPK(st.to), n(st.min.toFixed(2)), n(st.max.toFixed(2)), n(st.len.toFixed(2)), n(st.area.toFixed(2))]);
       rows.push([r.name, f.name, 'ANCHO MEDIO', '', '', n(st.mean.toFixed(3)), '', '', '']);
       widthPolygon(f, segs).forEach(pg => polys.push({ type: 'Feature', geometry: { type: 'Polygon', coordinates: [[...pg.ring, pg.ring[0]].map(c => [+c[1].toFixed(7), +c[0].toFixed(7)])] },
         properties: { capa: r.name, traza: f.name, pk_inicio: fmtPK(pg.seg.a), pk_fin: fmtPK(pg.seg.b), ancho_inicio_m: pg.seg.wa, ancho_fin_m: pg.seg.wb,
@@ -2893,7 +3481,7 @@ function resourceList(opt = {}) {
     toast(`${n} recursos importados.`); resourceList(opt);
   };
   b.querySelector('[data-a=exp]').onclick = async () => {
-    const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`, n = v => String(v).replace('.', ',');
+    const q = csvQ, n = v => String(v).replace('.', ',');
     const rows = [['tipo', 'nombre', 'empresa', 'telefono', 'direccion', 'materiales', 'notas', 'lat', 'lon']].concat([...resources.values()].map(r => [r.type, r.name, r.company, r.phone, r.address, r.materials, r.notes, n(r.lat.toFixed(6)), n(r.lng.toFixed(6))]));
     try { await saveBlob(new Blob(['\ufeff' + rows.map(r => r.map(q).join(';')).join('\r\n')], { type: 'text/csv' }), 'recursos_OBRA-GIS.csv'); } catch (e) { /* cancelado */ }
   };
@@ -3076,7 +3664,7 @@ function afecResults(rep) {
   b.querySelector('[data-a=new]').onclick = () => afecSheet([...new Set(rep.targets.map(t => t.layerId))]);
 }
 function afecCsv(rep) {
-  const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`, n = v => (Math.round(v * 10) / 10).toString().replace('.', ',');
+  const q = csvQ, n = v => (Math.round(v * 10) / 10).toString().replace('.', ',');
   const head = ['capa', 'elemento', 'tipo', 'pk_inicio', 'pk_fin', 'longitud_m', 'afeccion', 'elemento_afectado', 'organismo', 'datos'];
   return [head.map(q).join(';')].concat(rep.rows.map(r => [r.layer, r.trace, r.kind, fmtPK(r.d0), fmtPK(r.d1), n(r.len), r.svc, r.el, r.org, r.attrs.map(([k, v]) => (k ? k + ': ' : '') + v).join(' | ')].map(q).join(';'))).join('\r\n');
 }
@@ -3130,6 +3718,629 @@ ${rows.length ? `<table><tr><th>PK</th><th>Long.</th><th>Afección</th><th>Eleme
 </body></html>`;
 }
 
+/* ---------------- Informe de la visita ----------------
+   Recoge lo que se ha registrado o cambiado desde una fecha (actuaciones con sus datos y mediciones, anotaciones, fotos,
+   anchos y trazas nuevas) y lo entrega como informe para imprimir o guardar en PDF, con resumen de mediciones y CSV. */
+const dayStart = t => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
+const plural = (n, a, b) => `${n} ${n === 1 ? a : b}`;
+const stamp = (t = Date.now()) => { const d = new Date(t); return isoDay(d) + '_' + String(d.getHours()).padStart(2, '0') + String(d.getMinutes()).padStart(2, '0') + String(d.getSeconds()).padStart(2, '0'); }; // fecha y hora para nombres de fichero
+const isoDay = t => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+function visitReportSheet() {
+  const all = [...acts.values()], last = all.reduce((m, a) => Math.max(m, a.updated || a.created || 0), 0);
+  const since0 = settings.visitSince && settings.visitSince <= Date.now() ? settings.visitSince : dayStart(last || Date.now());
+  const b = openSheet(`<h2>Informe de la visita</h2><p class="sub">${esc((obras.get(settings.activeObra) || {}).name || '')} · actuaciones, anotaciones, fotos, anchos y trazas nuevas</p>
+    <div class="pkrow"><div class="field"><label for="vrSince">Cambios desde el día</label><input type="date" id="vrSince" value="${isoDay(since0)}"></div>
+      <div class="field"><label for="vrWho">Técnico</label><input type="text" id="vrWho" value="${esc(settings.surveyor || '')}" placeholder="Nombre"></div></div>
+    <label class="opt"><input type="checkbox" id="vrAll">Incluir todo lo registrado en la obra (sin filtrar por fecha)</label>
+    <label class="opt"><input type="checkbox" id="vrPh" checked>Incluir las fotos</label>
+    <div class="field"><label for="vrObs">Observaciones generales</label><textarea id="vrObs" rows="3" placeholder="Estado general del camino, accesos, incidencias…">${esc(settings.visitObs || '')}</textarea></div>
+    <p class="hint" id="vrCount"></p>
+    <div class="acts"><button class="btn pri full" data-a="html">Generar informe (imprimir o PDF)</button><button class="btn" data-a="csv">Mediciones en CSV</button></div>`);
+  const opts = () => ({ since: $('#vrAll').checked ? 0 : new Date($('#vrSince').value + 'T00:00:00').getTime() || 0, who: $('#vrWho').value.trim(), photos: $('#vrPh').checked, obs: $('#vrObs').value.trim() });
+  const count = () => { const d = visitData(opts()); $('#vrCount').textContent = `${plural(d.acts.length, 'actuación', 'actuaciones')} · ${plural(d.notes.length, 'anotación', 'anotaciones')} · ${plural(d.photos, 'foto', 'fotos')} · ${d.widths.length} trazas con anchos · ${d.newTraces.length} trazas nuevas`; };
+  b.querySelectorAll('input,textarea').forEach(x => x.onchange = count); count();
+  const save = o => { settings.surveyor = o.who; settings.visitObs = o.obs; if (o.since) settings.visitSince = o.since; saveSettings(); };
+  b.querySelector('[data-a=html]').onclick = async () => {
+    const o = opts(); save(o); const bt = b.querySelector('[data-a=html]'); bt.disabled = true; bt.textContent = 'Preparando el informe…';
+    try { const html = await visitHtml(o); await saveBlob(new Blob([html], { type: 'text/html' }), `informe_visita_${safeName((obras.get(settings.activeObra) || {}).name)}_${isoDay(Date.now())}.html`); }
+    catch (e) { if (!/cancel/i.test(e.message || '')) toast('No se pudo generar el informe: ' + (e.message || e), 7000); }
+    bt.disabled = false; bt.textContent = 'Generar informe (imprimir o PDF)';
+  };
+  b.querySelector('[data-a=csv]').onclick = async () => { const o = opts(); save(o); const d = visitData(o);
+    if (!d.acts.length) { toast('No hay actuaciones en ese periodo.'); return; }
+    try { await saveBlob(new Blob([actsCSV(d.acts)], { type: 'text/csv' }), `mediciones_visita_${isoDay(Date.now())}.csv`); } catch (e) { /* cancelado */ } };
+}
+// Longitud de traza cubierta por actuaciones, sin contar dos veces los solapes
+function unionLen(list) {
+  const iv = list.map(a => [a.d0, a.d1]).sort((x, y) => x[0] - y[0]); let tot = 0, cur = null;
+  iv.forEach(([a, b]) => { if (!cur || a > cur[1]) { if (cur) tot += cur[1] - cur[0]; cur = [a, b]; } else cur[1] = Math.max(cur[1], b); });
+  return tot + (cur ? cur[1] - cur[0] : 0);
+}
+function visitData(o) {
+  const ch = x => (x.updated || x.created || 0) >= o.since;
+  const actsL = actsSorted().filter(ch), notesL = [...notes.values()].filter(n => !n.layerId && (n.created || 0) >= o.since).sort((a, b) => a.created - b.created);
+  const widths = [], newTraces = [];
+  layers.forEach(e => {
+    if (typeOf(e.rec) !== 'kml') return;
+    if (e.rec.drawn && (e.rec.created || 0) >= o.since) newTraces.push(e);
+    Object.entries(e.rec.widths || {}).forEach(([fi, w]) => { if ((w.updated || 0) >= o.since || !o.since) { const f = e.feats[+fi]; if (f) { const st = widthStats(widthSegments(w, f)); if (st) widths.push({ e, f, st }); } } });
+  });
+  const photos = actsL.reduce((s, a) => s + (a.media || []).filter(m => m.kind === 'photo').length, 0) + notesL.reduce((s, n) => s + (n.media || []).filter(m => m.kind === 'photo').length, 0);
+  return { acts: actsL, notes: notesL, widths, newTraces, photos };
+}
+async function photoDataUrl(blob, max = 900) {
+  try {
+    const bmp = await createImageBitmap(blob); const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', 0.72);
+  } catch (e) { return null; }
+}
+// Croquis de una traza con sus actuaciones numeradas (SVG, sin fondo cartográfico)
+function traceSvg(f, list, num) {
+  const P = c => L.CRS.EPSG3857.project(L.latLng(c[0], c[1]));
+  const base = segmentCoords(f, 0, f.length), ps = base.map(P);
+  const x0 = Math.min(...ps.map(p => p.x)), x1 = Math.max(...ps.map(p => p.x)), y0 = Math.min(...ps.map(p => p.y)), y1 = Math.max(...ps.map(p => p.y));
+  const W = 700, pad = 30, dx = (x1 - x0) || 1, dy = (y1 - y0) || 1, H = Math.round(Math.min(460, Math.max(160, dy / dx * (W - 2 * pad) + 2 * pad))), s = Math.min((W - 2 * pad) / dx, (H - 2 * pad) / dy);
+  const T = c => { const p = P(c); return [pad + (p.x - x0) * s, H - pad - (p.y - y0) * s]; };
+  const pl = cs => cs.map(c => T(c).map(v => v.toFixed(1)).join(',')).join(' ');
+  const kc = 1 / Math.cos(base[0][0] * Math.PI / 180), sc = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000].find(v => v * kc * s >= 70) || 5000, scPx = sc * kc * s;
+  let g = `<polyline points="${pl(base)}" fill="none" stroke="#777" stroke-width="3" stroke-linecap="round"/>`;
+  const [sx, sy] = T(base[0]), [ex, ey] = T(base[base.length - 1]);
+  g += `<circle cx="${sx}" cy="${sy}" r="5" fill="#0b6e4f"/><text x="${sx + 7}" y="${sy - 7}" font-size="11">0+000</text><circle cx="${ex}" cy="${ey}" r="5" fill="#e8590c"/><text x="${ex > W - 80 ? ex - 7 : ex + 7}" y="${ey - 9}" font-size="11" text-anchor="${ex > W - 80 ? 'end' : 'start'}">${fmtPK(f.length)}</text>`;
+  const placed = [];
+  list.forEach(a => { const col = actColor(a.type), cs = a.coords && a.coords.length ? a.coords : segmentCoords(f, a.d0, a.d1);
+    g += cs.length > 1 ? `<polyline points="${pl(cs)}" fill="none" stroke="${col}" stroke-width="7" stroke-linecap="butt" opacity=".9"/>` : `<circle cx="${T(cs[0])[0]}" cy="${T(cs[0])[1]}" r="6" fill="${col}"/>`;
+    let [lx, ly] = T(cs[Math.floor(cs.length / 2)]); const ax = lx, ay = ly;
+    for (let k = 0; k < 12 && placed.some(([px, py]) => Math.hypot(px - lx, py - ly) < 20); k++) ly = ay - 22 * (k % 2 ? -(k + 1) / 2 : (k + 2) / 2); // separa números que se tapan
+    placed.push([lx, ly]); if (ly !== ay) g += `<line x1="${ax}" y1="${ay}" x2="${lx}" y2="${ly}" stroke="${col}" stroke-width="1"/>`;
+    g += `<circle cx="${lx}" cy="${ly}" r="9" fill="#fff" stroke="${col}" stroke-width="2"/><text x="${lx}" y="${ly + 4}" font-size="10" font-weight="700" text-anchor="middle">${num.get(a.id)}</text>`; });
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px;border:1px solid #ccc;background:#fafaf7">${g}<line x1="10" y1="14" x2="${10 + scPx}" y2="14" stroke="#000" stroke-width="2"/><text x="${14 + scPx}" y="18" font-size="11">${sc >= 1000 ? sc / 1000 + ' km' : sc + ' m'}</text><text x="${W - 26}" y="22" font-size="15" font-weight="700">N↑</text></svg>`;
+}
+async function visitHtml(o) {
+  const E = esc, d = visitData(o), ob = obras.get(settings.activeObra) || {}, num = new Map(); d.acts.forEach((a, i) => num.set(a.id, i + 1));
+  const ph = async list => { if (!o.photos) return ''; const out = []; for (const m of (list || []).filter(x => x.kind === 'photo')) { const u = await photoDataUrl(m.blob); if (u) out.push(u); } return out; };
+  // por traza
+  const byTrace = new Map(); d.acts.forEach(a => { const k = a.layerId + '#' + a.featIdx; byTrace.set(k, [...(byTrace.get(k) || []), a]); });
+  let tracesHtml = '';
+  for (const [, list] of byTrace) {
+    const ctx = featOf(list[0]), f = ctx && ctx.f, wst = f && ctx.rec.widths && ctx.rec.widths[list[0].featIdx] ? widthStats(widthSegments(ctx.rec.widths[list[0].featIdx], f)) : null;
+    tracesHtml += `<h2>${E(list[0].traceName)} <small>${E(list[0].layerName || '')}</small></h2>
+      <p>${f ? `Longitud de la traza: <b>${fmtLen(f.length)}</b>` : 'Traza no cargada'}${wst ? ` · ancho medio <b>${fmtW(wst.mean)}</b> (${fmtW(wst.min)} – ${fmtW(wst.max)})` : ''} · ${list.length} actuaciones${f ? ` · tramo con actuaciones: <b>${fmtLen(unionLen(list))}</b> (${Math.round(unionLen(list) / f.length * 100)} % de la traza)` : ''}</p>
+      ${f ? traceSvg(f, list, num) : ''}
+      <table><tr><th>Nº</th><th>PK</th><th>Margen</th><th>Actuación</th><th>Datos</th><th>Mediciones</th><th>Observaciones</th></tr>
+      ${list.map(a => `<tr><td><b>${num.get(a.id)}</b></td><td style="white-space:nowrap">${fmtPK(a.d0)}${a.d1 > a.d0 ? '<br>' + fmtPK(a.d1) : ''}</td><td>${E(SIDE_ABBR[a.side] || '')}</td>
+        <td><span class="dot" style="background:${actColor(a.type)}"></span><b>${E(a.type)}</b><br><small>${E(actItem(a.type).catName)}${a.prio ? ' · prioridad ' + E((ACT_PRIO[a.prio] || [a.prio])[0].toLowerCase()) : ''}</small></td>
+        <td>${actParamRows(a).filter(([k]) => k !== 'Prioridad').map(([k, v]) => `${E(k)}: ${E(String(v))}`).join('<br>')}</td><td>${actMeasRows(a).map(([k, v]) => `${E(k)}: <b>${E(v)}</b>`).join('<br>')}</td><td>${E(a.text || '')}</td></tr>`).join('')}</table>`;
+    for (const a of list) { const imgs = await ph(a.media); if (imgs && imgs.length) tracesHtml += `<div class="ph">${imgs.map((u, i) => `<figure><img src="${u}"><figcaption>${num.get(a.id)}. ${E(a.type)} · PK ${fmtPK(a.d0)}${imgs.length > 1 ? ` (${i + 1})` : ''}</figcaption></figure>`).join('')}</div>`; }
+  }
+  let notesHtml = '';
+  if (d.notes.length) {
+    notesHtml = `<h2>Anotaciones</h2><table><tr><th>Nº</th><th>Anotación</th><th>Coordenadas</th><th>Fecha</th></tr>${d.notes.map((n, i) => `<tr><td>A${i + 1}</td><td><b>${E(n.title || 'Anotación')}</b>${n.text ? '<br>' + E(n.text) : ''}</td><td>${fmtLL(n.lat, n.lng)}<br><small>${fmtUTM(n.lat, n.lng)}</small></td><td>${fmtDate(n.created)}</td></tr>`).join('')}</table>`;
+    for (const [i, n] of d.notes.entries()) { const imgs = await ph(n.media); if (imgs && imgs.length) notesHtml += `<div class="ph">${imgs.map(u => `<figure><img src="${u}"><figcaption>A${i + 1}. ${E(n.title || '')}</figcaption></figure>`).join('')}</div>`; }
+  }
+  const wHtml = d.widths.length ? `<h2>Anchos del camino</h2><table><tr><th>Traza</th><th>Tramo medido</th><th>Ancho medio</th><th>Mín. – máx.</th><th>Superficie</th></tr>${d.widths.map(w => `<tr><td>${E(w.f.name)}</td><td>PK ${fmtPK(w.st.from)} – ${fmtPK(w.st.to)} (${fmtLen(w.st.len)})</td><td><b>${fmtW(w.st.mean)}</b></td><td>${fmtW(w.st.min)} – ${fmtW(w.st.max)}</td><td>${fmtArea(w.st.area)}</td></tr>`).join('')}</table>` : '';
+  const ntHtml = d.newTraces.length ? `<h2>Trazas nuevas dibujadas o grabadas</h2><ul>${d.newTraces.map(e => `<li>${E(e.rec.name)}: ${e.feats.map(f => f.type === 'ln' ? `${E(f.name)} (${fmtLen(f.length)})` : E(f.name)).join(', ')}</li>`).join('')}</ul>` : '';
+  const sum = actsSummary(d.acts), prioA = d.acts.filter(a => a.prio === 'alta');
+  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Informe de visita · ${E(ob.name || '')}</title>
+<style>body{font:13px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#16211c;max-width:960px;margin:24px auto;padding:0 16px}h1{font-size:22px;margin:0 0 4px}h2{font-size:16px;margin:26px 0 8px;border-bottom:2px solid #0b3d2e;padding-bottom:3px}h2 small{font-weight:400;color:#5b6b63}
+table{border-collapse:collapse;width:100%;margin:8px 0 12px;font-size:12px}th,td{border:1px solid #cfd8d3;padding:4px 6px;text-align:left;vertical-align:top}th{background:#eef3f0}.sub{color:#5b6b63}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
+.num td:not(:first-child){text-align:right}.ph{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;margin:6px 0 14px}figure{margin:0;break-inside:avoid}figure img{width:100%;border-radius:4px;border:1px solid #ddd}figcaption{font-size:11px;color:#5b6b63}
+.box{background:#f4f7f5;border-radius:6px;padding:8px 10px}.warn{background:#fff4e6;border:1px solid #ffd8a8;padding:8px 10px;border-radius:6px}small{color:#5b6b63}
+@media (max-width:700px){body{margin:12px auto;font-size:12px}table{display:block;overflow-x:auto;font-size:11px}h1{font-size:19px}}
+@media print{body{margin:0;max-width:none}h2{break-after:avoid}tr,figure{break-inside:avoid}}</style></head><body>
+<h1>Informe de visita de campo</h1>
+<p class="sub">Obra: <b>${E(ob.name || '')}</b> · ${o.since ? `cambios desde el ${new Date(o.since).toLocaleDateString('es-ES')}` : 'todo lo registrado'} · emitido el ${new Date().toLocaleString('es-ES')}${o.who ? ` · técnico: <b>${E(o.who)}</b>` : ''} · OBRA-GIS v${APP_VERSION}</p>
+<div class="box"><b>${plural(d.acts.length, 'actuación', 'actuaciones')}</b> en ${byTrace.size} traza${byTrace.size === 1 ? '' : 's'} (${fmtLen([...byTrace.values()].reduce((s, l) => s + unionLen(l), 0))} de camino con actuaciones) · ${d.notes.length} anotaciones · ${d.photos} fotos${d.widths.length ? ` · anchos en ${d.widths.length} trazas` : ''}${d.newTraces.length ? ` · ${d.newTraces.length} trazas nuevas` : ''}${prioA.length ? ` · <b style="color:#e03131">${prioA.length} de prioridad alta</b>` : ''}</div>
+${o.obs ? `<h2>Observaciones generales</h2><p>${E(o.obs).replace(/\n/g, '<br>')}</p>` : ''}
+${sum.length ? `<h2>Resumen de mediciones</h2>${(() => { const cols = [['Longitud (m)', 'L', MEAS_DEC.L], ['Superficie (m²)', 'area', MEAS_DEC.area], ['Volumen (m³)', 'vol', MEAS_DEC.vol], ['Peso (t)', 't', MEAS_DEC.t], ['Unidades', 'ud', 0]].filter(c => sum.some(r => r[c[1]])); // solo las columnas con datos (cabe en el móvil)
+  return `<table class="num"><tr><th>Actuación</th><th>Nº</th>${cols.map(c => `<th>${c[0]}</th>`).join('')}</tr>${sum.map(r => `<tr><td><span class="dot" style="background:${actColor(r.type)}"></span>${E(r.type)}</td><td>${r.n}</td>${cols.map(c => `<td>${r[c[1]] ? nf(r[c[1]], c[2]) : ''}</td>`).join('')}</tr>`).join('')}</table>`; })()}
+<p><small>Mediciones calculadas con los datos tomados en campo (longitud por PK × ancho × espesor; densidades orientativas para el peso). Comprobar antes de usarlas en una medición oficial.</small></p>` : ''}
+${prioA.length ? `<h2>Actuaciones de prioridad alta</h2><ul>${prioA.map(a => `<li><b>${num.get(a.id)}. ${E(a.type)}</b> · ${E(a.traceName)} · PK ${fmtPK(a.d0)}${a.d1 > a.d0 ? '–' + fmtPK(a.d1) : ''}${a.text ? ' · ' + E(a.text) : ''}</li>`).join('')}</ul>` : ''}
+${tracesHtml}${wHtml}${ntHtml}${notesHtml}
+<h2>Nota</h2><p class="warn">Informe generado con OBRA-GIS a partir de los datos tomados en la visita. Los PK se miden sobre la traza del KML; las mediciones son orientativas y deben comprobarse antes de su uso en proyecto o certificación.</p>
+</body></html>`;
+}
+
+/* ---------------- PK en directo: dónde estoy respecto a la traza más cercana ---------------- */
+let livePkT = 0, livePkCur = null, livePkTO = null;
+function updateLivePK() {
+  if (settings.livePK === false || !lastPos) { const el0 = $('#livePk'); if (el0) el0.hidden = true; return; }
+  if (Date.now() - livePkT < 1500) { clearTimeout(livePkTO); livePkTO = setTimeout(updateLivePK, 1510 - (Date.now() - livePkT)); return; } livePkT = Date.now(); // la última posición se aplica siempre (no se queda una lectura vieja)
+  let el = $('#livePk');
+  if (!el) { el = document.createElement('div'); el.id = 'livePk'; el.className = 'livepk'; el.hidden = true; document.body.appendChild(el); el.onclick = livePkMenu; }
+  const n = nearestTrace(L.latLng(lastPos.lat, lastPos.lng));
+  if (!n || n.off > 60) { el.hidden = true; livePkCur = null; return; }
+  const a = pointAtPK(n.f, Math.max(0, n.d - 2)), b = pointAtPK(n.f, Math.min(n.f.length, n.d + 2)), k = Math.cos(lastPos.lat * Math.PI / 180);
+  const cross = (b.lng - a.lng) * k * (lastPos.lat - a.lat) - (b.lat - a.lat) * (lastPos.lng - a.lng) * k;
+  const fi = layers.get(n.rec.id).feats.indexOf(n.f), w = roadWidthAt(n.rec, fi, n.d, n.d);
+  livePkCur = { ...n, fi };
+  if (walkAct) showWalkBar();
+  el.innerHTML = `${esc(n.f.name)} · PK ${fmtPK(n.d)}<small>${n.off < 2 ? 'en el eje' : `${Math.round(n.off)} m a la ${cross > 0 ? 'izquierda' : 'derecha'}`}${w ? ' · ancho ' + fmtW(w) : ''}</small>`;
+  el.hidden = false;
+}
+function livePkMenu() {
+  const c = livePkCur; if (!c) return;
+  const b = openSheet(`<h2>PK ${fmtPK(c.d)}</h2><p class="sub">${esc(c.f.name)} · ${esc(c.rec.name)} · a ${Math.round(c.off)} m del eje</p>
+    <div class="acts">${walkHere() ? `<button class="btn go full" data-a="wend">Terminar aquí el tramo de ${esc(walkAct.draft.type)}</button>` : `<button class="btn go full" data-a="wstart">${ICON.road}Empezar tramo aquí</button>`}
+      <button class="btn full" data-a="act">${ICON.road}Actuación en este punto</button>${repeatRow()}
+      <button class="btn" data-a="trace">Ficha de la traza</button><button class="btn" data-a="off">Ocultar el PK en directo</button></div>`);
+  b.querySelector('[data-a=act]').onclick = () => openActEditor({ rec: c.rec, f: c.f, d0: c.d, d1: c.d });
+  const ws = b.querySelector('[data-a=wstart]'); if (ws) ws.onclick = () => walkStartSheet();
+  const we = b.querySelector('[data-a=wend]'); if (we) we.onclick = () => { closeSheet(); if (walkAct) walkAct.shown = 0; walkEnd(false); };
+  const rp = b.querySelector('[data-a=rep]'); if (rp) rp.onclick = () => repeatLastAct();
+  const rw = b.querySelector('[data-a=repw]'); if (rw) rw.onclick = () => repeatWalk();
+  b.querySelector('[data-a=trace]').onclick = () => { const p = pointAtPK(c.f, c.d); featureSheet(c.f, L.latLng(p.lat, p.lng), c.rec); };
+  b.querySelector('[data-a=off]').onclick = () => { settings.livePK = false; saveSettings(); $('#livePk').hidden = true; closeSheet(); toast('PK en directo desactivado. Se vuelve a activar en Capas → Ajustes.', 5000); };
+}
+
+/* ---------------- Aviso de versión nueva (app Android) ----------------
+   version.json se publica junto a la web. Si hay una versión más reciente, la app lo avisa y ofrece hacer antes una copia de seguridad. */
+const VERSION_URL = 'https://celtis-eng.github.io/OBRAGIS/version.json';
+async function checkAppUpdate(manual) {
+  if (!NATIVE && !manual) return;
+  let v; try { v = JSON.parse(await httpGetText(VERSION_URL + '?t=' + Date.now())); } catch (e) { if (manual) toast('No se pudo comprobar: sin conexión.'); return; }
+  if (!v || !v.version || !semverLess(APP_VERSION, v.version)) { if (manual) toast(`Tienes la última versión (${APP_VERSION}).`); return; }
+  if (!manual && settings.updDismiss === v.version) return;
+  let el = $('#upBanner'); if (!el) { el = document.createElement('div'); el.id = 'upBanner'; el.className = 'upbanner'; document.body.appendChild(el); }
+  const apk = v.apk || 'https://github.com/Celtis-eng/OBRAGIS/releases/download/apk/CampoKML.apk';
+  el.innerHTML = `<b>Hay una versión nueva de OBRA-GIS: ${esc(v.version)}</b>${v.notas ? `<br><small>${esc(v.notas)}</small>` : ''}<br>Antes de instalarla, haz una copia de seguridad de tus obras.
+    <div class="row"><button class="mini pri" data-u="bk">1. Copia de seguridad</button><a class="mini" href="${esc(apk)}" target="_blank" rel="noopener" data-u="dl">2. Descargar e instalar</a><button class="mini" data-u="no">Más tarde</button></div>`;
+  el.hidden = false;
+  el.querySelector('[data-u=bk]').onclick = () => backupAllObras();
+  el.querySelector('[data-u=no]').onclick = () => { settings.updDismiss = v.version; saveSettings(); el.hidden = true; };
+}
+
+/* ---------------- Tramo andando: «Empezar aquí» y «Terminar aquí» ----------------
+   Se elige el tipo, se empieza en el PK donde estás y se termina al llegar al final, sin tener el editor abierto. */
+let walkAct = null; // { draft, t }
+const walkHere = () => !!(walkAct && walkAct.draft.obraId === settings.activeObra);
+async function currentTracePos() {
+  const p = await getPos(); const n = nearestTrace(L.latLng(p.lat, p.lng));
+  if (!n) throw new Error('No hay ninguna traza KML visible cerca.');
+  return { ...n, p };
+}
+function walkStartSheet(pre) {
+  const WALK_COMMON = ['Limpieza de cunetas', 'Desbroce de márgenes', 'Refino y planeo sin aporte', 'Zahorra artificial', 'Cuneta revestida', 'Bacheo'];
+  const types = [...new Set([...(settings.actFav || []), ...(settings.actRecent || []), ...WALK_COMMON])].filter(t => ACT_ITEMS.some(i => i.name === t) && !ACT_POINT.has(t)).slice(0, 6); // un tramo andando no es para caños ni arquetas
+  // primero se elige (tipo y margen) y luego se pulsa «Empezar»: un toque de más solo marca una opción, nunca empieza un tramo
+  const b = openSheet(`<h2>Empezar tramo aquí</h2><p class="sub">1. Elige qué vas a medir · 2. Pulsa «Empezar» · 3. Camina y pulsa «Terminar aquí» al llegar al final.</p>
+    <div class="field"><span class="flabel" id="wsLbl">Margen</span><div class="seg walkseg" role="radiogroup" aria-labelledby="wsLbl"><button type="button" role="radio" aria-checked="${pre && pre.side ? 'false' : 'true'}" class="${pre && pre.side ? '' : 'on'}" data-ws="auto">Automático</button>${Object.entries(SIDES).map(([k, v]) => `<button type="button" role="radio" aria-checked="${pre && k === pre.side ? 'true' : 'false'}" class="${pre && k === pre.side ? 'on' : ''}" data-ws="${k}">${esc(v.replace('Margen ', '').replace(' / calzada', '').replace(' márgenes', ''))}</button>`).join('')}</div>
+      <p class="hint">Automático: cunetas y desbroces en los dos márgenes; firmes en el eje.</p></div>
+    <div class="field"><span class="flabel" id="wtLbl">Qué vas a medir</span>
+    ${types.length ? `<div class="bigtypes" role="radiogroup" aria-labelledby="wtLbl">${types.map(t => `<button type="button" class="btn" role="radio" aria-checked="false" data-wt="${esc(t)}"><span class="dot" style="background:${actColor(t)}"></span>${esc(t)}</button>`).join('')}</div>` : ''}
+    <label for="wType" class="small">u otro tipo</label>${actTypeSelect('', true).replace('id="aType"', 'id="wType"')}</div>
+    <div class="savebar"><button class="btn go full" data-a="wgo" disabled>Elige primero qué vas a medir</button></div>`);
+  let side = pre && pre.side || 'izq', sideSet = !!(pre && pre.side), type = '';
+  const GO = b.querySelector('[data-a=wgo]');
+  const pick = t => { type = t; b.querySelectorAll('[data-wt]').forEach(x => { const on = x.dataset.wt === t; x.classList.toggle('on', on); x.setAttribute('aria-checked', on); });
+    if ($('#wType').value !== t) $('#wType').value = ACT_ITEMS.some(i => i.name === t) && !types.includes(t) ? t : '';
+    GO.disabled = !t; GO.textContent = t ? `▶ Empezar aquí: ${t}` : 'Elige primero qué vas a medir'; };
+  b.querySelectorAll('[data-ws]').forEach(bt => bt.onclick = () => { sideSet = bt.dataset.ws !== 'auto'; if (sideSet) side = bt.dataset.ws; b.querySelectorAll('[data-ws]').forEach(x => { x.classList.toggle('on', x === bt); x.setAttribute('aria-checked', x === bt); }); });
+  b.querySelectorAll('[data-wt]').forEach(bt => bt.onclick = () => pick(bt.dataset.wt));
+  $('#wType').onchange = () => pick($('#wType').value);
+  GO.onclick = () => { if (type) startWalk(type, sideSet ? side : defaultSideFor(type, side), lastParamsOf(type).params); };
+  if (pre && pre.type) pick(pre.type);
+}
+async function startWalk(type, side, params) {
+  if (walkAct) { const o = obras.get(walkAct.draft.obraId);
+    if (!confirm(`Ya hay un tramo de «${walkAct.draft.type}» empezado${walkAct.draft.obraId !== settings.activeObra ? ` en la obra «${o ? o.name : '¿?'}»` : ''} en el PK ${fmtPK(walkAct.draft.d0)}. ¿Descartarlo y empezar este?`)) return; }
+  toast('Obteniendo posición GPS…', 2500);
+  let n; try { n = await currentTracePos(); } catch (e) { toast((e.code ? geoErr(e) : e.message), 6000); return; }
+  if (n.off > 50) { toast(`Estás a ${Math.round(n.off)} m de «${n.f.name}»: acércate al camino (menos de 50 m) para empezar el tramo.`, 7000); return; }
+  hideUndo(); const e = layers.get(n.rec.id);
+  walkAct = { draft: { id: uid(), obraId: settings.activeObra, layerId: n.rec.id, featIdx: e.feats.indexOf(n.f), traceName: n.f.name, layerName: n.rec.name, d0: n.d, d1: n.d, type, side, text: '', media: [], created: Date.now(), coords: [], params: { ...(params || {}) }, prio: '' }, t: Date.now() };
+  try { await DB.put('kv', walkAct, 'walk'); } catch (er) { /* nada */ }
+  startWatch(); keepAwake(true); buzz(60); closeSheet(); showWalkBar(); toast(`Tramo de «${type}» empezado en el PK ${fmtPK(n.d)}. Pulsa «Terminar aquí» al llegar al final.`, 6000);
+}
+// Deshacer en lugar de preguntar: una barra con «Deshacer» durante unos segundos
+let undoT = null;
+function showUndo(msg, fn, ms = 8000) {
+  let el = $('#undoBar'); if (!el) { el = document.createElement('div'); el.id = 'undoBar'; el.className = 'undobar'; el.setAttribute('role', 'status'); document.body.appendChild(el); }
+  el.innerHTML = `<span>${esc(msg)}</span><button class="mini" type="button">Deshacer</button>`; el.hidden = false; $('#toast').hidden = true;
+  clearTimeout(undoT); undoT = setTimeout(() => { el.hidden = true; }, ms);
+  const t0 = Date.now(); el.querySelector('button').onclick = async () => { if (Date.now() - t0 < 600) return; clearTimeout(undoT); el.hidden = true; try { await fn(); } catch (e) { toast('No se pudo deshacer: ' + (e.message || e), 6000); } };
+}
+function hideUndo() { clearTimeout(undoT); const el = $('#undoBar'); if (el) el.hidden = true; } // un «Deshacer» viejo no debe actuar sobre una situación nueva
+const buzz = p => { try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) { /* nada */ } }; // vibración al empezar y terminar (se nota con guantes)
+// Pantalla siempre encendida mientras hay un tramo en marcha (si el móvil lo permite)
+let wakeLock = null;
+async function keepAwake(on) {
+  try { if (on && !wakeLock && navigator.wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); }
+    if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; } } catch (e) { wakeLock = null; }
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && walkHere()) keepAwake(true); });
+// Datos de la última actuación del mismo tipo (para no volver a escribir ancho, espesor…)
+function lastParamsOf(type) { const a = [...acts.values()].filter(x => x.type === type && x.obraId === settings.activeObra).sort((x, y) => (y.updated || y.created) - (x.updated || x.created))[0];
+  const p = a ? { ...(a.params || {}) } : {}; delete p._wAuto; return { params: p, side: a && a.side }; }
+// Sigue andando: nuevo tramo del mismo tipo, margen y datos que empieza donde terminó el anterior (sin pedir GPS)
+async function continueWalk(a, at, opts = {}) {
+  const ctx = featOf(a), from = isFinite(at) ? at : a.d1; // «at» = PK donde empieza el siguiente (hacia atrás, el menor)
+  if (!ctx || !ctx.f || (from >= ctx.f.length - 0.5 && !(isFinite(at) && at < a.d1)) || (isFinite(at) && at <= 0.5 && at < a.d1)) { toast('Fin del camino: no hay más tramo que seguir.', 5000); return false; }
+  walkAct = { draft: { id: uid(), obraId: a.obraId, layerId: a.layerId, featIdx: a.featIdx, traceName: a.traceName, layerName: a.layerName, d0: from, d1: from, type: a.type, side: a.side, text: '', media: [], created: Date.now(), coords: [], params: { ...(a.params || {}) }, prio: '', _noMeasChain: !!opts.noMeas }, t: Date.now() };
+  try { await DB.put('kv', walkAct, 'walk'); } catch (e) { /* nada */ }
+  startWatch(); keepAwake(true); showWalkBar(); toast(`Siguiente tramo de «${a.type}» desde el PK ${fmtPK(from)}.`, 4000);
+  return true;
+}
+// «Repetir la última» andando: mismo tipo, margen y datos; empieza aquí y se termina al llegar
+function repeatWalk() { const a = lastLinear(); if (!a) { toast('Todavía no hay ningún tramo que repetir.'); return; } const p = { ...(a.params || {}) }; delete p._wAuto; startWalk(a.type, a.side, p); }
+// «▶ Seguir»: junto al «+», un toque empieza andando otro tramo como el último (tipo, margen y medidas)
+const lastLinear = () => [...acts.values()].filter(a => a.obraId === settings.activeObra && !ACT_POINT.has(a.type)).sort((a, b) => (b.updated || b.created) - (a.updated || a.created))[0] || null;
+const SHORT_TYPE = { 'Desbroce de márgenes': 'Desbroce márg.', 'Desbroce de la traza': 'Desbroce traza', 'Limpieza de cunetas': 'Cunetas', 'Demolición de firme existente': 'Demolición', 'Fresado de firme asfáltico': 'Fresado', 'Machacado y escarificado de firme': 'Machacado', 'Refino y planeo sin aporte': 'Refino', 'Escarificado y compactación': 'Escarificado', 'Excavación / desmonte': 'Excavación', 'Terraplén / relleno': 'Terraplén', 'Estabilización de suelos': 'Estabilización', 'Subbase de zahorra natural': 'Zahorra nat.', 'Otra actuación en la explanada': 'Explanada', 'Zahorra artificial': 'Zahorra art.', 'Pavimento de hormigón': 'Hormigón', 'Aglomerado asfáltico en caliente': 'Aglom. caliente', 'Aglomerado asfáltico en frío': 'Aglom. frío', 'Tratamiento superficial': 'Tratamiento', 'Riego de imprimación / adherencia': 'Riego', 'Cuneta en tierra': 'Cuneta tierra', 'Cuneta revestida': 'Cuneta revest.', 'Escollera': 'Escollera', 'Muro': 'Muro', 'Gaviones': 'Gaviones', 'Barrera / bionda': 'Bionda', 'Sobreancho / abanico': 'Sobreancho', 'Apartadero / zona de cruce': 'Apartadero' };
+const shortType = t => SHORT_TYPE[t] || (t.length > 15 ? t.slice(0, 14) + '…' : t);
+function updateSeguir() {
+  let bt = $('#fabSeguir'); const la = lastLinear(), ok = la && !walkHere() && !settings.simple;
+  if (!bt) { if (!ok) return; bt = document.createElement('button'); bt.id = 'fabSeguir'; bt.type = 'button'; bt.className = 'fab seguir'; $('#fabNote').before(bt);
+    bt.onclick = () => repeatWalk(); }
+  bt.hidden = !ok; if (ok) { bt.innerHTML = `<span>▶ ${esc(shortType(la.type))}</span>`; bt.setAttribute('aria-label', `Seguir andando: nuevo tramo de ${la.type} desde aquí`); bt.title = `Nuevo tramo de ${la.type} desde aquí`; }
+}
+function showWalkBar() {
+  setTimeout(updateSeguir, 0);
+  let el = $('#walkBar');
+  if (!walkAct || walkAct.draft.obraId !== settings.activeObra) { if (el) el.hidden = true; return; } // el tramo es de otra obra: se verá al volver a ella
+  if (!el) { el = document.createElement('div'); el.id = 'walkBar'; el.className = 'walkbar'; document.body.appendChild(el);
+    el.innerHTML = `<span data-w="txt"></span><button class="mini pri" data-w="end">Terminar aquí</button><button class="mini" data-w="split" title="Guarda este tramo y empieza otro igual aquí">Guardar y seguir</button><button class="mini" data-w="x" aria-label="Cancelar tramo">✕</button>`;
+    el.querySelector('[data-w=end]').onclick = () => walkEnd(false);
+    el.querySelector('[data-w=split]').onclick = () => walkEnd(true);
+    el.querySelector('[data-w=x]').onclick = async () => { if (!walkAct || Date.now() - walkAct.shown < 1500) return; const prev = walkAct; walkAct = null; await DB.del('kv', 'walk').catch(() => {}); showWalkBar(); keepAwake(false);
+      showUndo(`Tramo de «${prev.draft.type}» cancelado`, async () => { if (prev.draft.obraId !== settings.activeObra) { toast('Ese tramo es de otra obra.'); return; } walkAct = { ...prev, shown: Date.now() }; await DB.put('kv', walkAct, 'walk'); showWalkBar(); keepAwake(true); }); }; }
+  const d = walkAct.draft, here = livePkCur && livePkCur.rec.id === d.layerId && livePkCur.fi === d.featIdx && livePkT >= walkAct.t ? livePkCur.d : null;
+  el.querySelector('[data-w=txt]').innerHTML = `<b>${esc(d.type)}</b><br>PK ${fmtPK(d.d0)}${here != null ? ` → ${fmtPK(here)} · ${fmtLen(Math.abs(here - d.d0))}` : ''}`;
+  if (el.hidden !== false || !walkAct.shown) walkAct.shown = Date.now();
+  el.hidden = false;
+  if (el.offsetHeight > 0) document.documentElement.style.setProperty('--wbh', el.offsetHeight + 'px');
+}
+async function walkEnd(split) {
+  if (!walkAct) return;
+  if (Date.now() - (walkAct.shown || 0) < 1500) return; // la barra acaba de aparecer bajo el dedo: un toque de más no termina el tramo
+  const d = walkAct.draft; let ctx = featOf(d);
+  if (!ctx || !ctx.f) { // la capa se borró y se volvió a cargar: se busca por nombre
+    const e = [...layers.values()].find(x => x.rec.type === 'kml' && x.rec.name === d.layerName && x.feats[d.featIdx] && x.feats[d.featIdx].name === d.traceName);
+    if (e) { d.layerId = e.rec.id; ctx = featOf(d); }
+  }
+  if (!ctx || !ctx.f) { if (confirm(`La traza «${d.traceName}» de este tramo ya no está cargada. ¿Cancelar el tramo?`)) { walkAct = null; await DB.del('kv', 'walk').catch(() => {}); showWalkBar(); } return; }
+  toast('Obteniendo posición GPS…', 2500);
+  let p; try { p = await getPos(); } catch (e) { toast(geoErr(e), 6000); return; }
+  const r = pkAt(ctx.f, L.latLng(p.lat, p.lng));
+  if (r.off > 150 && !confirm(`Estás a ${Math.round(r.off)} m de «${ctx.f.name}». ¿Terminar el tramo en el punto del camino más cercano (PK ${fmtPK(r.d)})?`)) return;
+  if (r.off > 50) toast(`Estás a ${Math.round(r.off)} m de la traza: se usa el punto más cercano.`, 5000);
+  if (Math.abs(r.d - d.d0) < 1) { toast(`Aún estás en el PK ${fmtPK(d.d0)}, donde empezó el tramo: camina hasta el final y pulsa otra vez.`, 6000); return; }
+  hideUndo(); const endAt = r.d, startAt = d.d0; d.d1 = r.d; if (d.d1 < d.d0) [d.d0, d.d1] = [d.d1, d.d0];
+  const prev = { ...walkAct, draft: { ...walkAct.draft, d0: startAt, d1: startAt } }; // copia para «Deshacer» (sin los PK ya reordenados)
+  walkAct = null; await DB.del('kv', 'walk').catch(() => {}); showWalkBar(); keepAwake(false); buzz([60, 80, 60]);
+  if (!Object.keys(d.params || {}).some(k => d.params[k] != null && d.params[k] !== '' && k[0] !== '_')) d.params = lastParamsOf(d.type).params; // mismos datos que la última de su tipo
+  if (split === true && !d._noMeasChain && (() => { const mf = actItem(d.type).fields.filter(k => ['w', 'e', 'h', 'b', 'S'].includes(k)); return mf.length && !mf.some(k => d.params && d.params[k] > 0); })()) {
+    split = false; toast(`Primero indica las medidas de «${d.type}»; las siguientes se copiarán solas.`, 6000); }
+  if (split === true) { // «Terminar y seguir»: se guarda tal cual y empieza el siguiente tramo, con «Deshacer»
+    actDraft = { ...d, _cont: endAt < startAt ? -1 : 1, _split: true, _zeroOk: d.d0 + '|' + d.d1 }; const ok = await saveAct();
+    if (ok) showUndo(`Guardado: ${d.type} ${fmtPK(d.d0)}–${fmtPK(d.d1)}${walkAct ? '. Sigue el siguiente tramo.' : ''}`, async () => { if (d.obraId !== settings.activeObra) { toast('Ese tramo es de otra obra.'); return; } await DB.del('acts', d.id); acts.delete(d.id); drawActs(); walkAct = { ...prev, shown: Date.now() }; await DB.put('kv', walkAct, 'walk'); showWalkBar(); keepAwake(true); });
+    return; }
+  d._walk = true; d._dir = endAt < startAt ? -1 : 1; actDraft = d; renderActEditor(); sheetOpenAt = Date.now() + 1150; // 1,5 s sin toques: el dedo que pulsó «Terminar» está sobre «Guardar»
+  setTimeout(() => { const it = actItem(d.type), f0 = it.fields.find(k => !(d.params && d.params[k] > 0)), el = f0 && $('#pf_' + f0); if (el && it.fields.some(k => ['w', 'e', 'h', 'b', 'S'].includes(k))) el.scrollIntoView({ block: 'center' }); }, 300); // se lleva a las medidas que faltan: solo falta revisar los datos y guardar
+}
+// «Repetir la última»: misma actuación, margen y datos, empezando donde terminó la anterior
+function lastAct() { return [...acts.values()].filter(a => a.obraId === settings.activeObra).sort((a, b) => (b.updated || b.created) - (a.updated || a.created))[0] || null; }
+function repeatLastAct() {
+  const a = lastAct(); if (!a) { toast('Todavía no hay ninguna actuación que repetir.'); return; }
+  const ctx = featOf(a); if (!ctx || !ctx.f) { toast('La traza de la última actuación no está cargada.', 5000); return; }
+  const d0 = Math.min(a.d1, ctx.f.length);
+  actDraft = { ...a, id: uid(), d0, d1: d0, media: [], text: '', created: Date.now(), updated: undefined, params: { ...(a.params || {}) }, _sideSet: true };
+  delete actDraft.params._wAuto;
+  renderActEditor(); toast(`Copia de «${a.type}» desde el PK ${fmtPK(d0)}: indica dónde termina (PK final o «Aquí» junto a «Hasta PK») y guarda.`, 6000);
+  setTimeout(() => { const f1 = $('#aPk1'); if (f1) { f1.focus(); f1.select(); } }, 400);
+}
+// «Repetir la última»: una fila con las dos formas (aquí, escribiendo el final, o andando)
+const repeatRow = () => { const rl = repeatLabel(); if (!rl) return ''; const la = lastAct();
+  return `<div class="reprow"><span><b>↻ Repetir la última</b><small>${esc(rl)}</small></span><button class="mini" data-a="rep">Desde donde acabó</button>${walkHere() || (la && ACT_POINT.has(la.type)) ? '' : '<button class="mini" data-a="repw">Andando desde aquí</button>'}</div>`; };
+const repeatLabel = () => { const a = lastAct(); return a ? `${a.type} ${SIDE_ABBR[a.side] || ''}${actParamRows(a).filter(([k]) => k !== 'Prioridad').length ? ' · ' + actParamRows(a).filter(([k]) => k !== 'Prioridad').map(([, v]) => v).slice(0, 2).join(' · ') : ''}` : ''; };
+
+/* ---------------- Enviar a la oficina: paquete de obra + informe de la visita + mediciones, en un paso ---------------- */
+async function saveBlobsShare(files) { // [{blob, name}]
+  const FS = Plug('Filesystem'), SH = Plug('Share');
+  if (NATIVE && FS) {
+    const uris = []; let where = '';
+    for (const f of files) { const r = await saveBlob(f.blob, f.name, { share: false }); uris.push(r.uri); where = r.where; }
+    if (SH) { try { await SH.share({ title: 'OBRA-GIS', text: files.map(f => f.name).join('\n'), files: uris, dialogTitle: 'Enviar a la oficina' }); } catch (e) { if (/cancel/i.test(e.message || '')) return 'CANCEL'; throw e; } }
+    return where;
+  }
+  const fl = files.map(f => new File([f.blob], f.name, { type: f.blob.type || 'application/octet-stream' }));
+  if (navigator.canShare && navigator.canShare({ files: fl })) { try { await navigator.share({ files: fl, title: 'OBRA-GIS' }); return 'SHARE'; } catch (e) { if (/abort|cancel/i.test(e.name + e.message)) return 'CANCEL'; } }
+  for (const f of files) await saveBlob(f.blob, f.name);
+  return 'DOWNLOAD';
+}
+async function sendToOffice() {
+  const o = obras.get(settings.activeObra); if (!o) return;
+  const sent = (settings.lastSent || {})[o.id] || 0;
+  const b = openSheet(`<h2>Enviar a la oficina</h2><p class="sub">${esc(o.name)}</p>
+    <p>Se prepara todo lo necesario para la oficina:</p>
+    <ul class="ulist"><li><b>Paquete de la obra</b> (.zip): capas, actuaciones, fotos y anchos. Se abre con OBRA-GIS en otro móvil o en el ordenador.</li>
+      <li><b>Informe de la visita</b> (.html): para leer, imprimir o guardar en PDF.</li><li><b>Mediciones</b>: .csv para Excel (lo enviado) y .bc3 para Presto o Arquímedes (toda la obra, con los códigos de partida que hayas asignado).</li></ul>
+    ${(() => { const L0 = actsSorted(), zero = L0.filter(a => a.d1 - a.d0 < 0.5 && !ACT_POINT.has(a.type) && !(actMeasure(a).area || actMeasure(a).vol || actMeasure(a).n)),
+        nodat = L0.filter(a => { const it = actItem(a.type); return !ACT_POINT.has(a.type) && it.fields.some(k => ['w', 'e', 'h', 'b', 'S', 'n'].includes(k)) && !it.fields.some(k => a.params && a.params[k] > 0); }),
+        nofoto = L0.filter(a => !(a.media || []).length && a.prio === 'alta'), items = [[zero, 'de 0 m'], [nodat, 'sin medidas (no saldrá superficie ni volumen)'], [nofoto, 'de prioridad alta sin foto']].filter(x => x[0].length);
+      return items.length ? `<div class="fwarn" role="alert"><b>Antes de enviar, revisa:</b><ul class="revlist">${items.map(([l, t]) => `<li>${plural(l.length, 'actuación', 'actuaciones')} ${t}: ${l.slice(0, 4).map(a => `<button class="linkbtn" data-rv="${esc(a.id)}">${esc(a.type)} ${fmtPK(a.d0)}</button>`).join(' ')}${l.length > 4 ? ' …' : ''}</li>`).join('')}</ul><small>Se puede enviar igualmente.</small></div>` : ''; })()}
+    <label class="opt"><input type="checkbox" id="soSince" ${sent ? 'checked' : ''} ${sent ? '' : 'disabled'}>Informe solo con lo nuevo desde el último envío${sent ? ` (${fmtDate(sent)})` : ''}</label>
+    <div class="field"><label for="soWho">Tu nombre (sale en el informe)</label><input type="text" id="soWho" value="${esc(settings.surveyor || '')}"></div>
+    <div class="savebar"><button class="btn go full" data-a="go">Preparar y enviar</button></div>`);
+  b.querySelectorAll('[data-rv]').forEach(x => x.onclick = () => { const a = acts.get(x.dataset.rv); if (a) { map.fitBounds(L.latLngBounds(a.coords).pad(0.4), { maxZoom: 18 }); viewAct(a.id); } });
+  b.querySelector('[data-a=go]').onclick = async () => {
+    const bt = b.querySelector('[data-a=go]'); bt.disabled = true; bt.textContent = 'Preparando…';
+    settings.surveyor = $('#soWho').value.trim(); saveSettings();
+    const since = $('#soSince').checked ? sent : 0;
+    const all = actsSorted(), nuevas = all.filter(a => (a.updated || a.created || 0) >= since), notasN = [...notes.values()].filter(n => (n.updated || n.created || n.t || 0) >= since);
+    if (!all.length && !notes.size && ![...layers.values()].some(e => e.rec.type === 'kml')) { toast('La obra está vacía: todavía no hay nada que enviar.', 6000); bt.disabled = false; bt.textContent = 'Preparar y enviar'; return; }
+    if (since && !nuevas.length && !notasN.length) { toast('No hay nada nuevo desde el último envío. Quita la marca de «solo lo nuevo» para enviarlo todo otra vez.', 7000); bt.disabled = false; bt.textContent = 'Preparar y enviar'; return; }
+    try {
+      const pkg = await buildObraPackage(o.id, { blobOnly: true }); if (!pkg) throw new Error('no se pudo preparar el paquete');
+      const day = stamp(), base = safeName(o.name).slice(0, 40);
+      const html = await visitHtml({ since, who: settings.surveyor, photos: true, obs: settings.visitObs || '' });
+      const list = actsSorted().filter(a => (a.updated || a.created || 0) >= since);
+      const files = [{ blob: pkg.blob, name: pkg.name }, { blob: new Blob([html], { type: 'text/html' }), name: `informe_visita_${base}_${day}.html` }];
+      if (list.length) files.push({ blob: new Blob([actsCSV(list)], { type: 'text/csv' }), name: `mediciones_${base}_${day}.csv` });
+      if (all.length) files.push({ blob: new Blob([encodeANSI(buildBC3(all, o.name))], { type: 'application/octet-stream' }), name: `mediciones_${base}_${day}.bc3` });
+      const where = await saveBlobsShare(files);
+      if (where === 'CANCEL') { bt.disabled = false; bt.textContent = 'Preparar y enviar'; return; }
+      settings.lastSent = { ...(settings.lastSent || {}), [o.id]: Date.now() }; settings.lastBackup = Date.now(); saveSettings();
+      closeSheet(); toast(where === 'DOCUMENTS' ? 'Listo. Una copia queda en Documentos › OBRA-GIS.' : `Listo: ${files.length} ficheros preparados (paquete, informe${list.length ? ', mediciones' : ''}).`, 7000);
+    } catch (e) { toast('No se pudo preparar el envío: ' + (e.message || e), 8000); bt.disabled = false; bt.textContent = 'Preparar y enviar'; }
+  };
+}
+
+/* ---------------- Modo sencillo y primera vez ---------------- */
+function applySimple() { document.body.classList.toggle('simple', !!settings.simple); }
+function welcomeSheet() {
+  const b = openSheet(`<h2>Bienvenido a OBRA-GIS</h2>
+    <ol class="steps"><li><b>Abre el plano del camino</b> que te manden (KML o KMZ) con «Importar» o desde WhatsApp/correo con «Abrir con OBRA-GIS».</li>
+      <li><b>Pulsa el botón naranja +</b> donde estés para apuntar lo que ves: la app pone sola el punto kilométrico (PK).</li>
+      <li><b>Al terminar</b>, pulsa el botón naranja <b>+</b> o el <b>menú</b> (arriba a la izquierda) y elige <b>«Enviar a la oficina»</b>.</li></ol>
+    <p><b>¿Cómo vas a usar la app?</b></p>
+    <div class="acts"><button class="btn go full" data-r="simple">Apuntar en campo (modo sencillo, letra grande)</button><button class="btn pri full" data-r="full">Técnico: todas las herramientas</button></div>
+    <p class="hint">Se puede cambiar cuando quieras en el menú (arriba a la izquierda) → Ajustes.</p>`);
+  b.querySelectorAll('[data-r]').forEach(bt => bt.onclick = () => { settings.simple = bt.dataset.r === 'simple'; settings.welcomed = true; saveSettings(); applySimple(); closeSheet(); });
+  onSheetClose(() => { if (!settings.welcomed) { settings.welcomed = true; saveSettings(); } });
+}
+
+/* ---------------- Dictado por voz en los cuadros de texto ---------------- */
+const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+function addDictation(textarea) {
+  if (!textarea || textarea.parentNode.querySelector('.dict')) return;
+  const bt = document.createElement('button'); bt.type = 'button'; bt.className = 'mini dict'; bt.innerHTML = `${ICON.audio}Dictar texto`;
+  textarea.insertAdjacentElement('afterend', bt);
+  const SR = Plug('SpeechRecognition'); // app Android: reconocimiento de voz del sistema (ventana de Google)
+  if (NATIVE && SR) {
+    bt.onclick = async () => {
+      try {
+        const av = await SR.available(); if (!av || !av.available) throw new Error('no disponible');
+        try { await SR.requestPermissions(); } catch (e) { /* ya concedido */ }
+        const r = await SR.start({ language: 'es-ES', maxResults: 1, prompt: 'Habla ahora', partialResults: false, popup: true });
+        const t = r && r.matches && r.matches[0]; if (!t) return;
+        textarea.value = (textarea.value ? textarea.value.trimEnd() + ' ' : '') + t.trim(); textarea.dispatchEvent(new Event('input'));
+      } catch (e) { toast('No se pudo dictar. Toca el cuadro de texto y usa el micrófono del teclado.', 6000); }
+    };
+    return;
+  }
+  if (!SpeechRec) { bt.onclick = () => toast('Para dictar, toca el cuadro de texto y pulsa el micrófono del teclado del móvil.', 6000); return; }
+  let rec = null, watchdog = null;
+  const reset = () => { clearTimeout(watchdog); rec = null; bt.classList.remove('rec'); bt.innerHTML = `${ICON.audio}Dictar texto`; };
+  onSheetClose(() => { if (rec) { try { rec.abort(); } catch (e) { /* nada */ } reset(); } }); // al cerrar la ficha se deja de escuchar
+  bt.onclick = () => {
+    if (rec) { rec.stop(); return; }
+    rec = new SpeechRec(); rec.lang = 'es-ES'; rec.interimResults = false; rec.continuous = true;
+    let heard = false;
+    rec.onaudiostart = () => { heard = true; };
+    rec.onresult = e => { heard = true; let t = ''; for (let i = e.resultIndex; i < e.results.length; i++) if (e.results[i].isFinal) t += e.results[i][0].transcript;
+      if (!t.trim()) return; textarea.value = (textarea.value.trim() ? textarea.value.trimEnd() + ' ' : '') + t.trim(); textarea.dispatchEvent(new Event('input')); }; // se añade a lo escrito, nunca lo sustituye
+    rec.onend = reset;
+    rec.onerror = ev => { toast(ev.error === 'not-allowed' || ev.error === 'service-not-allowed' ? 'Sin permiso de micrófono.' : 'No se pudo dictar: toca el cuadro de texto y usa el micrófono del teclado.', 6000); };
+    try { rec.start(); bt.classList.add('rec'); bt.innerHTML = `${ICON.audio}Parar dictado`; } catch (e) { reset(); toast('No se pudo dictar: usa el micrófono del teclado.', 5000); return; }
+    watchdog = setTimeout(() => { if (rec && !heard) { try { rec.abort(); } catch (e) { /* nada */ } reset(); toast('El dictado no responde en este dispositivo. Toca el cuadro de texto y usa el micrófono del teclado.', 7000); } }, 6000);
+  };
+}
+
+/* ---------------- Exportar mediciones a BC3 (FIEBDC-3) ----------------
+   Cada tipo de actuación se asigna a una partida (código, unidad, precio). Se puede cargar una base de precios o un
+   presupuesto en BC3 para elegir sus códigos. Cada actuación es una línea de medición con su PK y dimensiones. */
+const BC3_UNITS = { m: 'm', m2: 'm2', m3: 'm3', t: 't', ud: 'ud', kg: 'kg' };
+const BC3_DEC = { m: MEAS_DEC.L, m2: MEAS_DEC.area, m3: MEAS_DEC.vol, t: MEAS_DEC.t, ud: 0, kg: 0 }; // mismos decimales que en pantalla
+const isUnit = u => typeof u === 'string' && Object.prototype.hasOwnProperty.call(BC3_UNITS, u);
+const normUnit = u => { const x = String(u || '').toLowerCase().replace('²', '2').replace('³', '3').replace(/[\s.]/g, '');
+  return ({ ml: 'm', mlin: 'm', u: 'ud', uds: 'ud', un: 'ud', und: 'ud', tn: 't', tm: 't', tonelada: 't', toneladas: 't', kgs: 'kg' })[x] || x; };
+function defaultUnit(it) {
+  if (ACT_POINT.has(it.name) && (it.fields.includes('n') || !it.fields.some(k => ['area', 'vol'].includes(k)))) return 'ud'; // puntuales que se cuentan (caño, arqueta, entronque, badén…) // badén, entronque…: se apuntan en un PK y se cuentan
+  if (it.fields.includes('S')) return 'm2';
+  if (it.fields.includes('h') && it.fields.includes('b')) return 'm3';
+  if (it.fields.includes('w') && it.fields.includes('h')) return 'm3';
+  if (/aglomerado/i.test(it.name)) return 't';
+  if (it.fields.includes('e') && it.dens) return 'm3';
+  if (it.fields.includes('dot') || (it.fields.includes('w') && !it.fields.includes('e')) || it.fields.includes('area')) return 'm2';
+  if (it.fields.includes('w') && it.fields.includes('e')) return 'm2';
+  if (it.fields.includes('n')) return 'ud'; // caños, arquetas…: por unidad
+  if (it.fields.includes('lt')) return 'm';
+  return 'm';
+}
+// Código propio de una partida: OG + nº del tipo en el catálogo; los tipos antiguos o personalizados llevan uno derivado de su nombre
+function bc3AutoCode(type) {
+  const i = ACT_ITEMS.findIndex(x => x.name === type);
+  if (i >= 0) return 'OG' + String(i + 1).padStart(3, '0');
+  let h = 0; for (const ch of String(type)) h = (h * 31 + ch.codePointAt(0)) >>> 0;
+  return 'OGX' + h.toString(36).toUpperCase().padStart(7, '0'); // completo: dos nombres parecidos no comparten código
+}
+const bc3Code = s => String(s || '').normalize('NFC').replace(/[^\x21-\x7e\xa1-\xff]|[#|\\~]/g, '').slice(0, 20); // solo caracteres que caben en ANSI
+function bc3Map(type) {
+  const it = actItem(type), m = (settings.bc3Map || {})[type] || {}, auto = bc3AutoCode(type);
+  const code = bc3Code(m.code) && bc3Code(m.code) !== auto ? bc3Code(m.code) : '';
+  const price = typeof m.price === 'number' && isFinite(m.price) && m.price >= 0 && m.price < 1e9 ? m.price : 0;
+  return { code: code || auto, unit: isUnit(m.unit) ? m.unit : defaultUnit(it), price, summary: typeof m.summary === 'string' && m.summary ? m.summary : type, own: !!code, auto };
+}
+const bc3Round = (v, d) => Math.round(v * 10 ** d) / 10 ** d;
+// Cantidad y línea de medición de una actuación en la unidad elegida. Las dimensiones de la línea reproducen siempre la
+// cantidad (unidades × longitud × anchura × altura); si no se puede, la cantidad va entera en «unidades».
+function actQty(a, unit) {
+  const it = actItem(a.type), m = actMeasure(a), p = a.params || {}, L = bc3Round(Math.max(0, a.d1 - a.d0), 2), N = m.sides || 1;
+  const com = `${a.traceName || ''} PK ${fmtPK(a.d0)}${a.d1 > a.d0 ? '-' + fmtPK(a.d1) : ''} ${SIDE_ABBR[a.side] || ''}${p.mat ? ' ' + p.mat : ''}`.replace(/\s+/g, ' ').trim();
+  const pos = k => (isFinite(p[k]) && p[k] > 0 ? +p[k] : null);
+  const fF = it.forma ? (ACT_FORMS[p.forma || 'tri'] || ACT_FORMS.tri)[1] : 1;
+  const A = [[N, L, pos('w')], [1, L, pos('w')], [N, L, pos('b')], [N * fF, L, pos('S')]];
+  const V = [...A.map(c => [...c, pos('e') ? pos('e') / 100 : null]), [N, L, pos('b'), pos('h')], [1, L, pos('w'), pos('h')]];
+  const dens = it.dens || 0, dot = pos('dot') || 0;
+  let q = 0, C = [];
+  switch (unit) {
+    case 'm': q = m.tubo || m.Lm || m.L || 0; C = [[N, L], [1, L], [pos('n'), pos('lt')]]; break;
+    case 'm2': q = m.area || 0; C = A; break;
+    case 'm3': q = m.vol || 0; C = V; break;
+    case 't': q = m.t || 0; C = V.map(c => [c[0] * dens, ...c.slice(1)]); break;
+    case 'kg': q = m.kg || 0; C = A.map(c => [c[0] * dot, ...c.slice(1)]); break;
+    case 'ud': q = m.n || 1; C = []; break; // por unidad: cada actuación cuenta 1 si no tiene número
+  }
+  let dims = null, qr = bc3Round(q, 3);
+  if (qr > 0) for (const c of C) {
+    if (c.some(x => !(x > 0))) continue;
+    const cr = c.map((x, i) => bc3Round(x, i === 0 ? 4 : i === 1 ? 2 : 3)), prod = cr.reduce((s, x) => s * x, 1);
+    if (Math.abs(prod - q) <= Math.max(0.01, q * 5e-4)) { dims = cr; qr = bc3Round(prod, 3); break; }
+  }
+  if (!dims) dims = [qr];
+  while (dims.length < 4) dims.push('');
+  if (dims[0] === 1 && dims[1] !== '') dims[0] = '';
+  return { com, n: dims[0], lo: dims[1], an: dims[2], al: dims[3], q: qr };
+}
+const ACT_POINT = new Set(['Badén', 'Paso salvacunetas', 'Arqueta / pozo', 'Caño / obra de drenaje', 'Boquilla / aletas', 'Acceso a finca', 'Entronque / intersección', 'Señalización vertical', 'Bacheo', 'Limpieza de obra de drenaje', 'Demolición de obra de fábrica', 'Tala y poda de arbolado', 'Otro']); // se apuntan en un solo PK
+const it_road = a => !!actItem(a.type).road;
+const bc3Num = v => (v === '' || v == null || !isFinite(v) ? '' : (+v).toLocaleString('en-US', { useGrouping: false, maximumFractionDigits: 4 })); // nunca en notación científica
+// Códigos únicos para todas las partidas (si dos tipos coinciden, el segundo lleva sufijo)
+function bc3Codes(types) { const used = new Set(), out = {}; types.forEach(t => { let c = bc3Map(t).code, k = 2; while (used.has(c)) c = bc3Map(t).code.slice(0, 17) + '_' + k++; used.add(c); out[t] = c; }); return out; }
+function buildBC3(list, obraName) {
+  const day = new Date(), fecha = String(day.getDate()).padStart(2, '0') + String(day.getMonth() + 1).padStart(2, '0') + String(day.getFullYear()).slice(2);
+  const safe = t => String(t || '').normalize('NFC').replace(/[|\\~\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const types = [...new Set(list.map(a => a.type))], codes = bc3Codes(types);
+  const fecha8 = String(day.getDate()).padStart(2, '0') + String(day.getMonth() + 1).padStart(2, '0') + day.getFullYear();
+  const out = [`~V|OBRA-GIS|FIEBDC-3/2016\\${fecha8}|OBRA-GIS ${APP_VERSION}|\\|ANSI|`];
+  out.push(`~K|\\2\\2\\3\\2\\2\\2\\2\\EUR\\|`);
+  out.push(`~C|OBRAGIS##||${safe(obraName)} · mediciones de campo|0|${fecha}|0|`);
+  out.push(`~C|OG01#||Actuaciones medidas en campo (${list.length})|0|${fecha}|0|`);
+  out.push(`~D|OBRAGIS##|OG01#\\1\\1\\|`);
+  const rows = [];
+  types.forEach((t, k) => {
+    const mp = bc3Map(t), code = codes[t], lines = list.filter(a => a.type === t).map(a => actQty(a, mp.unit)), tot = bc3Round(lines.reduce((s, l) => s + l.q, 0), 3);
+    out.push(`~C|${code}|${mp.unit}|${safe(mp.summary)}|${bc3Num(mp.price) || 0}|${fecha}|0|`);
+    out.push(`~T|${code}|${safe(t)}: medición obtenida con OBRA-GIS a partir de las actuaciones tomadas en campo.|`);
+    rows.push(`${code}\\1\\${bc3Num(tot)}`);
+    out.push(`~M|OG01#\\${code}|1\\${k + 1}\\|${bc3Num(tot)}|${lines.map(l => `\\${safe(l.com)}\\${bc3Num(l.n)}\\${bc3Num(l.lo)}\\${bc3Num(l.an)}\\${bc3Num(l.al)}\\`).join('')}|`);
+  });
+  out.push(`~D|OG01#|${rows.join('\\')}\\|`);
+  return out.join('\r\n') + '\r\n';
+}
+function encodeANSI(str) { // windows-1252 (lo que esperan Presto, Arquímedes, etc.)
+  const ext = { '€': 0x80, '‚': 0x82, 'ƒ': 0x83, '„': 0x84, '…': 0x85, '†': 0x86, '‡': 0x87, 'ˆ': 0x88, '‰': 0x89, 'Š': 0x8a, '‹': 0x8b, 'Œ': 0x8c, 'Ž': 0x8e, '‘': 0x91, '’': 0x92, '“': 0x93, '”': 0x94, '•': 0x95, '–': 0x96, '—': 0x97, '˜': 0x98, '™': 0x99, 'š': 0x9a, '›': 0x9b, 'œ': 0x9c, 'ž': 0x9e, 'Ÿ': 0x9f, '−': 0x2d, '·': 0xb7, '²': 0xb2, '³': 0xb3, 'Ø': 0xd8 };
+  str = String(str).normalize('NFC'); const u = new Uint8Array(str.length); let i = 0;
+  for (const ch of str) { const c = ch.codePointAt(0); u[i++] = c < 0x80 || (c >= 0xa0 && c <= 0xff) ? c : ext[ch] || 0x3f; }
+  return u.slice(0, i);
+}
+async function loadBaseBC3(file) {
+  const b = parseBC3(new Uint8Array(await file.arrayBuffer()));
+  // capítulos: con «#» o, en bases que no lo ponen, conceptos sin unidad que tienen descomposición
+  const anyHash = [...b.C.values()].some(c => c.chapter); const isCh = code => { const c = b.C.get(code); return !!c && (c.chapter || (!anyHash && !c.unit && b.D.has(code))); };
+  const enCap = new Set(), enPartida = new Set();
+  for (const [par, kids] of b.D) kids.forEach(k => (isCh(par) ? enCap : enPartida).add(k.code));
+  // precio básico (material, mano de obra, maquinaria): solo está dentro de partidas y nunca directamente en un capítulo
+  const basicos = new Set([...enPartida].filter(c => !enCap.has(c)));
+  const base = [...b.C.values()].filter(c => !isCh(c.code) && c.unit && c.code && !basicos.has(c.code) && !['1', '2', '3'].includes(String(c.type)))
+    .map(c => ({ code: bc3Code(c.code), unit: String(c.unit).slice(0, 10), u: normUnit(c.unit), summary: String(c.summary || c.code).slice(0, 300), price: c.price >= 0 && c.price < 1e9 ? c.price : 0 })).filter(c => c.code);
+  if (!base.length) throw new Error('no tiene partidas con unidad (¿es un fichero BC3?)');
+  await DB.put('kv', { name: file.name, list: base, t: Date.now() }, 'bc3base');
+  return base.length;
+}
+// Propuestas de la base: cada tipo con la partida cuyo resumen contiene sus palabras (palabras completas), en una unidad en la
+// que esas actuaciones se pueden medir; un mismo código no se propone a dos tipos.
+const BC3_STOP = new Set(['para', 'desde', 'hasta', 'como', 'sobre', 'entre', 'otro', 'otra', 'tipo', 'medios', 'material', 'aporte', 'existente', 'obra', 'obras']);
+const BC3_SYN = { aglomerado: ['aglomerad', 'mezcla', 'bitumin'], cano: ['cano', 'tubo', 'tuberia', 'marco'], zahorra: ['zahorra'], arqueta: ['arqueta', 'pozo'], desbroce: ['desbroce', 'despeje'], refino: ['refino', 'perfilado', 'planeo'], pavimento: ['pavimento', 'solera', 'firme'], cuneta: ['cuneta'], escollera: ['escollera'], muro: ['muro'], bionda: ['bionda', 'barrera'], baden: ['baden'] };
+const bc3Words = s => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').split(/[^a-z0-9]+/).filter(w => w.length > 3 && !BC3_STOP.has(w));
+function suggestFromBase(types, base, acts) {
+  const cand = [];
+  types.forEach(t => {
+    const ws = bc3Words(t.replace(/\(.*?\)/g, '')); if (!ws.length) return;
+    const head = BC3_SYN[ws[0]] || [ws[0].slice(0, Math.max(5, ws[0].length - 2))]; // la palabra principal del tipo (o un sinónimo) tiene que aparecer
+    const la = acts.filter(a => a.type === t), def = defaultUnit(actItem(t));
+    base.forEach(c => {
+      if (!isUnit(c.u) || !la.every(a => actQty(a, c.u).q > 0)) return;
+      if (!isUnit(c.u)) return;
+      const sw = bc3Words(c.summary), hit = ws.filter(w => sw.some(x => x.startsWith(w.slice(0, Math.max(5, w.length - 2))))).length;
+      const wm = (x, h) => x === h || x === h + 's' || x === h + 'es' || (h.length >= 5 && x.startsWith(h)); // palabras cortas (caño, tubo) enteras: «canon» no es «caño»
+      if (!sw.some(x => head.some(h => wm(x, h)))) return;
+      const hits = hit + (sw.some(x => x.startsWith(ws[0].slice(0, Math.max(5, ws[0].length - 2)))) ? 0 : 1); // el sinónimo de la palabra principal cuenta
+      if (hits / ws.length < 0.5) return;
+      cand.push({ t, c, s: hits / ws.length + hits * 0.1 + (c.u === def ? 0.3 : 0) });
+    });
+  });
+  cand.sort((x, y) => y.s - x.s);
+  const out = {}, used = new Set(Object.values(settings.bc3Map || {}).map(m => m && m.code).filter(Boolean));
+  for (const x of cand) if (!out[x.t] && !used.has(x.c.code)) { out[x.t] = x.c; used.add(x.c.code); }
+  return out;
+}
+// Precio escrito a mano: «1.250» es mil doscientos cincuenta (miles con punto), «24,80» o «24.8» son decimales
+const parsePrice = v => { const t = String(v || '').trim().replace(/\s*€$/, ''); return /^[1-9]\d{0,2}(\.\d{3})+(,\d+)?$/.test(t) ? parseNum(t.replace(/\./g, '')) : parseNum(t); };
+const priceAmbiguous = v => /^[1-9]\d{0,2}\.\d{3}$/.test(String(v || '').trim()); // «24.800»: ¿miles o decimales? se dice cómo se ha entendido
+const fmtEuro = v => { const [e, d] = (Math.round(v * 100) / 100).toFixed(2).split('.'); return e.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + d + ' €'; }; // 1.250,00 € (con punto de miles también en 4 cifras)
+async function bc3Sheet() {
+  const list = actsSorted(); if (!list.length) { toast('Todavía no hay actuaciones que exportar.'); return; }
+  const types = [...new Set(list.map(a => a.type))];
+  const baseRec = await DB.get('kv', 'bc3base').catch(() => null), base = baseRec ? baseRec.list.map(c => ({ ...c, u: c.u || normUnit(c.unit) })) : [];
+  const sug = base.length ? suggestFromBase(types.filter(t => !bc3Map(t).own), base, list) : {};
+  const fmtQ = (t, u) => { const ls = list.filter(a => a.type === t).map(a => actQty(a, u)), tot = ls.reduce((s, l) => s + l.q, 0), z = ls.filter(l => !(l.q > 0)).length;
+    return `${nf(tot, BC3_DEC[u] || 0)} ${u}${z ? ` · <span class="warn">⚠ ${z} sin datos para medir en ${u}</span>` : ''}`; };
+  const b = openSheet(`<h2>Exportar mediciones a BC3</h2><p class="sub">${plural(list.length, 'actuación', 'actuaciones')} · ${plural(types.length, 'partida', 'partidas')} · formato FIEBDC-3 (Presto, Arquímedes…)</p>
+    <div class="row"><button class="mini" data-a="base">${baseRec ? 'Cambiar' : 'Cargar'} base de precios o presupuesto (.bc3)</button>${baseRec ? `<span class="hint">${esc(baseRec.name)} · ${base.length} partidas</span>` : ''}</div>
+    <p class="hint">Asigna a cada tipo de actuación su código de partida, la unidad en que se mide y, si quieres, el precio. Al elegir un código de la base se toman su unidad y su precio. Se recuerda para la próxima vez.</p>
+    <datalist id="bc3codes">${base.slice(0, 4000).map(c => `<option value="${esc(c.code)}">${esc(c.unit)} · ${esc(c.summary.slice(0, 80))}</option>`).join('')}</datalist>
+    <div class="bc3map">${types.map((t, i) => { const mp = bc3Map(t), sg = sug[t], u = sg ? sg.u : mp.unit, code = sg ? sg.code : mp.own ? mp.code : '';
+      return `<div class="bc3row" data-i="${i}"><div class="bt"><span class="dot" style="background:${actColor(t)}"></span><b>${esc(t)}</b> <small>${list.filter(a => a.type === t).length} act.</small></div>
+        <div class="pgrid3"><input type="text" list="bc3codes" data-k="code" value="${esc(code)}" data-sug="${sg ? esc(sg.code) : ''}" placeholder="${esc(mp.auto)}" aria-label="Código de ${esc(t)}">
+        <select data-k="unit" aria-label="Unidad">${Object.keys(BC3_UNITS).map(x => `<option ${x === u ? 'selected' : ''}>${x}</option>`).join('')}</select>
+        <input type="text" inputmode="decimal" data-k="price" value="${sg && sg.price ? String(sg.price).replace('.', ',') : !sg && mp.price ? String(mp.price).replace('.', ',') : ''}" placeholder="€/${esc(u)}" aria-label="Precio"></div>
+        <small class="rb" data-q>${fmtQ(t, u)}</small><small class="rb" data-s>${sg ? `Propuesta de la base: ${esc(sg.code)} · ${esc(sg.summary.slice(0, 70))}. Revísala.` : ''}</small></div>`; }).join('')}</div>
+    <p class="hint">Vacío = código propio de OBRA-GIS (el gris).</p>
+    <input type="file" id="inBase" accept=".bc3,.BC3" hidden>
+    <div class="savebar"><p class="bc3tot" id="bc3Tot" aria-live="polite"></p><button class="btn pri full" data-a="exp">Exportar BC3</button></div>`);
+  const rows = [...b.querySelectorAll('.bc3row')];
+  // final = al exportar (se aceptan las propuestas); si no (p. ej. al cambiar de base), las propuestas no tocadas no se guardan
+  const read = final => { const map0 = { ...(settings.bc3Map || {}) };
+    rows.forEach(r => { const t = types[+r.dataset.i], g = k => r.querySelector(`[data-k=${k}]`).value.trim(), C = r.querySelector('[data-k=code]');
+      if (!final && C.dataset.sug && C.value.trim() === C.dataset.sug && !r.dataset.touched) return;
+      const code = bc3Code(g('code')), bs = base.find(c => c.code === code), prev = map0[t] || {}, pr = parsePrice(g('price'));
+      map0[t] = { code: code && code !== bc3AutoCode(t) ? code : undefined, unit: g('unit'), price: isFinite(pr) && pr >= 0 && pr < 1e9 ? pr : undefined,
+        summary: bs ? bs.summary : prev.code && bc3Code(prev.code) === code ? prev.summary : undefined }; }); // sin la base cargada se conserva el resumen de la partida
+    settings.bc3Map = map0; saveSettings(); };
+  // importe de cada partida (cantidad × precio) y total, para revisar antes de exportar
+  const amounts = () => { let tot = 0, n = 0;
+    rows.forEach(r => { const t = types[+r.dataset.i], u = r.querySelector('[data-k=unit]').value, pr = parsePrice(r.querySelector('[data-k=price]').value), q = list.filter(a => a.type === t).reduce((s, a) => s + actQty(a, u).q, 0);
+      const pv = r.querySelector('[data-k=price]').value, el = r.querySelector('[data-imp]'); // la cantidad con los mismos decimales que va al BC3
+      if (isFinite(pr) && pr > 0) { tot += q * pr; n++; el.textContent = `Importe: ${nf(q, 3)} ${u} × ${pr.toLocaleString('es-ES', { maximumFractionDigits: 4 })} € = ${fmtEuro(q * pr)}${priceAmbiguous(pv) ? ` · ⚠ «${pv}» se ha entendido como ${fmtEuro(pr)}; si querías decimales escribe ${pv.replace('.', ',')}` : ''}`; } else el.textContent = ''; });
+    $('#bc3Tot').textContent = n ? `Total (${plural(n, 'partida', 'partidas')} con precio): ${fmtEuro(tot)}` : ''; };
+  rows.forEach(r => { const t = types[+r.dataset.i], U = r.querySelector('[data-k=unit]');
+    r.insertAdjacentHTML('beforeend', '<small class="rb imp" data-imp></small>');
+    r.addEventListener('input', () => { r.dataset.touched = '1'; amounts(); }); r.addEventListener('change', () => { r.dataset.touched = '1'; amounts(); });
+    U.onchange = () => { r.querySelector('[data-q]').innerHTML = fmtQ(t, U.value); r.querySelector('[data-k=price]').placeholder = '€/' + U.value; amounts(); };
+    r.querySelector('[data-k=code]').onchange = ev => { const bs = base.find(c => c.code === bc3Code(ev.target.value)), s = r.querySelector('[data-s]');
+      if (!bs) { s.textContent = ''; return; }
+      if (isUnit(bs.u)) U.value = bs.u; else s.textContent = `La unidad de la base («${bs.unit}») no la mide OBRA-GIS: elige la equivalente.`;
+      r.querySelector('[data-k=price]').value = bs.price ? String(bs.price).replace('.', ',') : '';
+      if (isUnit(bs.u)) s.textContent = bs.summary.slice(0, 90);
+      U.onchange(); }; });
+  amounts();
+  b.querySelector('[data-a=base]').onclick = () => $('#inBase').click();
+  $('#inBase').onchange = async ev => { const f = ev.target.files[0]; if (!f) return; try { read(false); const n = await loadBaseBC3(f); toast(`${n} partidas cargadas de ${f.name}.`, 5000); bc3Sheet(); } catch (e) { toast(`${f.name}: ${e.message || 'no se pudo leer'}`, 6000); } };
+  b.querySelector('[data-a=exp]').onclick = async () => {
+    const badP = rows.find(r => { const v = r.querySelector('[data-k=price]').value.trim(), n = parsePrice(v); return v && !(isFinite(n) && n >= 0 && n < 1e9); });
+    if (badP) { const P = badP.querySelector('[data-k=price]'); P.classList.add('bad'); P.focus(); toast(`Precio no válido en «${types[+badP.dataset.i]}»: escribe un número positivo, por ejemplo 24,80.`, 6000); return; }
+    read(true);
+    const codes = types.filter(t => bc3Map(t).own).map(t => bc3Map(t).code), dup = codes.find((c, i) => codes.indexOf(c) !== i); // los códigos propios de OBRA-GIS se hacen únicos solos
+    if (dup) { toast(`El código ${dup} está en dos tipos: cada partida necesita un código distinto.`, 6000); return; }
+    const zero = types.filter(t => list.some(a => a.type === t && !(actQty(a, bc3Map(t).unit).q > 0)));
+    if (zero.length && !confirm(`${zero.join(', ')}: hay actuaciones sin datos para medir en la unidad elegida y saldrán con 0. ¿Exportar igualmente?`)) return;
+    const txt = buildBC3(list, (obras.get(settings.activeObra) || {}).name || 'Obra');
+    try { await saveBlob(new Blob([encodeANSI(txt)], { type: 'application/octet-stream' }), `mediciones_${safeName((obras.get(settings.activeObra) || {}).name).slice(0, 40)}_${stamp()}.bc3`); toast('BC3 exportado.'); }
+    catch (e) { if (!/cancel/i.test(e.message || '')) toast('No se pudo exportar: ' + (e.message || e), 6000); }
+  };
+}
+
 /* ---------------- Licencia de uso ----------------
    La app consulta licencia.json publicado junto a la web (GitHub Pages). Si el autor pone "activa": false,
    la app queda bloqueada salvo para exportar las obras. Sin conexión se permite trabajar DIAS_GRACIA días
@@ -3178,7 +4389,7 @@ function applyLicense() {
 function eulaSheet(first) {
   const b = openSheet(`<h2>Licencia de uso</h2><div class="eula">${EULA_TEXT}</div>
     <div class="acts">${first ? '<button class="btn pri full" data-a="ok">Acepto las condiciones</button>' : '<button class="btn full" data-a="ok">Cerrar</button>'}</div>`);
-  b.querySelector('[data-a=ok]').onclick = () => { if (first) { settings.eulaAccepted = EULA_VERSION; settings.eulaDate = Date.now(); saveSettings(); } closeSheet(); };
+  b.querySelector('[data-a=ok]').onclick = () => { if (first) { settings.eulaAccepted = EULA_VERSION; settings.eulaDate = Date.now(); saveSettings(); } closeSheet(); if (first && !settings.welcomed && !layers.size) setTimeout(welcomeSheet, 100); };
   if (first) onSheetClose(() => { if (settings.eulaAccepted !== EULA_VERSION) setTimeout(() => eulaSheet(true), 50); });
 }
 function licenseSheet() {
@@ -3258,6 +4469,8 @@ async function exportKMZ() {
   ACT_TYPES.forEach(([t, c], i) => { actStyles += `<Style id="act${i}"><LineStyle><color>ff${c.slice(5, 7)}${c.slice(3, 5)}${c.slice(1, 3)}</color><width>5</width></LineStyle><IconStyle><color>ff${c.slice(5, 7)}${c.slice(3, 5)}${c.slice(1, 3)}</color></IconStyle></Style>`; });
   for (const a of actsSorted()) {
     let html = `<p><b>${esc(a.type)}</b> · ${esc(SIDES[a.side] || '')}<br>PK ${fmtPK(a.d0)} a ${fmtPK(a.d1)} · ${fmtLen(a.d1 - a.d0)}<br>${esc(a.traceName)}</p>`;
+    const kr = [...actParamRows(a), ...actMeasRows(a).filter(([k]) => k !== 'Longitud')];
+    if (kr.length) html += `<p>${kr.map(([k, v]) => `${esc(k)}: <b>${esc(String(v))}</b>`).join('<br>')}</p>`;
     if (a.text) html += `<p>${esc(a.text).replace(/\n/g, '<br>')}</p>`;
     (a.media || []).forEach((m, i) => {
       const name = `files/${a.id}_${i + 1}.${extFor(m)}`;
@@ -3269,7 +4482,8 @@ async function exportKMZ() {
       ? `<LineString><tessellate>1</tessellate><coordinates>${a.coords.map(c => `${c[1].toFixed(7)},${c[0].toFixed(7)},0`).join(' ')}</coordinates></LineString>`
       : `<Point><coordinates>${a.coords[0][1].toFixed(7)},${a.coords[0][0].toFixed(7)},0</coordinates></Point>`;
     actPms += `<Placemark><name>${xml(actTitle(a))}</name><description>${cdata(html)}</description><styleUrl>#act${ti}</styleUrl>
-<ExtendedData><Data name="Tipo"><value>${xml(a.type)}</value></Data><Data name="Margen"><value>${xml(SIDES[a.side] || '')}</value></Data><Data name="PK_inicio"><value>${fmtPK(a.d0)}</value></Data><Data name="PK_fin"><value>${fmtPK(a.d1)}</value></Data><Data name="Longitud_m"><value>${Math.round(a.d1 - a.d0)}</value></Data></ExtendedData>
+<ExtendedData><Data name="Tipo"><value>${xml(a.type)}</value></Data><Data name="Margen"><value>${xml(SIDES[a.side] || '')}</value></Data><Data name="PK_inicio"><value>${fmtPK(a.d0)}</value></Data><Data name="PK_fin"><value>${fmtPK(a.d1)}</value></Data><Data name="Longitud_m"><value>${(a.d1 - a.d0).toFixed(1)}</value></Data>${(() => { const m = actMeasure(a), x = [['Longitud_total_m', m.Lm || m.L, MEAS_DEC.L], ['Superficie_m2', m.area, MEAS_DEC.area], ['Volumen_m3', m.vol, MEAS_DEC.vol], ['Peso_t', m.t, MEAS_DEC.t], ['Unidades', m.n, 0]];
+  return x.filter(([, v]) => v).map(([k, v, dd]) => `<Data name="${k}"><value>${(+v).toFixed(dd)}</value></Data>`).join('') + Object.entries(a.params || {}).filter(([k, v]) => k[0] !== '_' && v !== '' && v != null).map(([k, v]) => `<Data name="${xml((ACT_FIELDS[k] || { l: k === 'mat' ? 'Material' : k }).l.replace(/ /g, '_'))}"><value>${xml(String(v))}</value></Data>`).join('') + (a.prio ? `<Data name="Prioridad"><value>${xml((ACT_PRIO[a.prio] || [a.prio])[0])}</value></Data>` : ''); })()}</ExtendedData>
 ${geom}</Placemark>\n`;
   }
   if (actPms) folders.set('Actuaciones', actPms);
@@ -3435,7 +4649,7 @@ async function offlinePickAt(ll) {
 }
 /* ---------------- Panel lateral con el gestor de capas ---------------- */
 let openLayerId = null, folderIds = new Map();
-function openDrawer() { renderDrawer(); $('#drawer').hidden = false; $('#scrim').hidden = false; }
+function openDrawer() { renderDrawer(); $('#drawer').hidden = false; $('#scrim').hidden = false; armBack(); }
 function closeDrawer() { $('#drawer').hidden = true; $('#scrim').hidden = true; }
 
 function layerRow(id, name, sub, swatch, opts) {
@@ -3453,6 +4667,7 @@ function layerOptions(e) {
   let h = '';
   if (t !== 'photos') h += `<label class="rng">Opacidad<input type="range" min="10" max="100" step="5" value="${Math.round((r.opacity ?? 1) * 100)}" data-op="${id}"></label>`;
   if (t === 'kml') h += `<label class="rng">Color<input type="color" value="${r.color}" data-col="${id}"></label>`;
+  if (t === 'kml' && r.hiddenFeats && r.hiddenFeats.length) h += `<div class="row"><span class="hint grow">${r.hiddenFeats.length} elemento${r.hiddenFeats.length > 1 ? 's' : ''} oculto${r.hiddenFeats.length > 1 ? 's' : ''}: ${r.hiddenFeats.map(i => esc((e.feats[i] || {}).name || '?')).join(', ')}</span><button class="mini" data-unhide="${id}">Mostrar ocultos</button></div>`;
   if (t === 'kml' && e.feats && e.feats.some(f => f.type === 'ln')) h += `<label class="rng">PK<select data-pkstep="${id}" aria-label="Distancia entre marcas de PK de esta capa">${pkStepOptions(r.pkStep || 0, true)}</select></label>`;
   h += `<div class="field row"><input type="text" value="${esc(r.name)}" data-name="${id}" aria-label="Nombre de la capa"><button class="mini" data-rename="${id}">Renombrar</button></div>`;
   h += `<div class="row"><button class="mini" data-props="${id}">${ICON.info}Propiedades</button>${t === 'kml' ? `<button class="mini" data-attr="${id}">${ICON.table}Tabla</button><button class="mini" data-afec="${id}">Afecciones</button>` : ''}${t !== 'wms' ? `<button class="mini" data-zoom="${id}">Encuadrar</button>` : ''}${t === 'photos' ? `<button class="mini" data-sharephotos="${id}">Compartir fotos con GPS</button>` : ''}<button class="mini del" data-dell="${id}">Eliminar capa</button></div>`;
@@ -3464,7 +4679,7 @@ function layerOptions(e) {
 const legendUrl = r => `${r.url}?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetLegendGraphic&FORMAT=image/png&LAYER=${encodeURIComponent(r.layers.split(',')[0])}`;
 function layerSub(e) {
   const t = typeOf(e.rec);
-  if (t === 'kml') return `KML · ${e.feats.length} elementos`;
+  if (t === 'kml') return `KML · ${plural(e.feats.length, 'elemento', 'elementos')}`;
   if (t === 'wms') return 'Servicio' + (e.rec.cover ? ' · ' + e.rec.cover : '');
   const n = [...notes.values()].filter(x => x.layerId === e.rec.id).length;
   return `Fotos con GPS · ${n}`;
@@ -3543,6 +4758,7 @@ async function renderDrawer() {
         <button class="mini" data-s="export" ${nSel ? '' : 'disabled'}>Exportar / compartir</button>
         <button class="mini del" data-s="del" ${nSel ? '' : 'disabled'}>Eliminar</button>
       </div></div>` : ''}
+    <div class="acts"><button class="btn go full" data-t="send">Enviar a la oficina</button></div>
     <div class="treehead"><h3>Capas de la obra</h3><button class="mini" data-t="newfolder">${ICON.folder}Nueva carpeta</button>${selMode ? '' : '<button class="mini" data-t="selmode">Seleccionar</button>'}</div>
     <div class="tree ${selMode ? 'selecting' : ''}">${treeHtml}</div>
     <datalist id="folderList">${folderNames.map(n => `<option value="${esc(n)}">`).join('')}</datalist>
@@ -3554,29 +4770,41 @@ async function renderDrawer() {
     ${own.length ? own.slice(0, 50).map(n => `<div class="nrow" data-note="${n.id}"><span class="pin ${noteType(n)}" style="transform:scale(.7)"><span></span>${ICON[noteType(n)]}</span>
       <span class="t"><b>${esc(n.title)}</b><small>${fmtDate(n.created)} · ${(n.media || []).length} archivos</small></span></div>`).join('')
       : '<p class="empty">Mantén pulsado en el mapa o usa el botón naranja para crear la primera.</p>'}
-    <h3>Herramientas</h3>
-    <div class="acts">
-      <button class="btn go full" data-t="fichas">${ICON.note}Fichas de inspección de campo</button>
-      <button class="btn" data-t="calc">${ICON.calc}Calculadora</button>
-      <button class="btn" data-t="afec">${ICON.layers}Informe de afecciones</button>
-      <button class="btn" data-t="reslist">${ICON.pin}Recursos</button>
+    <h3>Informes y datos</h3>
+    <div class="acts mlist">
       <button class="btn full" data-t="actlist">${ICON.road}Listado de actuaciones (${acts.size})</button>
-      <button class="btn" data-t="csv">Actuaciones a Excel (CSV)</button>
-      <button class="btn" data-t="export">Exportar KMZ</button>
-      <button class="btn" data-t="measure">${ICON.ruler}Medir</button>
-      <button class="btn" data-t="offline">Mapas sin conexión</button>
+      <button class="btn full" data-t="visit">${ICON.note}Informe de la visita</button>
+      <button class="btn full" data-t="bc3">Presupuesto (BC3 para Presto o Arquímedes)</button>
+      <button class="btn full" data-t="csv">Tabla para Excel (CSV)</button>
     </div>
-    <h3>Ajustes</h3>
+    <h3 class="tech">Herramientas</h3>
+    <div class="acts mlist tech">
+      <button class="btn full" data-t="measure">${ICON.ruler}Medir distancia o superficie</button>
+      <button class="btn full" data-t="calc">${ICON.calc}Calculadora</button>
+      <button class="btn full" data-t="afec">${ICON.layers}Informe de afecciones</button>
+    </div>
+    <details class="more dmore tech"><summary>Más herramientas</summary><div class="acts mlist">
+      <button class="btn full" data-t="fichas">${ICON.note}Fichas de inspección de campo</button>
+      <button class="btn full" data-t="reslist">${ICON.pin}Recursos (plantas, canteras, vertederos)</button>
+      <button class="btn full" data-t="export">Compartir para Google Earth (KMZ)</button>
+      <button class="btn full" data-t="offline">Mapas sin conexión</button>
+    </div></details>
+    <details class="more dmore" ${settings.setOpen ? 'open' : ''} id="dSet"><summary>Ajustes</summary>
+    <label class="opt"><input type="checkbox" id="chkSimple" ${settings.simple ? 'checked' : ''}>Modo sencillo: letra grande y solo lo necesario para apuntar en campo</label>
     <div class="field"><label for="selTravel">Indicaciones de Google Maps</label>
       <select id="selTravel"><option value="driving">En coche</option><option value="walking">A pie</option></select></div>
     <label class="opt"><input type="checkbox" id="chkPK" ${settings.pk ? 'checked' : ''}>Marcas de PK en las trazas (al acercar el mapa)</label>
-    <div class="field"><label for="selPkStep">Calibración general de los KML (distancia entre PK)</label><select id="selPkStep">${pkStepOptions(settings.pkStep || PK_STEP, false)}</select></div>
+    <label class="opt tech"><input type="checkbox" id="chkPKsub" ${settings.pkSub !== false ? 'checked' : ''}>Subcalibración al acercar (marcas intermedias hasta cada 10 m)</label>
+    <label class="opt"><input type="checkbox" id="chkLive" ${settings.livePK !== false ? 'checked' : ''}>PK en directo: con el GPS activo, muestra la traza, el PK y el margen donde estás</label>
+    <div class="field tech"><label for="selPkStep">Calibración general de los KML (distancia entre PK)</label><select id="selPkStep">${pkStepOptions(settings.pkStep || PK_STEP, false)}</select></div>
     <label class="opt"><input type="checkbox" id="chkStamp" ${settings.stamp ? 'checked' : ''}>Sellar fecha y coordenadas en las fotos que hago</label>
-    <div class="version"><span>OBRA-GIS <b>v${APP_VERSION}</b> · ${NATIVE ? 'app Android' : 'versión web'}</span><button class="mini" data-t="news" type="button">Novedades</button><button class="mini" data-t="lic" type="button">Licencia</button></div>
+    </details>
+    <div class="version"><span>OBRA-GIS <b>v${APP_VERSION}</b> · ${NATIVE ? 'app Android' : 'versión web'}</span><button class="mini" data-t="news" type="button">Novedades</button><button class="mini" data-t="lic" type="button">Licencia</button><button class="mini" data-t="upd" type="button">Buscar actualización</button></div>
     <p class="hint">${storage}</p>`;
   d.scrollTop = scroll;
 
   $('#dClose').onclick = closeDrawer;
+  { const ds = $('#dSet'); if (ds) ds.ontoggle = () => { settings.setOpen = ds.open; saveSettings(); }; }
   d.querySelectorAll('input[name=base]').forEach(r => r.onchange = () => setBase(r.value));
   d.querySelectorAll('[data-vis]').forEach(c => c.onchange = () => {
     if (selMode && layers.has(c.dataset.vis)) { c.checked ? selIds.add(c.dataset.vis) : selIds.delete(c.dataset.vis); renderDrawer(); return; }
@@ -3612,6 +4840,7 @@ async function renderDrawer() {
     };
     r.onchange = async () => { const id = r.dataset.op; await updateLayer(id, { opacity: +r.value / 100 }); if (typeOf(layers.get(id).rec) === 'kml') rebuildLayer(id); };
   });
+  d.querySelectorAll('[data-unhide]').forEach(bt => bt.onclick = async () => { await updateLayer(bt.dataset.unhide, { hiddenFeats: [] }); rebuildLayer(bt.dataset.unhide); renderDrawer(); });
   d.querySelectorAll('[data-afec]').forEach(bt => bt.onclick = () => { closeDrawer(); afecSheet([bt.dataset.afec]); });
   d.querySelectorAll('[data-pkstep]').forEach(sel => sel.onchange = async () => {
     const id = sel.dataset.pkstep, rec = layers.get(id).rec, v = askPkStep(sel, rec.pkStep);
@@ -3634,6 +4863,7 @@ async function renderDrawer() {
   d.querySelectorAll('[data-sharephotos]').forEach(bt => bt.onclick = () => { const id = bt.dataset.sharephotos; sharePhotos([...notes.values()].filter(n => n.layerId === id), layers.get(id).rec.name); });
   d.querySelector('[data-t=news]').onclick = () => { closeDrawer(); newsSheet(); };
   d.querySelector('[data-t=lic]').onclick = () => { closeDrawer(); licenseSheet(); };
+  d.querySelector('[data-t=upd]').onclick = () => { closeDrawer(); checkAppUpdate(true); };
   d.querySelectorAll('[data-fold]').forEach(bt => bt.onclick = () => { if (Date.now() - longPressAt < 700) return; settings.collapsed = settings.collapsed || {}; settings.collapsed[bt.dataset.fold] = !settings.collapsed[bt.dataset.fold]; saveSettings(); renderDrawer(); });
   d.querySelectorAll('[data-fvis]').forEach(c => c.onchange = async () => { for (const id of folderIds.get(c.dataset.fvis) || []) await setLayerVisible(id, c.checked); renderDrawer(); });
   d.querySelectorAll('[data-fmenu]').forEach(bt => bt.onclick = () => folderMenu(bt.dataset.fmenu));
@@ -3652,11 +4882,17 @@ async function renderDrawer() {
   d.querySelector('[data-t=calc]').onclick = () => { closeDrawer(); calcSheet(); };
   d.querySelector('[data-t=fichas]').onclick = () => { closeDrawer(); fichaList(); };
   d.querySelector('[data-t=afec]').onclick = () => { closeDrawer(); afecSheet(); };
+  d.querySelector('[data-t=send]').onclick = () => { closeDrawer(); sendToOffice(); };
+  d.querySelector('[data-t=bc3]').onclick = () => { closeDrawer(); bc3Sheet(); };
+  $('#chkSimple').onchange = e => { settings.simple = e.target.checked; saveSettings(); applySimple(); renderDrawer(); };
+  d.querySelector('[data-t=visit]').onclick = () => { closeDrawer(); visitReportSheet(); };
   d.querySelector('[data-t=measure]').onclick = () => { closeDrawer(); startMeasure(); };
   d.querySelector('[data-t=offline]').onclick = () => { closeDrawer(); offlineSheet(); };
   const sel = $('#selTravel'); sel.value = settings.travel; sel.onchange = () => { settings.travel = sel.value; saveSettings(); };
   $('#chkStamp').onchange = e => { settings.stamp = e.target.checked; saveSettings(); };
   $('#chkPK').onchange = e => { settings.pk = e.target.checked; saveSettings(); drawPK(); };
+  $('#chkPKsub').onchange = e => { settings.pkSub = e.target.checked; saveSettings(); drawPK(); };
+  $('#chkLive').onchange = e => { settings.livePK = e.target.checked; saveSettings(); livePkT = 0; updateLivePK(); };
   $('#selPkStep').onchange = e => {
     const v = askPkStep(e.target, settings.pkStep); if (!v) { renderDrawer(); return; }
     settings.pkStep = v; saveSettings();
@@ -3721,7 +4957,8 @@ async function selectionAction(act) {
   if (act === 'show' || act === 'hide') { for (const id of ids) await setLayerVisible(id, act === 'show'); return renderDrawer(); }
   if (act === 'up' || act === 'down') return groupMove(ids.filter(id => !isPointLayer(layers.get(id).rec)), act === 'up' ? -1 : 1);
   if (act === 'del') {
-    if (!confirm(`¿Quitar ${ids.length} capas de la obra? Las fotos importadas de esas capas también se borrarán.`)) return;
+    const nActs = [...acts.values()].filter(a => ids.includes(a.layerId)).length;
+    if (!confirm(`¿Quitar ${ids.length} capas de la obra? Las fotos importadas de esas capas también se borrarán.${nActs ? ` Sus ${nActs} actuaciones se conservan sin traza y se volverán a enlazar si vuelves a cargar esos KML.` : ''}`)) return;
     for (const id of ids) { const e = layers.get(id); map.removeLayer(mapLayerOf(e)); for (const n of [...notes.values()].filter(n => n.layerId === id)) { await DB.del('notes', n.id); notes.delete(n.id); removeNoteMarker(n.id); } layers.delete(id); await DB.del('layers', id); }
     selIds.clear(); selMode = false; drawPK(); drawActs(); drawWidths(); renderDrawer(); return toast('Capas eliminadas');
   }
@@ -3782,14 +5019,15 @@ function unionSheet(ents) {
     const ne = await saveKmlLayer(name, text, { folder: ents[0].rec.folder || '' });
     if (ne.feats.length !== total) toast(`Aviso: el KML unido tiene ${ne.feats.length} elementos y los originales sumaban ${total}.`, 7000);
     if (del) {
-      let off = 0; const widths = {};
+      let off = 0; const widths = {}, hidden = [];
       for (const e of ents) {
         for (const a of [...acts.values()].filter(a => a.layerId === e.rec.id)) { a.layerId = ne.rec.id; a.featIdx = off + a.featIdx; a.layerName = name; await DB.put('acts', a); }
         Object.entries(e.rec.widths || {}).forEach(([fi, w]) => { widths[off + +fi] = w; });
+        (e.rec.hiddenFeats || []).forEach(i => hidden.push(off + i)); // los elementos ocultos siguen ocultos
         off += e.feats.length;
         map.removeLayer(mapLayerOf(e)); layers.delete(e.rec.id); await DB.del('layers', e.rec.id);
       }
-      if (Object.keys(widths).length) { ne.rec.widths = widths; await DB.put('layers', ne.rec); }
+      if (Object.keys(widths).length || hidden.length) { if (Object.keys(widths).length) ne.rec.widths = widths; if (hidden.length) ne.rec.hiddenFeats = hidden; await DB.put('layers', ne.rec); rebuildLayer(ne.rec.id); }
     }
     selMode = false; selIds.clear(); closeSheet(); drawActs(); drawWidths(); drawPK();
     map.fitBounds(ne.group.getBounds().pad(0.1), { maxZoom: 17 });
@@ -3887,7 +5125,7 @@ function attrTable(id) {
     <input type="file" id="inCsv" accept=".csv,text/csv,text/plain" hidden>`);
   b.querySelectorAll('tr[data-i]').forEach(tr => tr.onclick = () => { const f = feats[+tr.dataset.i]; map.fitBounds(L.latLngBounds(f.parts.flatMap(p => p.c)).pad(0.3), { maxZoom: 18 }); featureSheet(f, L.latLng(f.start[0], f.start[1]), e.rec); });
   b.querySelector('[data-a=csv]').onclick = async () => {
-    const q = v => `"${String(v ?? '').replace(/"/g, '""').replace(/\r?\n/g, ' ')}"`, n = v => String(v).replace('.', ',');
+    const q = csvQ, n = v => String(v).replace('.', ',');
     const rows = [[...FIXED_COLS, ...keys]].concat(feats.map((f, i) => [i + 1, f.name, { ln: 'linea', pg: 'poligono', pt: 'punto' }[f.type], f.folder, f.type === 'ln' ? n(f.length.toFixed(2)) : '', f.type === 'pg' ? n((f.area || 0).toFixed(2)) : '', n(f.start[0].toFixed(7)), n(f.start[1].toFixed(7)), ...keys.map(k => val(f, k))]));
     try { await saveBlob(new Blob(['﻿' + rows.map(r => r.map(q).join(';')).join('\r\n')], { type: 'text/csv' }), `atributos_${safeName(e.rec.name)}.csv`); } catch (er) { if (!/cancel/i.test(er.message || '')) toast('No se pudo exportar.'); }
   };
@@ -3973,21 +5211,51 @@ $('#fabPhoto').onclick = () => {
 };
 // Nueva anotación en mi posición
 $('#fabNote').onclick = () => {
-  const b = openSheet(`<h2>Nuevo</h2><p class="sub">En tu posición GPS</p><div class="acts">
-    <button class="btn go full" data-a="act">${ICON.road}Actuación en el camino desde aquí</button>
-    <button class="btn full" data-a="note">${ICON.note}Anotación en este punto</button></div>
-    <p class="hint">Una actuación ocupa un tramo de la traza (de un PK a otro), por ejemplo una escollera o una cuneta. Una anotación es un punto suelto.</p>`);
+  const nh = settings.plusHints || 0; if (nh < 3) { settings.plusHints = nh + 1; saveSettings(); } // la explicación solo las primeras veces
+  const b = openSheet(`<h2>¿Qué apuntas aquí?</h2><p class="sub">En tu posición GPS · <button class="linkbtn" data-a="send">Enviar a la oficina</button></p><div class="acts">
+    ${walkHere() ? `<button class="btn go full" data-a="wend">${ICON.road}Terminar aquí el tramo de ${esc(walkAct.draft.type)}</button>` : `<button class="btn go full" data-a="wstart">${ICON.road}Empezar tramo andando</button>`}
+    ${(() => { const pts = [...new Set([...(settings.actRecent || []), 'Caño / obra de drenaje', 'Badén', 'Arqueta / pozo'])].filter(t => ACT_POINT.has(t) && ACT_ITEMS.some(i => i.name === t)).slice(0, 3);
+      return `<div class="chiprow pts" aria-label="Actuación puntual aquí con un toque">${pts.map(t => `<button class="mini" data-pq="${esc(t)}"><span class="dot" style="background:${actColor(t)}"></span>${esc(t.replace(' / obra de drenaje', '').replace(' / pozo', ''))}</button>`).join('')}</div>`; })()}
+    ${repeatRow()}
+    ${walkHere() ? '' : (() => { const r = [...new Set(settings.actRecent || [])].filter(t => ACT_ITEMS.some(i => i.name === t) && !ACT_POINT.has(t)).slice(0, 3); return r.length ? `<div class="chiprow" aria-label="Tramo de un tipo reciente">${r.map(t => `<button class="mini" data-wq="${esc(t)}"><span class="dot" style="background:${actColor(t)}"></span>${esc(t)}</button>`).join('')}</div>` : ''; })()}
+    <button class="btn full" data-a="act">${ICON.road}Otra actuación en este punto</button>
+    <button class="btn full" data-a="note">${ICON.note}Anotación o foto suelta</button></div>
+    ${nh < 3 ? '<p class="hint">Una actuación ocupa un tramo del camino (de un PK a otro), por ejemplo una escollera o una cuneta. Una anotación es un punto suelto con texto o fotos.</p>' : ''}
+    <div class="savebar plusfoot"><button class="btn full" data-a="close">Cerrar</button></div>`); // pie fijo bajo el dedo que pulsa «+»: un toque de más solo cierra
   b.querySelector('[data-a=note]').onclick = () => { closeSheet(); newNoteHere(); };
   b.querySelector('[data-a=act]').onclick = () => { closeSheet(); newActHere(); };
+  const ws = b.querySelector('[data-a=wstart]'); if (ws) ws.onclick = () => walkStartSheet();
+  b.querySelector('[data-a=close]').onclick = () => closeSheet();
+  sheetOpenAt = Date.now() + 550; // la ficha «+» aparece bajo el dedo que pulsó «+»: 0,9 s sin toques (dobles y triples toques)
+  b.querySelectorAll('[data-wq]').forEach(x => x.onclick = () => walkStartSheet({ type: x.dataset.wq }));
+  { const t0 = Date.now(); b.querySelectorAll('[data-pq]').forEach(x => x.onclick = () => { if (Date.now() - t0 < 1500) return; quickPoint(x.dataset.pq); }); } // se guardan al tocar: 1,5 s sin toques al abrir // un toque de más al abrir no crea nada // tipo ya elegido: solo falta «Empezar»
+  const we = b.querySelector('[data-a=wend]'); if (we) we.onclick = () => { closeSheet(); if (walkAct) walkAct.shown = 0; walkEnd(false); };
+  const rp = b.querySelector('[data-a=rep]'); if (rp) rp.onclick = () => repeatLastAct();
+  const rw = b.querySelector('[data-a=repw]'); if (rw) rw.onclick = () => repeatWalk();
+  b.querySelector('[data-a=send]').onclick = () => sendToOffice();
 };
 async function newActHere() {
   toast('Obteniendo posición GPS…', 2500);
-  let p; try { p = await getPos(); } catch (e) { toast(geoErr(e) + ' Toca la traza en el mapa y usa «Nueva actuación en esta traza».', 7000); return; }
+  let p; try { p = await getPos(); } catch (e) { toast(geoErr(e) + ' Toca la traza en el mapa y usa «Nueva actuación aquí».', 7000); return; }
   const n = nearestTrace(L.latLng(p.lat, p.lng));
   if (!n) { toast('No hay ninguna traza KML visible. Importa o muestra el KML del camino.', 6000); return; }
   if (n.off > 50) toast(`Estás a ${Math.round(n.off)} m de «${n.f.name}». Comprueba que es la traza correcta.`, 6000);
   map.panTo([p.lat, p.lng]);
   openActEditor({ rec: n.rec, f: n.f, d0: n.d, d1: n.d, gps: true });
+}
+// Actuación puntual con un toque (caño, badén, arqueta…): en el PK donde estás, con los datos de la última de su tipo y «Deshacer»
+async function quickPoint(type) {
+  toast('Obteniendo posición GPS…', 2500);
+  let p; try { p = await getPos(); } catch (e) { toast(geoErr(e), 6000); return; }
+  const n = nearestTrace(L.latLng(p.lat, p.lng));
+  if (!n) { toast('No hay ninguna traza KML visible. Importa o muestra el KML del camino.', 6000); return; }
+  if (n.off > 50) { toast(`Estás a ${Math.round(n.off)} m de «${n.f.name}»: acércate al camino o toca la traza en el mapa.`, 7000); return; }
+  hideUndo();
+  const e = layers.get(n.rec.id), last = lastParamsOf(type);
+  actDraft = { id: uid(), obraId: settings.activeObra, layerId: n.rec.id, featIdx: e.feats.indexOf(n.f), traceName: n.f.name, layerName: n.rec.name, d0: n.d, d1: n.d, type, side: last.side || defaultSideFor(type, 'eje'), text: '', media: [], created: Date.now(), coords: [], params: last.params, prio: '' };
+  const id = actDraft.id; closeSheet(); const ok = await saveAct();
+  if (ok) { buzz(50); const pr = actParamRows({ type, params: last.params }).filter(([k]) => k !== 'Prioridad').map(([, v]) => v).slice(0, 3).join(' · ');
+    showUndo(`${type} en el PK ${fmtPK(n.d)}${pr ? ` (${pr}, como la última)` : ''}`, async () => { await DB.del('acts', id); acts.delete(id); drawActs(); }, 10000); }
 }
 async function newNoteHere() {
   toast('Obteniendo posición GPS…', 2500);
@@ -4060,8 +5328,24 @@ function nativeInbox() { // app nativa: «Abrir con» y «Compartir»
       handleIncoming(await Promise.all(params.files.map(h => h.getFile())));
     });
   }
+  applySimple();
   if (settings.eulaAccepted !== EULA_VERSION) eulaSheet(true);
+  else if (!settings.welcomed && !layers.size) welcomeSheet();
+  try { const w = await DB.get('kv', 'walk'); if (w && w.draft) { walkAct = w; showWalkBar(); if (w.draft.obraId === settings.activeObra) { startWatch(); keepAwake(true); } } } catch (e) { /* nada */ }
+  try { // borradores pendientes (y el único de versiones anteriores)
+    let raw = null; try { raw = await DB.get('kv', 'drafts'); } catch (e) { /* nada */ }
+    const old = await DB.get('kv', 'draft').catch(() => null);
+    const list = [...(raw && typeof raw === 'object' && !Array.isArray(raw) ? Object.values(raw) : []), ...(old ? [old] : [])];
+    drafts = {};
+    for (const d0 of list) { let d = null; try { d = cleanDraft(d0); } catch (e) { d = null; } if (!d || !draftHasContent(d) || drafts[d.data.id] && drafts[d.data.id].t > d.t) continue;
+      const r = d.kind === 'act' ? acts.get(d.data.id) : notes.get(d.data.id);
+      if (r && (d.kind === 'act' ? actKey(r) === actKey(d.data) : noteKey(r) === noteKey(d.data))) continue; // igual que lo guardado: no es un borrador
+      drafts[d.data.id] = d; }
+    await DB.put('kv', drafts, 'drafts'); if (old) await DB.del('kv', 'draft'); // primero se guarda lo migrado y después se borra lo antiguo
+    if (refreshPending()) showDraftBar();
+  } catch (e) { console.warn('borradores', e); if (!drafts || typeof drafts !== 'object') drafts = {}; }
   checkLicense(); setInterval(checkLicense, 6 * 3600e3);
+  if (NATIVE) setTimeout(() => checkAppUpdate(false), 5000);
   if (new URLSearchParams(location.search).has('shared')) { history.replaceState(null, '', './'); receiveShared(); }
   drawPK();
   if (settings.lastVersion && settings.lastVersion !== APP_VERSION) { toast(`OBRA-GIS actualizada a la versión ${APP_VERSION}. Novedades en Capas → Novedades.`, 7000); }

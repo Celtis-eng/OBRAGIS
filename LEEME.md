@@ -1,6 +1,6 @@
 # OBRA-GIS
 
-**Versión actual: 1.15.0** · historial completo en [CHANGELOG.md](CHANGELOG.md)
+**Versión actual: 1.18.0** · historial completo en [CHANGELOG.md](CHANGELOG.md)
 
 App de campo para Android (también funciona en iPhone y en el ordenador) que:
 
@@ -95,6 +95,13 @@ Abre la dirección de GitHub Pages en **Edge o Chrome** y pulsa el icono *Instal
 - el clic derecho hace lo mismo que mantener pulsado en el móvil;
 - puedes arrastrar KML, KMZ, fotos o paquetes de obra encima del mapa;
 - los KML y KMZ se pueden abrir con doble clic (Abrir con → OBRA-GIS) una vez instalada.
+
+
+## Copias de seguridad y actualizaciones (desde la versión 1.17.0)
+
+- **Obras → Copia de seguridad de todas las obras** guarda un paquete .zip por obra. En el móvil Android van a **Documentos › OBRA-GIS**, que no se borra al desinstalar la app. Para recuperarlas: **Obras → Importar obra**.
+- El APK se firma siempre con `android-build/debug.keystore`, así que las versiones nuevas **se instalan encima sin desinstalar** y sin perder datos. Antes de la 1.17.0 cada compilación salía con una firma distinta y Android obligaba a desinstalar.
+- `version.json` indica la última versión publicada. La app Android lo consulta al abrirse y avisa cuando hay una nueva. **Cambia su número en cada entrega.**
 
 ## Versiones
 

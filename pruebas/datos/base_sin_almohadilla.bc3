@@ -1,0 +1,10 @@
+~V|BASE|FIEBDC-3/2016\01012026|Prueba|\|ANSI|
+~C|B||Base sin almohadillas|0|0|
+~C|C01||Firmes|0|0|
+~C|P10|m3|Zahorra artificial extendida y compactada|24.80|010126|0|
+~C|P11|m2|Firme completo de zahorra y riego|9.10|010126|0|
+~C|P12|ud|Canon de vertido de tierras|3.00|010126|0|
+~C|P13|ud|Caño de hormigón D 600 con aletas|1250.00|010126|0|
+~D|B|C01\1\1\|
+~D|C01|P10\1\1\P11\1\1\P12\1\1\P13\1\1\|
+~D|P11|P10\1\0.25\|
