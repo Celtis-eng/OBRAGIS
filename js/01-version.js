@@ -6,9 +6,10 @@
 /* ---------------- Versión de la app ----------------
    Cambia APP_VERSION en cada entrega (también se usa como versión de la app Android).
    Formato MAYOR.MENOR.CORRECCIÓN: menor = función nueva, corrección = arreglo. */
-const APP_VERSION = '1.18.8';
-const APP_DATE = '2026-11-22';
+const APP_VERSION = '1.18.9';
+const APP_DATE = '2026-11-23';
 const CHANGELOG = [
+  ['1.18.9', '23/11/2026', 'Depuración: «Mapa» y el PK escrito en «Desde/Hasta» ya no recortan el tramo (se alarga y lo dice); tras «Terminar» se ven los PK y la ✕ no tapa «Mapa»; andando no sale «Repetir la última»; avisos de datos junto al campo; «Fin del camino» visible; aviso para abrir el plano en el primer uso; código partido en módulos.'],
   ['1.18.8', '22/11/2026', 'Depuración: los puntuales del «+» ya no quedan bajo «Cerrar» y van arriba; caño, arqueta, entronque y badén sin número cuentan 1 ud en todas las salidas (el bacheo, por superficie, no); andando hacia atrás «Aquí» en «Hasta PK» alarga el tramo sin perder metros; «Guardar y seguir andando» desde el editor también ofrece «Deshacer»; un toque fallido ya no borra el «Deshacer»; en una cadena «sin medidas» no se vuelve a preguntar en cada corte; un tramo de milímetros avisa de 0 m; nombres claros en «▶ Seguir»; un doble toque sin querer ya no amplía el mapa; avisos arriba, sin tapar «▶ Seguir».'],
   ['1.18.7', '22/11/2026', 'Depuración: «Deshacer» caduca en cuanto cambia la situación (no puede borrar un tramo viejo ni solapar tramos); «Guardar y seguir andando» sigue desde el PK guardado aunque se corrija en el editor y también después de «Guardar sin medidas» o «Guardar con 0 m»; la ficha «+» tiene un pie «Cerrar» bajo el dedo (un toque de más ya no apunta un puntual); badén y puntuales sin número cuentan 1 ud en pantalla, CSV, informe y BC3; «▶ Seguir» muestra el tipo y ofrece el último tramo aunque luego se apunte un caño; el «+» ya no se mueve; el PK en directo no se queda con una lectura vieja; pulido de Irene.'],
   ['1.18.6', '22/11/2026', '«▶ Seguir» junto al «+»: un toque empieza andando otro tramo como el último. «Deshacer» siempre arriba, sin tapar nada. «Terminar aquí» desde el «+» vuelve a funcionar. «Guardar y seguir andando» desde el editor, también hacia atrás, sin tramos repetidos. Si no hay medidas que copiar, «Guardar y seguir» abre el editor. Badén puntual por unidad en el BC3. Puntuales protegidos 1,5 s frente a toques de más. Foco accesible en las fichas.'],

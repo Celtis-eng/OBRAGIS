@@ -71,9 +71,9 @@ async function quickPoint(type) {
   hideUndo();
   const e = layers.get(n.rec.id), last = lastParamsOf(type);
   actDraft = { id: uid(), obraId: settings.activeObra, layerId: n.rec.id, featIdx: e.feats.indexOf(n.f), traceName: n.f.name, layerName: n.rec.name, d0: n.d, d1: n.d, type, side: last.side || defaultSideFor(type, 'eje'), text: '', media: [], created: Date.now(), coords: [], params: last.params, prio: '' };
-  const id = actDraft.id; closeSheet(); const ok = await saveAct();
+  const id = actDraft.id, ob = actDraft.obraId; closeSheet(); const ok = await saveAct();
   if (ok) { buzz(50); const pr = actParamRows({ type, params: last.params }).filter(([k]) => k !== 'Prioridad').map(([, v]) => v).slice(0, 3).join(' · ');
-    showUndo(`${type} en el PK ${fmtPK(n.d)}${pr ? ` (${pr}, como la última)` : ''}`, async () => { await DB.del('acts', id); acts.delete(id); drawActs(); }, 10000); }
+    showUndo(`${type} en el PK ${fmtPK(n.d)}${pr ? ` (${pr}, como la última)` : ''}`, async () => { if (ob !== settings.activeObra) { toast('Ese puntual es de otra obra.'); return; } await DB.del('acts', id); acts.delete(id); drawActs(); }, 10000); }
 }
 async function newNoteHere() {
   toast('Obteniendo posición GPS…', 2500);
@@ -170,3 +170,11 @@ function nativeInbox() { // app nativa: «Abrir con» y «Compartir»
   if (settings.lastVersion !== APP_VERSION) { settings.lastVersion = APP_VERSION; saveSettings(); }
   else if (!layers.size && !notes.size && settings.eulaAccepted) toast('Pulsa Importar para abrir un KML, un KMZ o fotos con GPS. Mantén pulsado en el mapa para ver las opciones de un punto.', 8000);
 })();
+
+// Primer uso: sin ningún plano cargado el mapa no queda en negro sin decir qué hacer
+(() => { const box = document.createElement('div'); box.id = 'mapEmpty'; box.hidden = true;
+  box.innerHTML = '<p><b>Aún no hay ningún plano.</b><br>Abre el plano del camino (KML o KMZ) para empezar.</p><button class="btn pri" type="button">Abrir plano</button>';
+  $('#map').appendChild(box); box.querySelector('button').onclick = () => importMenu();
+  L.DomEvent.disableClickPropagation(box);
+  let t; const upd = () => { clearTimeout(t); t = setTimeout(() => { box.hidden = layers.size > 0 || notes.size > 0; }, 150); };
+  map.on('layeradd layerremove', upd); upd(); })();

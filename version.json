@@ -1,6 +1,6 @@
 {
-  "version": "1.18.8",
-  "fecha": "2026-11-22",
+  "version": "1.18.9",
+  "fecha": "2026-11-23",
   "apk": "https://github.com/Celtis-eng/OBRAGIS/releases/download/apk/CampoKML.apk",
-  "notas": "Depuración: puntuales del + siempre pulsables, unidades coherentes, tramos hacia atrás y Deshacer más seguro."
+  "notas": "Depuración: los PK de Desde/Hasta ya no recortan tramos, editor más claro tras Terminar, avisos junto al campo y aviso para abrir el plano."
 }

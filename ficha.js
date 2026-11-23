@@ -1,5 +1,5 @@
 'use strict';
-/* OBRA-GIS v1.18.8 (2026-11-22) — Ficha de inspección de campo · Restauración de caminos agrarios.
+/* OBRA-GIS v1.18.9 (2026-11-23) — Ficha de inspección de campo · Restauración de caminos agrarios.
    · Parte de PROYECTO: se rellena sola a partir del presupuesto (BC3 de Presto) y de los KMZ de las actuaciones.
    · Parte de CAMPO: se rellena en la visita con el móvil (botones grandes, fotos con GPS y PK, sin conexión).
    · Exporta la ficha para imprimir (PDF) y en JSON para la revisión del presupuesto.

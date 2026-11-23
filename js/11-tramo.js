@@ -123,10 +123,11 @@ async function walkEnd(split) {
     split = false; toast(`Primero indica las medidas de «${d.type}»; las siguientes se copiarán solas.`, 6000); }
   if (split === true) { // «Terminar y seguir»: se guarda tal cual y empieza el siguiente tramo, con «Deshacer»
     actDraft = { ...d, _cont: endAt < startAt ? -1 : 1, _split: true, _zeroOk: d.d0 + '|' + d.d1 }; const ok = await saveAct();
-    if (ok) showUndo(`Guardado: ${d.type} ${fmtPK(d.d0)}–${fmtPK(d.d1)}${walkAct ? '. Sigue el siguiente tramo.' : ''}`, async () => { if (d.obraId !== settings.activeObra) { toast('Ese tramo es de otra obra.'); return; } await DB.del('acts', d.id); acts.delete(d.id); drawActs(); walkAct = { ...prev, shown: Date.now() }; await DB.put('kv', walkAct, 'walk'); showWalkBar(); keepAwake(true); });
+    if (ok) showUndo(`Guardado: ${d.type} ${fmtPK(d.d0)}–${fmtPK(d.d1)}${walkAct ? '. Sigue el siguiente tramo.' : '. Fin del camino: no hay más tramo que seguir.'}`, async () => { if (d.obraId !== settings.activeObra) { toast('Ese tramo es de otra obra.'); return; } await DB.del('acts', d.id); acts.delete(d.id); drawActs(); walkAct = { ...prev, shown: Date.now() }; await DB.put('kv', walkAct, 'walk'); showWalkBar(); keepAwake(true); });
     return; }
   d._walk = true; d._dir = endAt < startAt ? -1 : 1; actDraft = d; renderActEditor(); sheetOpenAt = Date.now() + 1150; // 1,5 s sin toques: el dedo que pulsó «Terminar» está sobre «Guardar»
-  setTimeout(() => { const it = actItem(d.type), f0 = it.fields.find(k => !(d.params && d.params[k] > 0)), el = f0 && $('#pf_' + f0); if (el && it.fields.some(k => ['w', 'e', 'h', 'b', 'S'].includes(k))) el.scrollIntoView({ block: 'center' }); }, 300); // se lleva a las medidas que faltan: solo falta revisar los datos y guardar
+  setTimeout(() => { const pr = $('#sheetBody .pkrow'); if (pr) pr.scrollIntoView({ block: 'start' }); // PK arriba (bajo la ✕, sin quedar debajo de ella) y las medidas justo debajo
+    const it = actItem(d.type), f0 = it.fields.find(k => !(d.params && d.params[k] > 0)), el = f0 && $('#pf_' + f0); if (el && it.fields.some(k => ['w', 'e', 'h', 'b', 'S'].includes(k))) el.classList.add('need'); }, 300);
 }
 // «Repetir la última»: misma actuación, margen y datos, empezando donde terminó la anterior
 function lastAct() { return [...acts.values()].filter(a => a.obraId === settings.activeObra).sort((a, b) => (b.updated || b.created) - (a.updated || a.created))[0] || null; }
@@ -140,7 +141,8 @@ function repeatLastAct() {
   setTimeout(() => { const f1 = $('#aPk1'); if (f1) { f1.focus(); f1.select(); } }, 400);
 }
 // «Repetir la última»: una fila con las dos formas (aquí, escribiendo el final, o andando)
-const repeatRow = () => { const rl = repeatLabel(); if (!rl) return ''; const la = lastAct();
+// (andando no se ofrece: «Desde donde acabó» abriría una actuación de 0 m encima del tramo en marcha)
+const repeatRow = () => { const rl = repeatLabel(); if (!rl || walkHere()) return ''; const la = lastAct();
   return `<div class="reprow"><span><b>↻ Repetir la última</b><small>${esc(rl)}</small></span><button class="mini" data-a="rep">Desde donde acabó</button>${walkHere() || (la && ACT_POINT.has(la.type)) ? '' : '<button class="mini" data-a="repw">Andando desde aquí</button>'}</div>`; };
 const repeatLabel = () => { const a = lastAct(); return a ? `${a.type} ${SIDE_ABBR[a.side] || ''}${actParamRows(a).filter(([k]) => k !== 'Prioridad').length ? ' · ' + actParamRows(a).filter(([k]) => k !== 'Prioridad').map(([, v]) => v).slice(0, 2).join(' · ') : ''}` : ''; };
 
@@ -169,14 +171,14 @@ async function sendToOffice() {
         nodat = L0.filter(a => { const it = actItem(a.type); return !ACT_POINT.has(a.type) && it.fields.some(k => ['w', 'e', 'h', 'b', 'S', 'n'].includes(k)) && !it.fields.some(k => a.params && a.params[k] > 0); }),
         nofoto = L0.filter(a => !(a.media || []).length && a.prio === 'alta'), items = [[zero, 'de 0 m'], [nodat, 'sin medidas (no saldrá superficie ni volumen)'], [nofoto, 'de prioridad alta sin foto']].filter(x => x[0].length);
       return items.length ? `<div class="fwarn" role="alert"><b>Antes de enviar, revisa:</b><ul class="revlist">${items.map(([l, t]) => `<li>${plural(l.length, 'actuación', 'actuaciones')} ${t}: ${l.slice(0, 4).map(a => `<button class="linkbtn" data-rv="${esc(a.id)}">${esc(a.type)} ${fmtPK(a.d0)}</button>`).join(' ')}${l.length > 4 ? ' …' : ''}</li>`).join('')}</ul><small>Se puede enviar igualmente.</small></div>` : ''; })()}
-    <label class="opt"><input type="checkbox" id="soSince" ${sent ? 'checked' : ''} ${sent ? '' : 'disabled'}>Informe solo con lo nuevo desde el último envío${sent ? ` (${fmtDate(sent)})` : ''}</label>
+    ${sent ? `<label class="opt"><input type="checkbox" id="soSince" checked>Informe solo con lo nuevo desde el último envío (${fmtDate(sent)})</label>` : ''}
     <div class="field"><label for="soWho">Tu nombre (sale en el informe)</label><input type="text" id="soWho" value="${esc(settings.surveyor || '')}"></div>
     <div class="savebar"><button class="btn go full" data-a="go">Preparar y enviar</button></div>`);
   b.querySelectorAll('[data-rv]').forEach(x => x.onclick = () => { const a = acts.get(x.dataset.rv); if (a) { map.fitBounds(L.latLngBounds(a.coords).pad(0.4), { maxZoom: 18 }); viewAct(a.id); } });
   b.querySelector('[data-a=go]').onclick = async () => {
     const bt = b.querySelector('[data-a=go]'); bt.disabled = true; bt.textContent = 'Preparando…';
     settings.surveyor = $('#soWho').value.trim(); saveSettings();
-    const since = $('#soSince').checked ? sent : 0;
+    const since = $('#soSince') && $('#soSince').checked ? sent : 0;
     const all = actsSorted(), nuevas = all.filter(a => (a.updated || a.created || 0) >= since), notasN = [...notes.values()].filter(n => (n.updated || n.created || n.t || 0) >= since);
     if (!all.length && !notes.size && ![...layers.values()].some(e => e.rec.type === 'kml')) { toast('La obra está vacía: todavía no hay nada que enviar.', 6000); bt.disabled = false; bt.textContent = 'Preparar y enviar'; return; }
     if (since && !nuevas.length && !notasN.length) { toast('No hay nada nuevo desde el último envío. Quita la marca de «solo lo nuevo» para enviarlo todo otra vez.', 7000); bt.disabled = false; bt.textContent = 'Preparar y enviar'; return; }

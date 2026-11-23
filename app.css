@@ -834,3 +834,35 @@ body.simple .pkrow{grid-template-columns:1fr}
 body:has(#livePk:not([hidden])) #sheet[hidden] ~ #toast{top:calc(var(--safe-t) + 140px)}
 /* ficha «+» más alta: todo a la vista sin quedar bajo el pie «Cerrar» */
 #sheet:has(.plusfoot){max-height:86vh}
+
+/* ================= 1.18.9 · ronda 10 y propuesta 7 de Irene ================= */
+body:has(#undoBar:not([hidden])) #sheet:not([hidden]){max-height:calc(100dvh - var(--safe-t, 0px) - 140px)!important}
+
+@keyframes p7band{from{opacity:0}to{opacity:1}}
+.sheet-x{z-index:4}
+.sheet-x::before{content:"";position:absolute;z-index:-1;top:-18px;right:-10px;width:100vw;height:64px;pointer-events:none;
+  background:var(--bg);box-shadow:0 8px 10px -8px rgba(0,0,0,.35);opacity:0;
+  animation:p7band linear both;animation-timeline:scroll(nearest block);animation-range:0 32px}
+
+#map:focus-visible{outline:3px solid #ffb020;outline-offset:-4px}
+.leaflet-marker-icon:focus-visible,.leaflet-interactive:focus-visible{outline:3px solid #ffb020!important;outline-offset:2px}
+
+.walkseg button{text-transform:none}
+.walkseg button[data-ws=izq],.walkseg button[data-ws=der]{text-transform:capitalize}
+
+body.simple #sheetBody .seg:has([data-side]){display:grid;grid-template-columns:1fr 1fr;gap:6px}
+body.simple #sheetBody .seg:has([data-side]) button{border-radius:10px!important}
+/* P7-6 · dato mal escrito: mensaje junto al campo (fieldErr) y borde más grueso, no solo color */
+#sheetBody input.bad{border-width:3px}
+.ferr{display:block;color:#b3261e;font-size:.9rem;font-weight:600;margin-top:4px}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .ferr{color:#ffb4ab}}
+:root[data-theme=dark] .ferr{color:#ffb4ab}
+/* P10-1 · tras «Terminar» los PK quedan bajo la ✕, no debajo de ella; la medida que falta, resaltada */
+.pkrow{scroll-margin-top:64px}
+#sheetBody input.need{border-color:var(--warn,#c77700);border-width:3px}
+/* M10-4 / M9-6 · con una ficha abierta la barra del tramo se oculta: los botones redondos vuelven abajo, sobre el pie «Cerrar» */
+body:has(#sheet:not([hidden])) .fabs{bottom:calc(var(--safe-b) + 28px)!important}
+/* P7-4 · primer uso sin plano */
+#mapEmpty{position:absolute;z-index:500;left:50%;top:40%;transform:translate(-50%,-50%);width:min(82vw,340px);padding:16px 18px;border-radius:14px;
+  background:var(--surface);color:var(--text);text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.35);font-size:1rem;line-height:1.4}
+#mapEmpty[hidden]{display:none}#mapEmpty p{margin:0 0 12px}#mapEmpty .btn{width:100%;justify-content:center}

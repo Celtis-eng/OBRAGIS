@@ -58,7 +58,7 @@ async function actuacionesYBorradores() {
   ok('El texto del borrador vuelve', await p.evaluate(() => $('#aText') && $('#aText').value === 'falta escollera'));
   await p.fill('#pf_e', '', { timeout: 500 }).catch(() => {});
   await p.fill('#pf_h', '-3'); await p.click('[data-a=save]'); await esperar(300);
-  ok('Rechaza valores imposibles', await p.evaluate(() => !!$('#aText') && /Altura/.test($('#toast').textContent)), await p.evaluate(() => $('#toast').textContent));
+  ok('Rechaza valores imposibles (mensaje junto al campo)', await p.evaluate(() => !!$('#aText') && /Altura/.test(($('#ferr_pf_h') || {}).textContent || '') && $('#pf_h').getAttribute('aria-invalid') === 'true'), await p.evaluate(() => ($('#ferr_pf_h') || {}).textContent));
   await p.fill('#pf_h', '2'); await p.fill('#pf_b', '1,5'); await p.fill('#aPk1', '1+050'); await p.dispatchEvent('#aPk1', 'change'); await esperar(100);
   await p.click('[data-a=save]'); await esperar(300);
   const res = await p.evaluate(() => [...acts.values()].map(a => `${a.type}:${a.d0}-${a.d1}`).sort().join(' '));
@@ -465,6 +465,55 @@ async function ronda9() {
   await browser.close();
 }
 
+async function ronda10() {
+  const { browser, ctx, page: p, errores } = await abrir({ tactil: true, ancho: 400, alto: 820, geo: { latitude: 37.61, longitude: -2.93 } });
+  ok('Primer uso sin plano: el mapa dice qué hacer', await p.evaluate(() => !!$('#mapEmpty') && !$('#mapEmpty').hidden && /plano/.test($('#mapEmpty').textContent)));
+  await p.setInputFiles('#inKml', [DATOS + 'pendientes_rangos.kml']); await esperar(600);
+  ok('Con plano cargado el aviso desaparece', await p.evaluate(() => $('#mapEmpty').hidden));
+  const enPK = d => p.evaluate(d => { const f = [...layers.values()][0].feats[0], q = pointAtPK(f, d); return { latitude: q.lat + 0.00002, longitude: q.lng }; }, d);
+  const atras = async (tipo = 'Limpieza de cunetas') => { // tramo andado hacia atrás de 900 a 800 y «Terminar aquí»
+    await p.evaluate(async () => { walkAct = null; await DB.del('kv', 'walk'); showWalkBar(); closeSheet(); for (const k of Object.keys(drafts)) await clearDraft(k); }); await esperar(300);
+    await ctx.setGeolocation(await enPK(900)); await esperar(200);
+    await p.evaluate(t => { settings.actRecent = []; for (const a of [...acts.values()]) if (a.type === t) acts.delete(a.id); startWalk(t, 'ambos', {}); }, tipo); await esperar(1800);
+    await ctx.setGeolocation(await enPK(800)); await esperar(300); await p.click('#walkBar [data-w=end]'); await esperar(2000); };
+  // P10-1: tras «Terminar», los PK se ven y la ✕ no queda encima de «Mapa»
+  await atras();
+  const sx = await p.evaluate(() => { const x = $('#sheetX').getBoundingClientRect(), m = $('#sheetBody [data-a=map1]').getBoundingClientRect(), k = $('#aPk1').getBoundingClientRect();
+    return { solapa: !(m.right < x.left || m.left > x.right || m.bottom < x.top || m.top > x.bottom), pkVisible: k.top >= x.bottom - 4 && k.bottom <= innerHeight }; });
+  ok('Tras «Terminar»: PK a la vista y la ✕ no tapa «Mapa»', !sx.solapa && sx.pkVisible, JSON.stringify(sx));
+  // M10-1: «Mapa» en «Hasta PK» con un toque real en el mapa alarga el tramo (780–900), no lo recorta
+  await p.click('#sheetBody [data-a=map1]'); await esperar(500);
+  const pt = await p.evaluate(() => { const f = [...layers.values()][0].feats[0], q = pointAtPK(f, 780); map.setView([q.lat, q.lng], 17, { animate: false }); const c = map.latLngToContainerPoint([q.lat, q.lng]), r = $('#map').getBoundingClientRect(); return { x: r.left + c.x, y: r.top + c.y }; }); await esperar(400);
+  await p.touchscreen.tap(pt.x, pt.y); await esperar(800);
+  ok('Hacia atrás, «Mapa» en «Hasta PK»: tramo 780–900 (no se pierden metros)', await p.evaluate(() => actDraft && Math.abs(actDraft.d0 - 780) < 3 && Math.round(actDraft.d1) === 900), await p.evaluate(() => actDraft && [actDraft.d0, actDraft.d1]));
+  // M10-2: escribir «0+780» en «Hasta PK» hace lo mismo
+  await atras();
+  await p.fill('#aPk1', '0+780'); await p.press('#aPk1', 'Tab'); await esperar(300);
+  ok('Hacia atrás, PK escrito en «Hasta»: tramo 780–900', await p.evaluate(() => actDraft && Math.round(actDraft.d0) === 780 && Math.round(actDraft.d1) === 900 && $('#aPk0').value === '0+780' && $('#aPk1').value === '0+900'), await p.evaluate(() => actDraft && [actDraft.d0, actDraft.d1, $('#aPk0').value, $('#aPk1').value]));
+  // M10-5: «Guardar sin medidas» + «Guardar y seguir andando» → Deshacer conserva la cadena «sin medidas»
+  await atras('Desbroce de márgenes'); await p.evaluate(() => { const w = $('#pf_w'); if (w) w.value = ''; });
+  await p.click('#sheetBody [data-a=savecont]'); await esperar(900);
+  const nm = await p.$('#sheetBody [data-a=savenm]'); ok('Desbroce sin ancho: pide medidas', !!nm); if (nm) { await nm.click(); await esperar(1500); }
+  await p.click('#undoBar .mini'); await esperar(800);
+  ok('Deshacer del editor mantiene la cadena «sin medidas»', await p.evaluate(() => !!walkAct && walkAct.draft._noMeasChain === true), await p.evaluate(() => walkAct && walkAct.draft._noMeasChain));
+  // P10-2 y M10-4: andando, el «+» no ofrece «Desde donde acabó» y baja a su sitio sobre el pie «Cerrar»
+  await esperar(1600); await p.click('#fabNote'); await esperar(1200);
+  const pl = await p.evaluate(() => { const r = $('#fabNote').getBoundingClientRect(), u = document.elementsFromPoint(r.x + r.width / 2, r.y + r.height / 2).find(e => e.closest && e.closest('#sheetBody'));
+    return { rep: !!$('#sheetBody [data-a=rep]'), bajo: u ? (u.closest('.plusfoot') ? 'pie' : (u.textContent || '').trim().slice(0, 30)) : 'nada' }; });
+  ok('Andando, el «+» no ofrece «Desde donde acabó»', !pl.rep, JSON.stringify(pl));
+  ok('Andando, bajo el «+» queda el pie «Cerrar» (o nada)', pl.bajo === 'pie' || pl.bajo === 'nada', JSON.stringify(pl));
+  // M10-3: al llegar al final de la traza con «Guardar y seguir», el «Deshacer» dice «Fin del camino»
+  const fin = await p.evaluate(async () => { walkAct = null; await DB.del('kv', 'walk'); showWalkBar(); closeSheet(); const e = [...layers.values()][0], f = e.feats[0];
+    actDraft = { id: uid(), obraId: settings.activeObra, layerId: e.rec.id, featIdx: 0, traceName: f.name, layerName: e.rec.name, d0: f.length - 60, d1: f.length, type: 'Limpieza de cunetas', side: 'ambos', text: '', media: [], created: Date.now(), coords: [], params: {}, prio: '', _walk: true, _cont: 1, _noMeasOk: true };
+    renderActEditor(); await saveAct(); return $('#undoBar').hidden ? '' : $('#undoBar').textContent; });
+  ok('Fin de la traza: el «Deshacer» dice «Fin del camino»', /Fin del camino/.test(fin), fin);
+  // P7-3: «Enviar a la oficina» la primera vez no muestra una casilla desactivada
+  await p.evaluate(() => { hideUndo(); closeSheet(); sendToOffice(); }); await esperar(500);
+  ok('Primer envío: sin casilla desactivada', await p.evaluate(() => !!$('#sheetBody [data-a=go]') && !$('#soSince')));
+  ok('Sin errores JS', !errores.length, errores.join(' | '));
+  await browser.close();
+}
+
 async function modoSencillo() {
   const { browser, page: p, errores } = await abrir({ ancho: 360, alto: 740, tactil: true });
   await p.evaluate(() => { settings.simple = true; applySimple(); openDrawer(); }); await esperar(300);
@@ -477,7 +526,7 @@ async function modoSencillo() {
 }
 
 (async () => {
-  for (const t of [pkYNumeros, geometriaYPendientes, actuacionesYBorradores, tramoAndandoYRepetir, bc3, paqueteYEnvio, toquesYBarras, borradoresYDictado, ronda4, ronda5, ronda6, ronda7, ronda8, ronda9, modoSencillo]) {
+  for (const t of [pkYNumeros, geometriaYPendientes, actuacionesYBorradores, tramoAndandoYRepetir, bc3, paqueteYEnvio, toquesYBarras, borradoresYDictado, ronda4, ronda5, ronda6, ronda7, ronda8, ronda9, ronda10, modoSencillo]) {
     console.log(`\n— ${t.name}`);
     try { await t(); } catch (e) { ok(t.name + ' terminó sin excepciones', false, e.message.split('\n')[0]); }
   }

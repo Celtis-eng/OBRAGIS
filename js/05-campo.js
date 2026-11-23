@@ -127,8 +127,8 @@ function renderEditor() {
     <div class="loc"><span>${fmtLL(d.lat, d.lng)}${d.acc ? ' · ±' + Math.round(d.acc) + ' m' : ''} · ${srcLabel(d.src)}</span>
       <button class="mini" data-a="gps">Usar mi posición</button></div>
     <p class="hint">Puedes arrastrar el marcador amarillo para corregir la posición.</p>
-    <div class="field"><input type="text" id="nTitle" placeholder="Título (p. ej. Fuga en hidrante H-12)" value="${esc(d.title)}"></div>
-    <div class="field"><textarea id="nText" rows="3" placeholder="Descripción u observaciones">${esc(d.text)}</textarea></div>
+    <div class="field"><label for="nTitle">Título</label><input type="text" id="nTitle" placeholder="Título (p. ej. Fuga en hidrante H-12)" value="${esc(d.title)}"></div>
+    <div class="field"><label for="nText">Descripción</label><textarea id="nText" rows="3" placeholder="Descripción u observaciones">${esc(d.text)}</textarea></div>
     <div class="media">${mediaHtml(d.media, true)}</div>
     <div class="acts">
       <button class="btn" data-a="photo">${ICON.photo}Foto</button>

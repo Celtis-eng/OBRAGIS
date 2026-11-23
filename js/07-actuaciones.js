@@ -305,13 +305,10 @@ function renderActEditor() {
       + (actDraft.d1 <= actDraft.d0 && actItem(actDraft.type).fields.some(k => ['w', 'b', 'S', 'h'].includes(k)) ? '<p class="hint">Actuación puntual: indica el PK final o la longitud para calcular superficie y volumen.</p>' : r.length ? '' : '<p class="hint">Rellena los datos para ver las mediciones.</p>'); };
   meas();
   addDictation($('#aText'));
-  b.querySelectorAll('[data-pf]').forEach(inp => inp.oninput = () => { if (inp.dataset.pf === 'w') delete actDraft.params._wAuto; inp.classList.toggle('bad', !!actFieldError(inp.dataset.pf, inp.value)); meas(); });
+  b.querySelectorAll('[data-pf]').forEach(inp => inp.oninput = () => { if (inp.dataset.pf === 'w') delete actDraft.params._wAuto; inp.classList.remove('need'); fieldErr(inp, actFieldError(inp.dataset.pf, inp.value)); meas(); });
   if (f) showSlopeSegment(f, Math.min(a.d0, a.d1), Math.max(a.d0, a.d1));
   onSheetClose(() => setTimeout(() => { if (!actPick && ($('#sheet').hidden || !$('#aText'))) { slopeHL.clearLayers(); if (!$('#aText')) actDraft = actPick ? actDraft : null; } }, 0));
-  const setPK = (which, d) => { syncAct(); d = Math.max(0, Math.min(f ? f.length : d, d));
-    if (which === 'd1' && d < actDraft.d0 && actDraft.d1 > actDraft.d0) which = 'd0'; // «Hasta» por debajo de «Desde» en un tramo: se alarga por ese lado
-    else if (which === 'd0' && d > actDraft.d1 && actDraft.d1 > actDraft.d0) which = 'd1';
-    actDraft[which] = d; if (which === 'd0' && actDraft.d1 < actDraft.d0) actDraft.d1 = actDraft.d0; if (actDraft.params._wAuto) delete actDraft.params.w; renderActEditor(); };
+  const setPK = (which, d) => { syncAct(); pkRule(which, Math.max(0, Math.min(f ? f.length : d, d))); if (actDraft.params._wAuto) delete actDraft.params.w; renderActEditor(); };
   $('#aType').onchange = () => { syncAct(); const nt = $('#aType').value, old = actItem(actDraft.type); actDraft.type = nt;
     if (!actDraft._sideSet && !acts.has(actDraft.id)) actDraft.side = defaultSideFor(nt, actDraft.side);
     const ni = actItem(nt); if (old && old.mat && !(ni.mat || []).includes(actDraft.params.mat)) delete actDraft.params.mat; if (actDraft.params._wAuto) delete actDraft.params.w; renderActEditor(); };
@@ -326,7 +323,12 @@ function renderActEditor() {
       if (f && isFinite(v) && v > f.length + 0.5) t = `⚠ Pasa del final de la traza (${fmtPK(f.length)})`; // aviso al escribir, no solo al guardar
       $('#' + id + 'rb').textContent = t; el.classList.toggle('bad', t.startsWith('⚠')); };
     // sin volver a dibujar la ficha: así no se pierde el toque en «Guardar» justo después de escribir el PK
-    el.onchange = () => { if (!isFinite(parsePK(el.value))) { $('#' + id + 'rb').textContent = pkReadBack(el.value); return; } syncAct(); refreshActInline(); }; });
+    el.onchange = () => { if (!isFinite(parsePK(el.value))) { $('#' + id + 'rb').textContent = pkReadBack(el.value); return; }
+      const p0 = actDraft.d0, p1 = actDraft.d1, which = id === 'aPk0' ? 'd0' : 'd1'; syncAct();
+      if (p1 > p0 && ((which === 'd1' && actDraft.d1 < p0) || (which === 'd0' && actDraft.d0 > p1))) { // escrito al revés: la misma regla que «Aquí» y «Mapa» (no se pierden metros)
+        const v = actDraft[which]; actDraft.d0 = p0; actDraft.d1 = p1; pkRule(which, v);
+        ['d0', 'd1'].forEach((k, i) => { const e2 = $(i ? '#aPk1' : '#aPk0'); e2.value = fmtPK(actDraft[k]); e2.dataset.v = e2.value; $(i ? '#aPk1rb' : '#aPk0rb').textContent = ''; e2.classList.remove('bad'); }); }
+      refreshActInline(); }; });
   const refreshActInline = () => {
     const d = actDraft; if (!d) return;
     const lo = Math.min(d.d0, d.d1), hi = Math.max(d.d0, d.d1), ln = Math.max(0, Math.min(hi, f ? f.length : hi) - lo);
@@ -374,12 +376,30 @@ function renderActEditor() {
   const del = b.querySelector('[data-a=delete]'); if (del) del.onclick = () => deleteAct(a.id);
 }
 let actPick = null;
+// Dato mal escrito: el mensaje va junto al campo (y lo lee el lector de pantalla), no en un aviso pasajero lejos
+function fieldErr(inp, er) {
+  const id = 'ferr_' + inp.id; let m = document.getElementById(id);
+  inp.classList.toggle('bad', !!er); inp.setAttribute('aria-invalid', er ? 'true' : 'false');
+  if (!er) { if (m) m.remove(); inp.removeAttribute('aria-describedby'); return; }
+  if (!m) { inp.insertAdjacentHTML('afterend', `<small class="ferr" id="${id}" role="alert"></small>`); m = document.getElementById(id); }
+  m.textContent = '⚠ ' + er; inp.setAttribute('aria-describedby', id);
+}
+// Cambiar «Desde» o «Hasta» (con «Aquí», «Mapa» o escrito). Si en un tramo el PK nuevo queda al otro lado,
+// el tramo se alarga por ese lado (antes se recortaba y se perdían metros sin avisar) y se dice cómo queda.
+function pkRule(which, d) {
+  const a = actDraft, l0 = a.d1 - a.d0; let moved = false;
+  if (which === 'd1' && d < a.d0 && a.d1 > a.d0) { which = 'd0'; moved = true; }
+  else if (which === 'd0' && d > a.d1 && a.d1 > a.d0) { which = 'd1'; moved = true; }
+  a[which] = d;
+  if (a.d1 < a.d0) { if (which === 'd0') a.d1 = a.d0; else [a.d0, a.d1] = [a.d1, a.d0]; }
+  if (moved) toast(`El PK queda al otro lado del tramo: se alarga hasta ${fmtPK(a.d0)}–${fmtPK(a.d1)} (${fmtLen(a.d1 - a.d0)}, antes ${fmtLen(l0)}). Si querías acortarlo, escribe los dos PK.`, 7000);
+}
 const _slopePickPoint = slopePickPoint;
 slopePickPoint = function (ll) { // también atiende la selección de inicio/fin de actuaciones
   if (!actPick) return _slopePickPoint(ll);
   const ctx = featOf(actDraft); const r = pkAt(ctx.f, L.latLng(ll));
   const which = actPick; actPick = null; $('#pickBar').hidden = true;
-  actDraft[which] = r.d; if (actDraft.d1 < actDraft.d0) [actDraft.d0, actDraft.d1] = [actDraft.d1, actDraft.d0];
+  pkRule(which, Math.max(0, Math.min(ctx.f.length, r.d))); // la misma regla que «Aquí»: el tramo se alarga, no se recorta
   if (actDraft.params && actDraft.params._wAuto) delete actDraft.params.w;
   renderActEditor();
 };
@@ -388,7 +408,7 @@ async function saveAct() {
   const a = actDraft; if (!a) return false;
   if (a.type === 'Otro') a.type = (a.custom || '').trim() || 'Otro';
   if (!a.type) { toast('Elige el tipo de actuación.'); return; }
-  for (const inp of document.querySelectorAll('[data-pf]')) { const er = actFieldError(inp.dataset.pf, inp.value); if (er) { inp.classList.add('bad'); inp.focus(); toast(er, 6000); return; } }
+  for (const inp of document.querySelectorAll('[data-pf]')) { const er = actFieldError(inp.dataset.pf, inp.value); if (er) { fieldErr(inp, er); inp.focus(); inp.scrollIntoView({ block: 'center' }); return; } }
   if (!isFinite(a.d0) || !isFinite(a.d1)) { toast('Revisa los PK: escribe por ejemplo 1+250.'); return; }
   if (a.d1 < a.d0) [a.d0, a.d1] = [a.d1, a.d0];
   const ctx = featOf(a);
@@ -423,10 +443,10 @@ async function saveAct() {
   if (!$('#drawer').hidden) renderDrawer();
   if (cont) { // «Guardar y seguir andando»: el siguiente tramo empieza en el PK guardado (corregido o no)
     buzz(40); const go = await continueWalk(a, cont === -1 ? a.d0 : a.d1, { noMeas: noMeasUsed });
-    if (!fromSplit) showUndo(`Guardado: ${a.type} ${fmtPK(a.d0)}–${fmtPK(a.d1)}${go ? '. Sigue el siguiente tramo.' : ''}`, async () => { // mismo «Deshacer» que desde la barra
+    if (!fromSplit) showUndo(`Guardado: ${a.type} ${fmtPK(a.d0)}–${fmtPK(a.d1)}${go ? '. Sigue el siguiente tramo.' : '. Fin del camino: no hay más tramo que seguir.'}`, async () => { // mismo «Deshacer» que desde la barra
       if (a.obraId !== settings.activeObra) { toast('Ese tramo es de otra obra.'); return; }
       await DB.del('acts', a.id); acts.delete(a.id); drawActs(); const st = cont === -1 ? a.d1 : a.d0;
-      walkAct = { draft: { ...a, id: uid(), d0: st, d1: st, media: [], text: '', created: Date.now(), coords: [], params: { ...(a.params || {}) } }, t: Date.now(), shown: Date.now() };
+      walkAct = { draft: { ...a, id: uid(), d0: st, d1: st, media: [], text: '', created: Date.now(), coords: [], params: { ...(a.params || {}) }, _noMeasChain: noMeasUsed }, t: Date.now(), shown: Date.now() };
       await DB.put('kv', walkAct, 'walk').catch(() => {}); showWalkBar(); keepAwake(true); }); }
   return true;
 }
