@@ -15,8 +15,11 @@ const AB_EVERY = 5 * 60000;     // como mucho una copia cada 5 min mientras se t
 const abOn = () => NATIVE || window.__abTest === true;
 const abDirty = new Map();      // obraId → nº de cambios (para no dar por copiado algo que cambió durante la copia)
 let abBusy = false;
+let abSaveT = null;
 function abMark(obraId) {
   if (!obraId) return;
+  settings.obraMod = { ...(settings.obraMod || {}), [obraId]: Date.now() }; // último cambio de cada obra (también borrados): sirve para avisar al importar un paquete más antiguo
+  clearTimeout(abSaveT); abSaveT = setTimeout(saveSettings, 1500);
   abDirty.set(obraId, (abDirty.get(obraId) || 0) + 1);
   const l = settings.abDirty || []; if (!l.includes(obraId)) { settings.abDirty = [...l, obraId]; saveSettings(); } // se recuerda aunque la app se cierre de golpe
 }
@@ -64,12 +67,14 @@ async function autoBackup(force) {
         } else await FS.deleteFile({ path: fin, directory: D }).catch(() => {});
         await FS.rename({ from: tmp, to: fin, directory: D });
         const old = (settings.abBase || {})[id]; // la obra se renombró: se quitan las copias con el nombre viejo
+        if (old && old !== base) await FS.rename({ from: old + '_anterior.zip', to: ant, directory: D }).catch(() => {}); // al renombrar no se pierde la copia anterior
         if (old && old !== base) for (const x of [old + '.zip', old + '_anterior.zip', old + '.tmp']) await FS.deleteFile({ path: x, directory: D }).catch(() => {});
         settings.abBase = { ...(settings.abBase || {}), [id]: base };
         if ((abDirty.get(id) || 0) === gen) { abDirty.delete(id); settings.abDirty = (settings.abDirty || []).filter(x => x !== id); }
         delete errs[id];
       } catch (e) { okAll = false; errs[id] = e.message || String(e); console.warn('Copia automática', e); }
     }
+    for (const k of Object.keys(errs)) if (!obras.has(k)) delete errs[k];
     settings.abErrs = errs; settings.abErr = Object.values(errs)[0] || ''; settings.abLast = Date.now();
     if (!okAll && Date.now() - (settings.abErrShown || 0) > 3600000) { // el aviso se repite (como mucho cada hora) mientras siga fallando
       settings.abErrShown = Date.now(); toast(`No se pudo hacer la copia automática de ${plural(Object.keys(errs).length, 'obra', 'obras')}. Haz una copia en Obras → «Copia de seguridad de todas las obras».`, 9000); }
@@ -82,21 +87,23 @@ setInterval(() => { if ($('#sheet').hidden) autoBackup(false); }, 60000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') autoBackup(true); });
 function abStatusHtml() {
   if (!abOn()) return '';
-  const pend = (settings.abDirty || []).filter(id => obras.has(id)).length, ne = Object.keys(settings.abErrs || {}).filter(id => obras.has(id)).length;
-  return `<p class="hint abst"><b>Copia automática activada</b>: cada obra se guarda sola en <b>Documentos › OBRA-GIS › Copia automática</b>, que no se borra al desinstalar la app${settings.abLast ? ` · última: ${fmtDate(settings.abLast)}` : ''}${pend ? ` · ${plural(pend, 'obra', 'obras')} con cambios por copiar` : ''}.${ne ? ` <b>⚠ ${plural(ne, 'obra no se pudo copiar', 'obras no se pudieron copiar')}</b> (${esc(settings.abErr)}).` : ''}</p>`;
+  const pend = settings.abInit ? (settings.abDirty || []).filter(id => obras.has(id)).length : obras.size, ne = Object.keys(settings.abErrs || {}).filter(id => obras.has(id)).length;
+  return `<p class="hint abst${ne ? ' err' : ''}"><b>Copia automática activada</b>: cada obra se guarda sola en <b>Documentos › OBRA-GIS › Copia automática</b>, que no se borra al desinstalar la app${settings.abLast ? ` · última: ${fmtDate(settings.abLast)}` : ''}${pend ? ` · ${plural(pend, 'obra', 'obras')} con cambios por copiar` : ''}.${ne ? ` <b>⚠ ${plural(ne, 'obra no se pudo copiar', 'obras no se pudieron copiar')}</b> (${esc(settings.abErr)}).` : ''}</p>`;
 }
 // Recuperar tras reinstalar: se eligen uno o varios .zip (de la copia automática o de una copia manual)
 // Varios .zip a la vez (la carpeta entera): se agrupan por obra y se queda la copia más reciente de cada una
 // (antes el «_anterior» podía pisar a la buena y volvían nombres viejos).
 async function importManyPackages(files) {
   const pk = [];
-  for (const f of files) { const z = await isObraPackage(f); if (!z) { await fichaImportFiles([f]); continue; }
+  for (const f of files) { const z = await isObraPackage(f);
+    if (!z && /\.(zip|tmp)$/i.test(f.name)) { toast(`«${f.name}» está dañado o incompleto y no se ha importado.`, 7000); await new Promise(r => setTimeout(r, 1500)); continue; }
+    if (!z) { await fichaImportFiles([f]); continue; }
     let m = null; try { m = JSON.parse(await z.file(/(^|\/)obra\.json$/)[0].async('string')); } catch (e) { /* lo dirá la importación */ }
     pk.push({ f, z, id: m && m.obra && m.obra.id, t: Date.parse(m && m.exportado) || f.lastModified || 0 }); }
   const best = new Map(), skipped = [];
   for (const x of pk) { const k = x.id || x.f.name, b = best.get(k); if (!b || x.t > b.t) { if (b) skipped.push(b); best.set(k, x); } else skipped.push(x); }
-  if (skipped.length) toast(`Se recupera la copia más reciente de cada obra (${plural(best.size, 'obra', 'obras')}); ${plural(skipped.length, 'copia más antigua se descarta', 'copias más antiguas se descartan')}.`, 8000);
   for (const x of [...best.values()].sort((a, b) => a.t - b.t)) await importObraPackage(x.f, x.z, { fecha: x.t });
+  if (skipped.length) toast(`Recuperada la copia más reciente de cada obra (${plural(best.size, 'obra', 'obras')}). ${plural(skipped.length, 'copia más antigua se ha descartado', 'copias más antiguas se han descartado')}: ${skipped.map(x => x.f.name).slice(0, 3).join(', ')}${skipped.length > 3 ? '…' : ''}.`, 10000); // al final: no lo tapa «Importando…»
 }
 function restoreFromBackup() {
   toast('Elige los .zip de Documentos › OBRA-GIS › Copia automática (puedes marcar varios).', 8000);

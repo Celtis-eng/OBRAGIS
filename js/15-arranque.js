@@ -47,7 +47,7 @@ $('#fabNote').onclick = () => {
   b.querySelector('[data-a=close]').onclick = () => closeSheet();
   sheetOpenAt = Date.now() + 550; // la ficha «+» aparece bajo el dedo que pulsó «+»: 0,9 s sin toques (dobles y triples toques)
   b.querySelectorAll('[data-wq]').forEach(x => x.onclick = () => walkStartSheet({ type: x.dataset.wq }));
-  { const t0 = Date.now(); b.querySelectorAll('[data-pq]').forEach(x => x.onclick = () => { if (Date.now() - t0 < 1500) return; quickPoint(x.dataset.pq); }); } // se guardan al tocar: 1,5 s sin toques al abrir // un toque de más al abrir no crea nada // tipo ya elegido: solo falta «Empezar»
+  { const t0 = Date.now(); b.querySelectorAll('[data-pq]').forEach(x => x.onclick = () => { if (Date.now() - t0 < 1500) { if (Date.now() - t0 > 500) toast('Vuelve a tocar para apuntarlo.', 2500); return; } quickPoint(x.dataset.pq); }); } // se guardan al tocar: 1,5 s sin toques al abrir // un toque de más al abrir no crea nada // tipo ya elegido: solo falta «Empezar»
   const we = b.querySelector('[data-a=wend]'); if (we) we.onclick = () => { closeSheet(); if (walkAct) walkAct.shown = 0; walkEnd(false); };
   const rp = b.querySelector('[data-a=rep]'); if (rp) rp.onclick = () => repeatLastAct();
   const rw = b.querySelector('[data-a=repw]'); if (rw) rw.onclick = () => repeatWalk();
@@ -175,7 +175,8 @@ function nativeInbox() { // app nativa: «Abrir con» y «Compartir»
 // Primer uso: sin ningún plano cargado el mapa no queda en negro sin decir qué hacer
 (() => { const box = document.createElement('div'); box.id = 'mapEmpty'; box.hidden = true;
   box.innerHTML = '<p><b>Aún no hay ningún plano.</b><br>Abre el plano del camino (KML o KMZ) para empezar.</p><button class="btn pri" type="button">Abrir plano</button><button class="linkbtn" type="button" data-a="restore">¿Has reinstalado la app? Recuperar mis obras</button>';
-  $('#map').appendChild(box); box.querySelector('button').onclick = () => importMenu(); box.querySelector('[data-a=restore]').onclick = () => restoreFromBackup();
+  $('#map').appendChild(box); box.querySelector('button').onclick = () => $('#inKml').click(); box.querySelector('[data-a=restore]').onclick = () => restoreFromBackup();
+  if (!(NATIVE || window.__abTest)) box.querySelector('[data-a=restore]').hidden = true; // en la web no hay copia automática
   box.querySelectorAll('button').forEach(x => L.DomEvent.disableClickPropagation(x)); // el resto del aviso deja pasar los toques al mapa
   let t; const upd = () => { clearTimeout(t); t = setTimeout(() => { box.hidden = layers.size > 0 || notes.size > 0; }, 150); };
   map.on('layeradd layerremove', upd); upd(); })();

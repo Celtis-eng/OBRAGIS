@@ -10,6 +10,8 @@ const isUnit = u => typeof u === 'string' && Object.prototype.hasOwnProperty.cal
 const normUnit = u => { const x = String(u || '').toLowerCase().replace('²', '2').replace('³', '3').replace(/[\s.]/g, '');
   return ({ ml: 'm', mlin: 'm', u: 'ud', uds: 'ud', un: 'ud', und: 'ud', tn: 't', tm: 't', tonelada: 't', toneladas: 't', kgs: 'kg' })[x] || x; };
 function defaultUnit(it) {
+  if (it.custom) { const L = [...acts.values()].filter(a => a.type === it.name), has = k => L.some(a => a.params && a.params[k] > 0); // nombre propio: según lo que se haya medido
+    return has('w') ? 'm2' : has('n') || L.every(a => a.d1 - a.d0 < 0.5) ? 'ud' : 'm'; }
   if (ACT_POINT.has(it.name) && (it.fields.includes('n') || !it.fields.some(k => ['area', 'vol'].includes(k)))) return 'ud'; // puntuales que se cuentan (caño, arqueta, entronque, badén…) // badén, entronque…: se apuntan en un PK y se cuentan
   if (it.fields.includes('S')) return 'm2';
   if (it.fields.includes('h') && it.fields.includes('b')) return 'm3';
@@ -133,6 +135,8 @@ function suggestFromBase(types, base, acts) {
       if (!sw.some(x => head.some(h => wm(x, h)))) return;
       const hits = hit + (sw.some(x => x.startsWith(ws[0].slice(0, Math.max(5, ws[0].length - 2)))) ? 0 : 1); // el sinónimo de la palabra principal cuenta
       if (hits / ws.length < 0.5) return;
+      const act0 = ['limpieza', 'demolicion', 'desbroce', 'reparacion', 'reposicion', 'retirada', 'perfilado', 'refino', 'excavacion'].find(x => sw[0] && sw[0].startsWith(x.slice(0, 6)));
+      if (act0 && !ws.some(w => w.startsWith(act0.slice(0, 5)))) return; // la partida es otra operación («Limpieza y perfilado de cuneta» no es «Cuneta revestida»)
       cand.push({ t, c, s: hits / ws.length + hits * 0.1 + (c.u === def ? 0.3 : 0) });
     });
   });

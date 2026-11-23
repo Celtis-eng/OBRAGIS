@@ -1,6 +1,6 @@
 {
-  "version": "1.19.2",
+  "version": "1.19.3",
   "fecha": "2026-11-23",
   "apk": "https://github.com/Celtis-eng/OBRAGIS/releases/download/apk/CampoKML.apk",
-  "notas": "Copia automática más segura y recuperación sin riesgo de quedarse con una copia antigua."
+  "notas": "Importación más segura (avisa si el paquete es más antiguo), editor más claro y BC3 más correcto."
 }

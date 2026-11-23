@@ -491,10 +491,12 @@ async function ronda10() {
   ok('Hacia atrás, «Mapa» en «Hasta PK»: tramo 780–900 (no se pierden metros)', await p.evaluate(() => actDraft && Math.abs(actDraft.d0 - 780) < 3 && Math.round(actDraft.d1) === 900), await p.evaluate(() => actDraft && [actDraft.d0, actDraft.d1]));
   // M10-2 / A11-1: lo escrito a mano se respeta; si queda al revés se avisa en el otro PK y al guardar se pregunta
   await atras();
-  await p.fill('#aPk1', '0+780'); await p.press('#aPk1', 'Tab'); await esperar(300);
+  await p.fill('#aPk1', '0+780'); await esperar(600); await p.press('#aPk1', 'Tab'); await esperar(300); // como una persona: la copia de trabajo ya ha guardado el borrador antes del «change»
+  ok('El resumen fijo sigue a los PK escritos (A13-2)', await p.evaluate(() => /0\+780/.test($('#aSum').textContent)), await p.evaluate(() => $('#aSum').textContent));
   ok('PK escrito al revés: aviso en el otro PK, sin dar la vuelta en silencio', await p.evaluate(() => actDraft && Math.round(actDraft.d0) === 800 && Math.round(actDraft.d1) === 780 && /Desde/.test($('#aPk0rb').textContent)), await p.evaluate(() => actDraft && [actDraft.d0, actDraft.d1, $('#aPk0rb').textContent]));
   await p.evaluate(() => { actDraft.params.w = 1; }); await p.click('#sheetBody [data-a=save]'); await esperar(500);
-  ok('Guardar con PK al revés pregunta (no guarda solo)', await p.evaluate(() => !!$('#invWarn') && /0\+780 a 0\+800/.test($('#invWarn').textContent)), await p.evaluate(() => ($('#invWarn') || {}).textContent));
+  ok('Guardar con PK al revés pregunta (no guarda solo) y ofrece alargar 780–900 (I13-3)', await p.evaluate(() => !!$('#invWarn') && /0\+780–0\+800/.test($('#invWarn').textContent) && /alargado: 0\+780–0\+900/.test($('#invWarn').textContent)), await p.evaluate(() => ($('#invWarn') || {}).textContent));
+  ok('El aviso de PK al revés va bajo los PK, sin taparlos (M13-2)', await p.evaluate(() => { const w = $('#invWarn'), r0 = $('#aPk0').getBoundingClientRect(), c = document.elementFromPoint(r0.x + r0.width / 2, r0.y + r0.height / 2); return w.previousElementSibling && w.previousElementSibling.classList.contains('pkrow') && c === $('#aPk0'); }));
   await p.fill('#aPk0', '0+780'); await p.press('#aPk0', 'Tab'); await p.fill('#aPk1', '0+900'); await p.press('#aPk1', 'Tab'); await esperar(300);
   ok('Escribiendo los dos PK queda 780–900 sin aviso', await p.evaluate(() => Math.round(actDraft.d0) === 780 && Math.round(actDraft.d1) === 900 && !$('#aPk0').classList.contains('bad') && !$('#aPk1').classList.contains('bad')), await p.evaluate(() => [actDraft.d0, actDraft.d1]));
   // A11-1: mover un tramo escribiendo «Desde» y luego «Hasta» (orden natural)
@@ -586,6 +588,10 @@ async function pendientesViejos() {
   await p.evaluate(() => { const e = [...layers.values()][0]; openActEditor({ rec: e.rec, f: e.feats[0], d0: 1000, d1: 1000, type: 'Otro' }); }); await esperar(500);
   await p.fill('#aOther', 'Hito kilométrico'); await p.click('#sheetBody [data-a=save]'); await esperar(500);
   ok('«Otro» puntual con nombre propio se guarda sin pedir 0 m (M7-7)', await p.evaluate(() => !$('#zeroWarn') && [...acts.values()].some(a => a.type === 'Hito kilométrico')));
+  ok('Un borrado cuenta como cambio de la obra (L13-1b)', await p.evaluate(async () => { const t0 = Date.now(); const a = [...acts.values()].find(x => x.type === 'Limpieza de cunetas'); await deleteAct(a.id); return (settings.obraMod || {})[settings.activeObra] >= t0; }));
+  ok('«La obra ya existe» con paquete más antiguo: aviso y «Reemplazar» no es el botón principal (L13-1)', await p.evaluate(async () => { hideUndo(); const pr = askImportMode('X', Date.now() - 15000, Date.now()); await new Promise(r => setTimeout(r, 300));
+    const ok1 = /más antiguo/.test($('#sheetBody').textContent) && !$('#sheetBody [data-m=replace]').classList.contains('pri') && /:\d\d:\d\d/.test($('#sheetBody').textContent); $('#sheetBody [data-m=""]').click(); await pr; return ok1; }));
+  ok('«Otro» con nombre propio: con unidades sale en ud y con su campo al reabrir (L13-3)', await p.evaluate(() => { const it = actItem('Hito kilométrico'); return it.fields.includes('n') && bc3Map('Hito kilométrico').unit === 'ud'; }));
   ok('Badén guardado en «m» por versiones antiguas sale por unidad (M8-4)', await p.evaluate(() => { settings.bc3Map = { 'Badén': { unit: 'm' } }; return bc3Map('Badén').unit === 'ud'; }));
   ok('Sin errores JS', !errores.length, errores.join(' | '));
   await browser.close();

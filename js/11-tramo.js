@@ -167,6 +167,7 @@ async function sendToOffice() {
   const o = obras.get(settings.activeObra); if (!o) return;
   const sent = (settings.lastSent || {})[o.id] || 0;
   const b = openSheet(`<h2>Enviar a la oficina</h2><p class="sub">${esc(o.name)}</p>
+    <div class="field" id="soWhoF"><label for="soWho">Tu nombre (sale en el informe)</label><input type="text" id="soWho" value="${esc(settings.surveyor || '')}"></div>
     <p>Se prepara todo lo necesario para la oficina:</p>
     <ul class="ulist"><li><b>Paquete de la obra</b> (.zip): capas, actuaciones, fotos y anchos. Se abre con OBRA-GIS en otro móvil o en el ordenador.</li>
       <li><b>Informe de la visita</b> (.html): para leer, imprimir o guardar en PDF.</li><li><b>Mediciones</b>: .csv para Excel (lo enviado) y .bc3 para Presto o Arquímedes (toda la obra, con los códigos de partida que hayas asignado).</li></ul>
@@ -175,7 +176,6 @@ async function sendToOffice() {
         nofoto = L0.filter(a => !(a.media || []).length && a.prio === 'alta'), items = [[zero, 'de 0 m'], [nodat, 'sin medidas (no saldrá superficie ni volumen)'], [nofoto, 'de prioridad alta sin foto']].filter(x => x[0].length);
       return items.length ? `<div class="fwarn" role="alert"><b>Antes de enviar, revisa:</b><ul class="revlist">${items.map(([l, t]) => `<li>${plural(l.length, 'actuación', 'actuaciones')} ${t}: ${l.slice(0, 4).map(a => `<button class="linkbtn" data-rv="${esc(a.id)}">${esc(a.type)} ${fmtPK(a.d0)}</button>`).join(' ')}${l.length > 4 ? ' …' : ''}</li>`).join('')}</ul><small>Se puede enviar igualmente.</small></div>` : ''; })()}
     ${sent ? `<label class="opt"><input type="checkbox" id="soSince" checked>Informe solo con lo nuevo desde el último envío (${fmtDate(sent)})</label>` : ''}
-    <div class="field"><label for="soWho">Tu nombre (sale en el informe)</label><input type="text" id="soWho" value="${esc(settings.surveyor || '')}"></div>
     <div class="savebar"><button class="btn go full" data-a="go">Preparar y enviar</button></div>`);
   b.querySelectorAll('[data-rv]').forEach(x => x.onclick = () => { const a = acts.get(x.dataset.rv); if (a) { map.fitBounds(L.latLngBounds(a.coords).pad(0.4), { maxZoom: 18 }); viewAct(a.id); } });
   b.querySelector('[data-a=go]').onclick = async () => {

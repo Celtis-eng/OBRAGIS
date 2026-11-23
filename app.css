@@ -878,3 +878,58 @@ body:has(#walkBar:not([hidden])) .savebar.plusfoot{padding-bottom:calc(var(--wbh
 .walksum{position:sticky;top:0;z-index:3;margin:0 52px 8px 0;padding:8px 10px;border-radius:10px;background:var(--surface-2,var(--bg2));border:1px solid var(--border-strong,#888);font-size:1rem;line-height:1.3}
 .restorebox{display:flex;flex-direction:column;gap:6px;margin:4px 0 12px;padding:10px;border-radius:12px;border:2px dashed var(--border-strong,#888)}
 .restorebox span{font-weight:600}
+
+/* ================= 1.19.3 · propuesta 8 de Irene (ronda 13) ================= */
+
+/* P8-1 (I13-1, ALTA) · El resumen fijo del tramo (.walksum, z-index 3) queda DEBAJO de la franja de la ✕
+   (P7-2: .sheet-x z-index 4 con ::before opaco de 64 px). Justo cuando se desplaza la ficha —el caso para el que
+   existe el resumen— la franja lo tapa: se ve una banda vacía (cap/c360/02c_editor_walksum, band_antes).
+   El resumen sube por encima de la franja; no pisa la ✕ porque ya deja 52 px a la derecha. */
+#sheetBody .walksum{z-index:5;background:var(--bg2);box-shadow:0 6px 10px -8px rgba(0,0,0,.45)}
+
+/* P8-2 (I13-4) · «⚠ Pasa del final de la traza» se mete entre el campo «Hasta PK» y sus botones:
+   «Aquí / Mapa» de una columna quedan más abajo que los de la otra (cap/c360/02g_pk_final).
+   El mensaje va debajo de los botones y las dos columnas quedan alineadas. */
+.pkrow .field{display:flex;flex-direction:column}
+.pkrow .field > .ferr{order:3}
+.pkrow .field > .pkbtns{order:2}
+
+/* P8-3 (I13-5) · El aviso de PK al revés (#invWarn) vive en la barra fija de abajo: con él, la barra ocupa
+   212 de 533 px de ficha a 360×740 (40 %) y el formulario que hay que corregir queda en una rendija
+   (cap/c360/02f_invwarn). Aviso más compacto, opciones a lo ancho y con tope de altura. */
+.savebar .fwarn{max-height:34vh;overflow:auto;padding:8px 10px;font-size:.9rem;line-height:1.35}
+.savebar .fwarn .row{display:flex;flex-wrap:wrap;gap:6px}
+.savebar .fwarn .row .mini{flex:1 1 140px;min-height:44px;font-weight:600}
+
+/* P8-4 (I13-2) · Bienvenida en el móvil (Android) a 360×740: el recuadro «¿Ya usabas la app…? Recuperar mis
+   obras» (punteado, 2 líneas + botón de 52 px) empuja «¿Cómo vas a usar la app?» y los dos botones de modo
+   por debajo del borde: la decisión principal no se ve sin desplazar (cap/c360/00b_bienvenida).
+   En pantallas bajas el recuadro pasa a una sola fila: texto corto a la izquierda y botón a la derecha. */
+@media (max-height:780px){
+  .restorebox{flex-direction:row;align-items:center;gap:8px;padding:6px 8px;margin:2px 0 8px;border-width:1px}
+  .restorebox span{flex:1 1 auto;font-size:.9rem;line-height:1.25}
+  .restorebox .btn.full{width:auto;flex:0 0 auto;min-height:44px;padding:0 12px;font-size:.9rem}
+}
+
+/* P8-5 (I13-7) · Obras: el estado de la copia automática es un párrafo gris de 30-45 palabras al final de la
+   ficha (a 360 px empieza en y=640) y el fallo «⚠ 1 obra no se pudo copiar» sale con el mismo gris
+   (cap/c360/05b_obras_fallo). Se convierte en tarjeta de estado: verde si va bien, naranja si falla.
+   (El estado con fallo trae un tercer <b>; el arreglo bueno es la clase .abst.err desde abStatusHtml, ver T13-6.) */
+#sheetBody .abst{display:block;margin:10px 0;padding:8px 10px 8px 12px;border-radius:10px;border-left:5px solid var(--go,#1f7a55);background:var(--bg2);color:var(--fg)}
+#sheetBody .abst:has(b:nth-of-type(3)),#sheetBody .abst.err{border-left-color:#c77700;background:#fff4e6;color:#5c3200}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) #sheetBody .abst:has(b:nth-of-type(3)),:root:not([data-theme=light]) #sheetBody .abst.err{background:#3a2a12;color:#ffd8a8}}
+:root[data-theme=dark] #sheetBody .abst:has(b:nth-of-type(3)),:root[data-theme=dark] #sheetBody .abst.err{background:#3a2a12;color:#ffd8a8}
+
+/* P8-6 (I13-8) · Mapa vacío: «¿Has reinstalado la app? Recuperar mis obras» es un enlace subrayado de 2 líneas
+   pegado al botón principal (cap/c360/00c_mapa_vacio). Más aire y separación visual del «Abrir plano». */
+#mapEmpty .linkbtn{margin-top:12px;padding:8px 4px 0;border-top:1px solid var(--line);width:100%;line-height:1.3}
+
+/* P8-7 (I13-11) · Listado: el <summary> de cada traza mide 37 px de alto (< 44, WCAG 2.5.8 recomendado 44). */
+/* (sin display:flex: conserva el triángulo ▸ del <summary>, que es list-item) */
+#sheetBody details > summary{min-height:44px;box-sizing:border-box;padding-block:10px}
+
+/* P8-8 (I13-9) · «Falta: escribe ancho» (.fneed) solo se distingue del error (.ferr) por el tono; se le da
+   un icono propio y que no dependa del color (WCAG 1.4.1). */
+.fneed::before{content:"✎ ";font-weight:700}
+#sheet:has(.walksum) .sheet-x::before{display:none} /* con resumen fijo no hace falta la franja de la ✕ */
+.pkrow + #invWarn{margin:4px 0 10px}

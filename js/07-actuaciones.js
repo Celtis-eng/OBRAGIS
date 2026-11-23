@@ -84,7 +84,9 @@ const ACT_PRIO = { alta: ['Alta', '#e03131'], media: ['Media', '#f08c00'], baja:
 const ACT_ITEMS = ACT_CATS.flatMap(c => c.items.map(([name, color, fields, o]) => ({ name, color, fields, ...o, cat: c.id, catName: c.name })));
 const ACT_LEGACY = { 'Firme / pavimento': '#455a64', 'Reperfilado / desbroce': '#7cb342' };  // tipos de versiones anteriores
 const ACT_TYPES = ACT_ITEMS.map(i => [i.name, i.color]).concat(Object.entries(ACT_LEGACY)); // (lo usan la exportación KMZ y otros módulos)
-const actItem = t => ACT_ITEMS.find(i => i.name === t) || { name: t, color: ACT_LEGACY[t] || '#f4511e', fields: [], cat: 'otros', catName: 'Señalización y otros', legacy: true };
+// tipos antiguos: sin campos; tipos con nombre propio («Otro» → «Hito kilométrico»): los mismos campos que «Otro» (ancho, espesor, unidades)
+const actItem = t => ACT_ITEMS.find(i => i.name === t) || (ACT_LEGACY[t] ? { name: t, color: ACT_LEGACY[t], fields: [], cat: 'otros', catName: 'Señalización y otros', legacy: true }
+  : { name: t, color: '#f4511e', fields: ['w', 'e', 'n'], cat: 'otros', catName: 'Señalización y otros', legacy: true, custom: true });
 const SIDES = { izq: 'Margen izquierdo', der: 'Margen derecho', ambos: 'Ambos márgenes', eje: 'Eje / calzada' };
 const SIDE_ABBR = { izq: 'MI', der: 'MD', ambos: 'AM', eje: 'Eje' };
 const acts = new Map();
@@ -110,7 +112,7 @@ function actMeasure(a) {
   if (m.area && v('dot')) m.kg = m.area * v('dot');
   if (v('n')) m.n = v('n'); else if (ACT_POINT.has(a.type) && (it.fields.includes('n') || !it.fields.some(k => ['area', 'vol'].includes(k)))) m.n = 1; // el bacheo (por superficie) no cuenta unidades // badén, entronque…: cada uno cuenta como 1 ud (pantalla, CSV, informe y BC3)
   if (v('n') && v('lt')) m.tubo = v('n') * v('lt');
-  if (!it.fields.length || ['Limpieza de cunetas', 'Cuneta en tierra', 'Barrera / bionda'].includes(a.type)) m.Lm = L * sidesK;
+  if (!it.fields.length || it.custom || ['Limpieza de cunetas', 'Cuneta en tierra', 'Cuneta revestida', 'Barrera / bionda'].includes(a.type)) m.Lm = L * sidesK;
   return m;
 }
 function actFieldError(k, raw) {
@@ -259,7 +261,7 @@ function renderActEditor() {
   editorRerender = true;
   const b = openSheet(`<h2>${isNew ? 'Nueva actuación' : 'Editar actuación'}</h2>
     <p class="sub">${esc(a.traceName)} · ${esc(a.layerName || '')}${f ? ' · longitud ' + fmtLen(f.length) : ''}</p>
-    ${a._walk ? `<div class="walksum" aria-live="polite"><b>${esc(a.type || 'Tramo')}</b> · ${fmtPK(Math.min(a.d0, a.d1))} → ${fmtPK(Math.max(a.d0, a.d1))} · ${fmtLen(Math.abs(a.d1 - a.d0))}</div>` : ''}
+    ${a._walk ? `<div class="walksum" id="aSum"><b>${esc(a.type || 'Tramo')}</b> · ${fmtPK(Math.min(a.d0, a.d1))} → ${fmtPK(Math.max(a.d0, a.d1))} · ${fmtLen(Math.abs(a.d1 - a.d0))}</div>` : ''}
     <h3 class="sh">1 · Qué</h3>
     <div class="field"><label for="aType">Tipo de actuación</label><div class="row">${actTypeSelect(a.type)}${it && !it.legacy ? `<button type="button" class="mini ic fav ${isFav ? 'on' : ''}" data-a="fav" title="Favorita" aria-label="Marcar como favorita">${isFav ? '★' : '☆'}</button>` : ''}</div>
       ${it ? `<p class="hint"><span class="dot" style="background:${it.color}"></span>${esc(it.catName)}${it.hint ? ' · ' + esc(it.hint) : ''}</p>` : ''}</div>
@@ -274,7 +276,7 @@ function renderActEditor() {
       <div class="field"><label for="aPk1">Hasta PK</label><input type="text" id="aPk1" inputmode="decimal" value="${fmtPK(a.d1)}" data-v="${fmtPK(a.d1)}"><small class="rb" id="aPk1rb"></small>
         <div class="pkbtns"><button class="mini" data-a="gps1" aria-label="Fin en mi posición">${ICON.locate}Aquí</button><button class="mini" data-a="map1" aria-label="Fin tocando el mapa">${ICON.pin}Mapa</button></div></div>
     </div>
-    <p class="hint">${len > 0 ? `Tramo de ${fmtLen(len)}.` : 'Ahora es una actuación puntual. Para un tramo, camina hasta el final y pulsa «Aquí» junto a «Hasta PK», o escribe el PK final.'}</p>
+    <p class="hint" id="aLenHint">${len > 0 ? `Tramo de ${fmtLen(len)}.` : 'Ahora es una actuación puntual. Para un tramo, camina hasta el final y pulsa «Aquí» junto a «Hasta PK», o escribe el PK final.'}</p>
     ${fieldHtml ? `<h3 class="sh">3 · Medidas</h3><div class="pgrid">${fieldHtml}</div>` : ''}
     ${it ? '<div class="meas" id="aMeas"></div>' : ''}
     <h3 class="sh">${fieldHtml ? 4 : 3} · Observaciones y fotos</h3>
@@ -325,17 +327,22 @@ function renderActEditor() {
       $('#' + id + 'rb').textContent = t; el.classList.toggle('bad', t.startsWith('⚠')); };
     // sin volver a dibujar la ficha: así no se pierde el toque en «Guardar» justo después de escribir el PK
     el.onchange = () => { if (!isFinite(parsePK(el.value))) { $('#' + id + 'rb').textContent = pkReadBack(el.value); return; }
-      const p0 = actDraft.d0, p1 = actDraft.d1; syncAct(); el.value = fmtPK(actDraft[id === 'aPk0' ? 'd0' : 'd1']); { const w = $('#invWarn'); if (w) w.remove(); } // el aviso viejo ya no vale
+      const pv = x => { const v = parsePK(x.dataset.v); return isFinite(v) ? v : NaN; }, e0 = $('#aPk0'), e1 = $('#aPk1');
+      const p0 = isFinite(pv(e0)) ? pv(e0) : actDraft.d0, p1 = isFinite(pv(e1)) ? pv(e1) : actDraft.d1; syncAct(); el.value = fmtPK(actDraft[id === 'aPk0' ? 'd0' : 'd1']); { const w = $('#invWarn'); if (w) w.remove(); } // el aviso viejo ya no vale
       if (actDraft.d1 < actDraft.d0 - 0.01 && p1 > p0) actDraft._ext = [Math.min(p0, actDraft.d0, actDraft.d1), Math.max(p1, actDraft.d0, actDraft.d1)]; else delete actDraft._ext; // por si quería alargar // escrito a mano: se respeta tal cual (para mover un tramo se escriben los dos PK en cualquier orden)
       const inv = actDraft.d1 < actDraft.d0 - 0.01, other = id === 'aPk0' ? 'aPk1' : 'aPk0';
       $('#' + other + 'rb').textContent = inv ? `⚠ «Desde» queda después de «Hasta»: escribe también este PK` : ''; $('#' + other).classList.toggle('bad', inv);
       if (!inv) $('#' + id + 'rb').textContent = '';
+      if (f && actDraft[id === 'aPk0' ? 'd0' : 'd1'] > f.length + 0.5) { $('#' + id + 'rb').textContent = `⚠ Pasa del final de la traza (${fmtPK(f.length)})`; el.classList.add('bad'); } // el aviso no se borra al salir del campo
+      el.dataset.v = el.value;
       refreshActInline(); }; });
   const refreshActInline = () => {
     const d = actDraft; if (!d) return;
     const lo = Math.min(d.d0, d.d1), hi = Math.max(d.d0, d.d1), ln = Math.max(0, Math.min(hi, f ? f.length : hi) - lo);
     if (f) showSlopeSegment(f, lo, Math.min(hi, f.length));
     const al = $('#aLen'); if (al) al.value = ln ? Math.round(ln) : '';
+    { const sm = $('#aSum'); if (sm) sm.innerHTML = `<b>${esc(d.type || 'Tramo')}</b> · ${fmtPK(lo)} → ${fmtPK(hi)} · ${fmtLen(ln)}`; // el resumen y la pista siguen a los PK escritos
+      const lh = $('#aLenHint'); if (lh && ln > 0) lh.textContent = `Tramo de ${fmtLen(ln)}${d.d1 < d.d0 - 0.01 ? ' (PK al revés)' : ''}.`; }
     if (d.params._wAuto && ctx) { const nw = roadWidthAt(ctx.rec, d.featIdx, lo, hi); if (nw) { d.params.w = Math.round(nw * 100) / 100; const wi = $('#pf_w'); if (wi) wi.value = String(d.params.w).replace('.', ','); } }
     meas();
   };
@@ -418,9 +425,10 @@ async function saveAct() {
     if (Lf && $('#aText')) for (const [id, k] of [['aPk0', 'd0'], ['aPk1', 'd1']]) if (a[k] > Lf + 0.5) { const el = $('#' + id); if (el) { fieldErr(el, `Pasa del final de la traza (${fmtPK(Lf)})`); el.focus(); el.scrollIntoView({ block: 'center' }); } return; } }
   if (!isFinite(a.d0) || !isFinite(a.d1)) { toast('Revisa los PK: escribe por ejemplo 1+250.'); return; }
   if (a.d1 < a.d0 - 0.01 && $('#aText') && a._swapOk !== a.d0 + '|' + a.d1) { // PK escritos al revés: se pregunta (antes se daban la vuelta en silencio)
-    let w = $('#invWarn'); if (!w) { $('#sheetBody .savebar').insertAdjacentHTML('afterbegin', '<div class="fwarn" id="invWarn" role="alert"></div>'); w = $('#invWarn'); }
+    let w = $('#invWarn'); if (!w) { $('#sheetBody .pkrow').insertAdjacentHTML('afterend', '<div class="fwarn" id="invWarn" role="alert"></div>'); w = $('#invWarn'); } // junto a los PK: no tapa los campos ni cae bajo el dedo
     const ex = a._ext && a._ext[1] - a._ext[0] > a.d0 - a.d1 + 0.5 ? a._ext : null;
-    w.innerHTML = `<b>«Desde PK» (${fmtPK(a.d0)}) va después de «Hasta PK» (${fmtPK(a.d1)})</b>. Corrige uno de los dos arriba o elige:<div class="row">${ex ? `<button type="button" class="mini" data-a="saveext">Alargar: ${fmtPK(ex[0])} a ${fmtPK(ex[1])} (${fmtLen(ex[1] - ex[0])})</button>` : ''}<button type="button" class="mini" data-a="saveinv">${fmtPK(a.d1)} a ${fmtPK(a.d0)} (${fmtLen(a.d0 - a.d1)})</button></div>`;
+    w.innerHTML = `<b>«Desde PK» (${fmtPK(a.d0)}) va después de «Hasta PK» (${fmtPK(a.d1)})</b>. Corrige uno de los dos o ${ex ? 'elige' : 'guárdalo así'}:<div class="row">${ex ? `<button type="button" class="mini" data-a="saveext">Guardar alargado: ${fmtPK(ex[0])}–${fmtPK(ex[1])} (${fmtLen(ex[1] - ex[0])})</button>` : ''}<button type="button" class="mini" data-a="saveinv">Guardar ${fmtPK(a.d1)}–${fmtPK(a.d0)} (${fmtLen(a.d0 - a.d1)})</button></div>`;
+    w.scrollIntoView({ block: 'nearest' });
     const t0 = Date.now(), go = fn => () => { if (Date.now() - t0 < 600 || !actDraft) return; fn(); ['aPk0', 'aPk1'].forEach((k, i) => { const e2 = $('#' + k); if (e2) { e2.value = fmtPK(i ? actDraft.d1 : actDraft.d0); e2.classList.remove('bad'); } }); saveAct(); };
     w.querySelector('[data-a=saveinv]').onclick = go(() => { actDraft._swapOk = actDraft.d0 + '|' + actDraft.d1; });
     { const be = w.querySelector('[data-a=saveext]'); if (be) be.onclick = go(() => { [actDraft.d0, actDraft.d1] = ex; delete actDraft._ext; }); }
@@ -441,7 +449,7 @@ async function saveAct() {
       const t0 = Date.now(); w.querySelector('[data-a=save0]').onclick = () => { if (Date.now() - t0 < 600 || !actDraft) return; actDraft._zeroOk = actDraft.d0 + '|' + actDraft.d1; saveAct(); };
       w.scrollIntoView({ block: 'nearest' }); return; } }
   { const it = actItem(a.type), mf = it.fields.filter(k => ['w', 'e', 'h', 'b', 'S', 'n'].includes(k));
-    if (mf.length && !mf.some(k => a.params && a.params[k] > 0) && !ACT_POINT.has(a.type) && a._noMeasOk !== true && !a._noMeasChain && $('#aText')) {
+    if (mf.length && !mf.some(k => a.params && a.params[k] > 0) && !ACT_POINT.has(a.type) && !wasPoint && a._noMeasOk !== true && !a._noMeasChain && $('#aText')) {
       const f0 = $('#pf_' + mf[0]); if (f0) { f0.classList.add('bad'); f0.scrollIntoView({ block: 'center' }); }
       let w = $('#measWarn'); if (!w) { $('#sheetBody .savebar').insertAdjacentHTML('afterbegin', '<div class="fwarn" id="measWarn" role="alert"></div>'); w = $('#measWarn'); }
       w.innerHTML = `<b>Sin medidas</b>: no saldrá superficie ni volumen. Escribe ${mf.map(k => ACT_FIELDS[k].l.toLowerCase()).join(' / ')} o:<div class="row"><button type="button" class="mini" data-a="savenm">Guardar sin medidas</button></div>`;
@@ -509,7 +517,8 @@ function actsSummary(list) {
   const m = new Map();
   list.forEach(a => { const k = a.type, r = m.get(k) || { type: k, n: 0, L: 0, area: 0, vol: 0, t: 0, kg: 0, ud: 0, tubo: 0 }, x = actMeasure(a);
     r.n++; r.L += x.Lm || x.L; r.area += x.area || 0; r.vol += x.vol || 0; r.t += x.t || 0; r.kg += x.kg || 0; r.ud += x.n || 0; r.tubo += x.tubo || 0; m.set(k, r); });
-  return [...m.values()].sort((a, b) => ACT_ITEMS.findIndex(i => i.name === a.type) - ACT_ITEMS.findIndex(i => i.name === b.type));
+  const ord = t => { const i = ACT_ITEMS.findIndex(x => x.name === t); return i < 0 ? 1e6 : i; }; // los tipos con nombre propio, al final
+  return [...m.values()].sort((a, b) => ord(a.type) - ord(b.type));
 }
 function summaryTableHtml(sum, escf = esc) {
   const c = (v, d) => (v ? nf(v, d) : '');

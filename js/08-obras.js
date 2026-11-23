@@ -12,6 +12,7 @@ async function clearMapData() {
   highlight.clearLayers(); slopeHL.clearLayers(); actsLayer.clearLayers(); pkLayer.clearLayers(); widthLayer.clearLayers();
 }
 async function loadObra(id, fit) {
+  if (typeof hideUndo === 'function' && id !== settings.activeObra) hideUndo(); // un «Deshacer» de otra obra no debe quedar a la vista
   closeSheet(); await clearMapData();
   settings.activeObra = id; saveSettings(); updateObraLabel(); loadAfecLast(); showWalkBar(); if (refreshPending()) showDraftBar(); else { const db = $('#draftBar'); if (db) db.hidden = true; }
   const recs = (await DB.all('layers')).filter(r => r.obraId === id).sort((a, b) => a.created - b.created);
@@ -198,8 +199,10 @@ async function importObraPackage(file, zipIn, iopts = {}) {
   } catch (e) { toast(`${fname} está dañado y no se ha importado (${e.message || e}). No se ha cambiado nada.`, 8000); return; }
   // la obra se reconoce por su identificador original (srcId), aunque ya se haya reemplazado antes
   const exists = obras.get(meta.obra.id) || [...obras.values()].find(x => x.srcId === meta.obra.id);
-  const pkT = Date.parse(meta.exportado) || 0, curT = Math.max(exists ? exists.created || 0 : 0, ...[...acts.values()].filter(a => exists && a.obraId === exists.id).map(a => a.updated || a.created || 0));
-  const mode = exists ? await askImportMode(exists.name, pkT, exists.id === settings.activeObra ? curT : 0) : 'new';
+  const pkT = Date.parse(meta.exportado) || 0; let curT = 0;
+  if (exists) { curT = (settings.obraMod || {})[exists.id] || 0; // último cambio de esa obra, esté activa o no (también los borrados)
+    if (!curT) try { curT = Math.max(exists.created || 0, ...(await DB.all('acts')).filter(a => a.obraId === exists.id).map(a => a.updated || a.created || 0), ...(await DB.all('notes')).filter(n => n.obraId === exists.id).map(n => n.updated || n.created || 0)); } catch (e) { /* nada */ } }
+  const mode = exists ? await askImportMode(exists.name, pkT, curT) : 'new';
   if (!mode) return;
   toast('Importando la obra…', 15000);
   const obraId = exists ? uid() : meta.obra.id;
@@ -272,6 +275,7 @@ async function importObraPackage(file, zipIn, iopts = {}) {
   }
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
   await loadObra(obraId, true);
+  if (pkT) { settings.obraMod = { ...(settings.obraMod || {}), [o.id]: pkT }; saveSettings(); } // la obra importada «es» de la fecha del paquete
   toast(`Obra «${o.name}» importada: ${(meta.capas || []).length} capas, ${nN} anotaciones y ${nA} actuaciones.`, 7000);
 }
 function cleanActParams(p) {
@@ -284,8 +288,8 @@ function cleanActParams(p) {
 function askImportMode(name, pkT, curT) {
   return new Promise(res => {
     const older = pkT && curT && pkT < curT; // el paquete es más antiguo que lo que hay: se avisa y «Reemplazar» deja de ser el botón principal
-    const b = openSheet(`<h2>La obra ya existe</h2><p class="sub">Ya tienes «${esc(name)}» en este móvil.</p>
-      ${pkT ? `<p>Copia del paquete: <b>${fmtDate(pkT)}</b>${curT ? ` · último cambio en el móvil: <b>${fmtDate(curT)}</b>` : ''}.</p>` : ''}
+    const b = openSheet(`<h2>La obra ya existe</h2><p class="sub">Ya tienes «${esc(name)}» en ${NATIVE ? 'este móvil' : 'este equipo'}.</p>
+      ${pkT ? `<p>Copia del paquete: <b>${fmtDateS(pkT)}</b>${curT ? ` · último cambio aquí: <b>${fmtDateS(curT)}</b>` : ''}.</p>` : ''}
       ${older ? '<div class="fwarn" role="alert"><b>El paquete es más antiguo</b> que lo que tienes en el móvil: si lo reemplazas, perderás los cambios posteriores.</div>' : ''}<div class="acts">
       <button class="btn ${older ? '' : 'pri '}full" data-m="replace">Reemplazarla por la del paquete</button>
       <button class="btn full" data-m="copy">Importarla como copia</button>
