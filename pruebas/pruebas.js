@@ -575,6 +575,56 @@ async function copiaAutomatica() {
   await n.browser.close();
 }
 
+async function datosASalvo() { // 1.19.4: lo que se graba está a salvo y se graba bien
+  const { browser, page: p, errores } = await abrir({ ancho: 400, alto: 820 });
+  await p.evaluate(() => { window.__abTest = true; const F = window.__fs = {};
+    window.Capacitor = { Plugins: { Filesystem: {
+      writeFile: async ({ path, data }) => { F[path] = data; }, appendFile: async ({ path, data }) => { F[path] += data; },
+      getUri: async ({ path }) => ({ uri: 'file:///Documents/' + path }), deleteFile: async ({ path }) => { if (!(path in F)) throw new Error('no existe'); delete F[path]; },
+      rename: async ({ from, to }) => { if (!(from in F)) throw new Error('no existe'); F[to] = F[from]; delete F[from]; } } } }; });
+  await p.setInputFiles('#inKml', [DATOS + 'pendientes_rangos.kml']); await esperar(600);
+  // M11-6: puntual, «Desde» escrito más adelante mueve el punto (no crea un tramo de 50 m)
+  await p.evaluate(() => { const e = [...layers.values()][0]; openActEditor({ rec: e.rec, f: e.feats[0], d0: 500, d1: 500, type: 'Arqueta / pozo' }); }); await esperar(500);
+  await p.fill('#aPk0', '0+550'); await p.dispatchEvent('#aPk0', 'change'); await esperar(200);
+  const m6 = await p.evaluate(() => ({ d0: actDraft.d0, d1: actDraft.d1, v1: $('#aPk1').value, rb: $('#aPk1rb').textContent }));
+  await p.click('#sheetBody [data-a=save]'); await esperar(500);
+  ok('Puntual: «Desde» escrito más adelante mueve el punto, sin tramo de 50 m (M11-6)', m6.d0 === 550 && m6.d1 === 550 && m6.v1 === '0+550' && !m6.rb && await p.evaluate(() => [...acts.values()].some(a => a.type === 'Arqueta / pozo' && a.d0 === 550 && a.d1 === 550)), JSON.stringify(m6));
+  // ANT-4: la medición en vivo se recorta al final de la traza; con un dato mal escrito no se calcula
+  const tipoW = await p.evaluate(() => ACT_ITEMS.find(i => i.fields.includes('w') && i.fields.includes('e') && !ACT_POINT.has(i.name)).name);
+  const Lf = await p.evaluate(t => { const e = [...layers.values()][0], f = e.feats[0]; openActEditor({ rec: e.rec, f, d0: 100, d1: 150, type: t }); return f.length; }, tipoW); await esperar(500);
+  await p.fill('#pf_w', '4'); await p.fill('#pf_e', '20'); await p.fill('#aPk1', '9+000'); await p.dispatchEvent('#aPk1', 'change'); await esperar(300);
+  const lon = await p.evaluate(() => $('#aMeas').textContent);
+  const exp = await p.evaluate(L => fmtLen(L - 100), Lf);
+  ok('Medición en vivo recortada al final de la traza (ANT-4)', lon.includes(exp), `${lon} · esperado ${exp}`);
+  await p.fill('#pf_w', '-3'); await p.dispatchEvent('#pf_w', 'input'); await esperar(200);
+  ok('Con un dato mal escrito no se muestra medición', await p.evaluate(() => /Corrige el dato/.test($('#aMeas').textContent) && !$('#aMeas table')));
+  await p.evaluate(() => closeSheet()); await esperar(300);
+  // M12-5: obra eliminada → su copia pasa a «_borrada» y no vuelve al recuperar la carpeta entera
+  await p.evaluate(async () => { const keep = settings.activeObra; const ok0 = obras.get(keep); ok0.name = 'Camino del Cerro'; await DB.put('obras', ok0); const o = await createObra('Obra que se borra');
+    await DB.put('acts', { id: uid(), obraId: o.id, d0: 0, d1: 10, type: 'Badén', side: 'izq', text: 'borrar', media: [], created: Date.now(), coords: [[37, -3]], params: {}, prio: '' });
+    await autoBackup(true); window.__keep = keep; });
+  await p.evaluate(async () => { window.confirm = () => true; await obrasSheet(); const o = [...obras.values()].find(x => x.name === 'Obra que se borra'); $(`#sheetBody [data-delo="${o.id}"]`).click(); });
+  await esperar(1200);
+  const fsAfter = await p.evaluate(() => Object.keys(window.__fs));
+  ok('Al eliminar una obra su copia no se borra: pasa a «_borrada» y se anota en la lista de eliminadas', fsAfter.some(x => /Obra_que_se_borra.*_borrada\.zip$/i.test(x) || /que_se_borra.*_borrada\.zip$/i.test(x)) && fsAfter.some(x => /OBRA-GIS_obras_eliminadas_.*\.zip$/.test(x)) && !fsAfter.some(x => /se_borra[^/]*_[a-z0-9]{4}\.zip$/i.test(x)), JSON.stringify(fsAfter));
+  const dir = path.join(__dirname, 'capturas', 'carpeta_copia'); fs.rmSync(dir, { recursive: true, force: true }); fs.mkdirSync(dir, { recursive: true });
+  const files = await p.evaluate(() => Object.entries(window.__fs).filter(([k]) => /\.zip$/.test(k)).map(([k, v]) => [k.split('/').pop(), v]));
+  const paths = files.map(([n, v]) => { const fp = path.join(dir, n); fs.writeFileSync(fp, Buffer.from(v, 'base64')); return fp; });
+  ok('Sin errores JS', !errores.length, errores.join(' | '));
+  await browser.close();
+  // reinstalación: se elige la carpeta entera
+  const n = await abrir({ ancho: 400, alto: 820 });
+  await n.page.setInputFiles('#inObra', paths); await esperar(4000);
+  const st = await n.page.evaluate(async () => (await DB.all('obras')).map(o => o.name));
+  ok('Recuperar la carpeta entera: no vuelve la obra eliminada (M12-5)', !st.includes('Obra que se borra') && st.length >= 1, JSON.stringify(st));
+  ok('Tras recuperar no queda «Mi primera obra» vacía (M13-10)', !st.includes('Mi primera obra') && st.includes('Camino del Cerro'), JSON.stringify(st));
+  const borr = paths.find(x => /_borrada\.zip$/.test(x));
+  await n.page.setInputFiles('#inObra', [borr]); await esperar(2500);
+  ok('Elegida a mano, la copia de una obra eliminada sí se recupera', await n.page.evaluate(async () => (await DB.all('obras')).some(o => o.name === 'Obra que se borra')));
+  ok('Sin errores JS', !n.errores.length, n.errores.join(' | '));
+  await n.browser.close();
+}
+
 async function pendientesViejos() {
   const { browser, page: p, errores } = await abrir({ ancho: 400, alto: 820 });
   await p.setInputFiles('#inKml', [DATOS + 'pendientes_rangos.kml']); await esperar(600);
@@ -609,7 +659,7 @@ async function modoSencillo() {
 }
 
 (async () => {
-  for (const t of [pkYNumeros, geometriaYPendientes, actuacionesYBorradores, tramoAndandoYRepetir, bc3, paqueteYEnvio, toquesYBarras, borradoresYDictado, ronda4, ronda5, ronda6, ronda7, ronda8, ronda9, ronda10, copiaAutomatica, pendientesViejos, modoSencillo]) {
+  for (const t of [pkYNumeros, geometriaYPendientes, actuacionesYBorradores, tramoAndandoYRepetir, bc3, paqueteYEnvio, toquesYBarras, borradoresYDictado, ronda4, ronda5, ronda6, ronda7, ronda8, ronda9, ronda10, copiaAutomatica, datosASalvo, pendientesViejos, modoSencillo]) {
     console.log(`\n— ${t.name}`);
     try { await t(); } catch (e) { ok(t.name + ' terminó sin excepciones', false, e.message.split('\n')[0]); }
   }

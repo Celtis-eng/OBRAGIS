@@ -303,7 +303,10 @@ function renderActEditor() {
   onSheetClose(() => { if (editorRerender || actPick || !actDraft) return; syncAct(); if (actChanged(actDraft)) storeDraft('act', { ...actDraft, params: { ...actDraft.params } }); else clearDraft(actDraft.id); });
   storeDraft('act', { ...actDraft, params: { ...actDraft.params } }, true); // copia de trabajo por si la app se cierra de golpe
   { let liveT; const live = () => { clearTimeout(liveT); liveT = setTimeout(() => { if (!actDraft || !$('#aText')) return; syncAct(); storeDraft('act', { ...actDraft, params: { ...actDraft.params } }, true); }, 250); }; b.addEventListener('input', live); b.addEventListener('change', live); }
-  const meas = () => { const box = $('#aMeas'); if (!box) return; syncAct(); const r = actMeasRows(actDraft);
+  const meas = () => { const box = $('#aMeas'); if (!box) return; syncAct();
+    // con un dato mal escrito no se calcula nada: se vería una medición que no es la que se va a guardar
+    if ([...document.querySelectorAll('[data-pf]')].some(inp => actFieldError(inp.dataset.pf, inp.value))) { box.innerHTML = '<p class="hint">Corrige el dato marcado para ver las mediciones.</p>'; return; }
+    const Lf = f && f.length > 0 ? f.length : Infinity, r = actMeasRows({ ...actDraft, d0: Math.min(actDraft.d0, Lf), d1: Math.min(actDraft.d1, Lf) }); // recortada al final de la traza (ANT-4)
     box.innerHTML = (r.length ? `<table class="attrs">${r.map(([k, v]) => `<tr><td>${k}</td><td><b>${v}</b></td></tr>`).join('')}</table>` : '')
       + (actDraft.d1 <= actDraft.d0 && actItem(actDraft.type).fields.some(k => ['w', 'b', 'S', 'h'].includes(k)) ? '<p class="hint">Actuación puntual: indica el PK final o la longitud para calcular superficie y volumen.</p>' : r.length ? '' : '<p class="hint">Rellena los datos para ver las mediciones.</p>'); };
   meas();
@@ -329,6 +332,7 @@ function renderActEditor() {
     el.onchange = () => { if (!isFinite(parsePK(el.value))) { $('#' + id + 'rb').textContent = pkReadBack(el.value); return; }
       const pv = x => { const v = parsePK(x.dataset.v); return isFinite(v) ? v : NaN; }, e0 = $('#aPk0'), e1 = $('#aPk1');
       const p0 = isFinite(pv(e0)) ? pv(e0) : actDraft.d0, p1 = isFinite(pv(e1)) ? pv(e1) : actDraft.d1; syncAct(); el.value = fmtPK(actDraft[id === 'aPk0' ? 'd0' : 'd1']); { const w = $('#invWarn'); if (w) w.remove(); } // el aviso viejo ya no vale
+      if (id === 'aPk0' && Math.abs(p1 - p0) < 0.01 && actDraft.d0 > actDraft.d1) { actDraft.d1 = actDraft.d0; e1.value = fmtPK(actDraft.d1); e1.dataset.v = e1.value; } // puntual: «Desde» más adelante mueve el punto, igual que «Aquí» y «Mapa» (M11-6)
       if (actDraft.d1 < actDraft.d0 - 0.01 && p1 > p0) actDraft._ext = [Math.min(p0, actDraft.d0, actDraft.d1), Math.max(p1, actDraft.d0, actDraft.d1)]; else delete actDraft._ext; // por si quería alargar // escrito a mano: se respeta tal cual (para mover un tramo se escriben los dos PK en cualquier orden)
       const inv = actDraft.d1 < actDraft.d0 - 0.01, other = id === 'aPk0' ? 'aPk1' : 'aPk0';
       $('#' + other + 'rb').textContent = inv ? `⚠ «Desde» queda después de «Hasta»: escribe también este PK` : ''; $('#' + other).classList.toggle('bad', inv);
