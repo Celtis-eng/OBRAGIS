@@ -35,8 +35,9 @@ async function loadObra(id, fit) {
   }
   if (!$('#drawer').hidden) renderDrawer();
 }
-async function createObra(name, desc = '') {
+async function createObra(name, desc = '', auto = false) {
   const o = { id: uid(), name: name.trim() || 'Obra nueva', desc, created: Date.now() };
+  if (auto) o.auto = true; // creada sola al instalar: si sigue vacía, sobra al recuperar obras
   await DB.put('obras', o); obras.set(o.id, o); return o;
 }
 async function obraCounts(id) {
@@ -77,6 +78,7 @@ async function obrasSheet() {
     const o = obras.get(bt.dataset.delo);
     if (!confirm(`¿Eliminar la obra «${o.name}» con todas sus capas, anotaciones, fotos y actuaciones? No se puede deshacer. Si quieres conservarla, expórtala antes.`)) return;
     await deleteObraData(o.id); await DB.del('obras', o.id); obras.delete(o.id);
+    await abObraDeleted(o).catch(e => console.warn(e)); // al recuperar la carpeta de copias no debe volver
     if (settings.activeObra === o.id) await loadObra([...obras.keys()][0], true);
     obrasSheet(); toast('Obra eliminada');
   });
@@ -267,9 +269,9 @@ async function importObraPackage(file, zipIn, iopts = {}) {
     await deleteObraData(exists.id); await DB.del('obras', exists.id); obras.delete(exists.id);
     try { const afOld = await DB.get('kv', 'afec:' + exists.id); if (afOld && !(await DB.get('kv', 'afec:' + obraId))) await DB.put('kv', afOld, 'afec:' + obraId); } catch (e) { /* nada */ }
   }
-  // una obra vacía con el mismo nombre (p. ej. «Mi primera obra» de una instalación nueva) sobra: se quita
+  // una obra vacía con el mismo nombre, o la «Mi primera obra» que se crea sola al instalar, sobra: se quita (M13-10)
   for (const x of [...obras.values()]) {
-    if (x.id === obraId || x.name !== o.name) continue;
+    if (x.id === obraId || !(x.name === o.name || x.auto || x.name === 'Mi primera obra')) continue;
     const c = await obraCounts(x.id); if (c.layers || c.notes || c.acts) continue;
     await deleteObraData(x.id); await DB.del('obras', x.id); obras.delete(x.id);
   }

@@ -127,7 +127,7 @@ function nativeInbox() { // app nativa: «Abrir con» y «Compartir»
     const [L0, N0, A0] = await Promise.all([DB.all('layers'), DB.all('notes'), DB.all('acts')]);
     const orphans = [...L0, ...N0, ...A0].some(x => !x.obraId);
     if (!obras.size || orphans) {
-      const o = obras.get(settings.activeObra) || [...obras.values()][0] || await createObra('Mi primera obra');
+      const o = obras.get(settings.activeObra) || [...obras.values()][0] || await createObra('Mi primera obra', '', true);
       for (const x of L0) if (!x.obraId) { x.obraId = o.id; await DB.put('layers', x); }
       for (const x of N0) if (!x.obraId) { x.obraId = o.id; await DB.put('notes', x); }
       for (const x of A0) if (!x.obraId) { x.obraId = o.id; await DB.put('acts', x); }

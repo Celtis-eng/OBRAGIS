@@ -65,6 +65,7 @@ async function autoBackup(force) {
           const moved = await FS.rename({ from: fin, to: ant, directory: D }).then(() => true, () => false);
           if (moved) settings.abAnt = { ...(settings.abAnt || {}), [id]: Date.now() };
         } else await FS.deleteFile({ path: fin, directory: D }).catch(() => {});
+        if (!obras.has(id)) { await FS.deleteFile({ path: tmp, directory: D }).catch(() => {}); continue; } // se eliminó mientras se copiaba
         await FS.rename({ from: tmp, to: fin, directory: D });
         const old = (settings.abBase || {})[id]; // la obra se renombró: se quitan las copias con el nombre viejo
         if (old && old !== base) await FS.rename({ from: old + '_anterior.zip', to: ant, directory: D }).catch(() => {}); // al renombrar no se pierde la copia anterior
@@ -90,19 +91,50 @@ function abStatusHtml() {
   const pend = settings.abInit ? (settings.abDirty || []).filter(id => obras.has(id)).length : obras.size, ne = Object.keys(settings.abErrs || {}).filter(id => obras.has(id)).length;
   return `<p class="hint abst${ne ? ' err' : ''}"><b>Copia automática activada</b>: cada obra se guarda sola en <b>Documentos › OBRA-GIS › Copia automática</b>, que no se borra al desinstalar la app${settings.abLast ? ` · última: ${fmtDate(settings.abLast)}` : ''}${pend ? ` · ${plural(pend, 'obra', 'obras')} con cambios por copiar` : ''}.${ne ? ` <b>⚠ ${plural(ne, 'obra no se pudo copiar', 'obras no se pudieron copiar')}</b> (${esc(settings.abErr)}).` : ''}</p>`;
 }
+// Obra eliminada: al recuperar la carpeta entera no debe volver (M12-5). Su copia NO se borra (por si fue un error):
+// se renombra a «_borrada.zip», y la lista de obras eliminadas se guarda en la carpeta (un .zip pequeño, para que el
+// selector de ficheros lo muestre junto a las copias) y sirve también tras reinstalar.
+const obraKey = o => o.srcId || o.id; // el id que llevan sus paquetes
+async function abObraDeleted(o) {
+  settings.obraDel = { ...(settings.obraDel || {}), [obraKey(o)]: Date.now() }; saveSettings();
+  if (!abOn()) return; const FS = Plug('Filesystem'); if (!FS) return; const D = 'DOCUMENTS';
+  const base = (settings.abBase || {})[o.id] || AB_DIR + abName(o);
+  for (const [a, b] of [[base + '.zip', base + '_borrada.zip'], [base + '_anterior.zip', base + '_borrada_anterior.zip']]) {
+    await FS.deleteFile({ path: b, directory: D }).catch(() => {}); await FS.rename({ from: a, to: b, directory: D }).catch(() => {}); }
+  await FS.deleteFile({ path: base + '.tmp', directory: D }).catch(() => {});
+  const ab = { ...(settings.abBase || {}) }; delete ab[o.id]; settings.abBase = ab;
+  const an = { ...(settings.abAnt || {}) }; delete an[o.id]; settings.abAnt = an; saveSettings();
+  try {
+    const z = new JSZip(); z.file('obras_eliminadas.json', JSON.stringify({ formato: 'OBRA-GIS-eliminadas', eliminadas: settings.obraDel }));
+    const p = AB_DIR + `OBRA-GIS_obras_eliminadas_${abInst()}`;
+    await nativeWrite(FS, p + '.tmp', await z.generateAsync({ type: 'blob' }), D);
+    await FS.deleteFile({ path: p + '.zip', directory: D }).catch(() => {});
+    await FS.rename({ from: p + '.tmp', to: p + '.zip', directory: D });
+  } catch (e) { console.warn('Lista de obras eliminadas', e); }
+}
 // Recuperar tras reinstalar: se eligen uno o varios .zip (de la copia automática o de una copia manual)
 // Varios .zip a la vez (la carpeta entera): se agrupan por obra y se queda la copia más reciente de cada una
 // (antes el «_anterior» podía pisar a la buena y volvían nombres viejos).
 async function importManyPackages(files) {
-  const pk = [];
-  for (const f of files) { const z = await isObraPackage(f);
+  const pk = [], del = { ...(settings.obraDel || {}) };
+  for (const f of files) {
+    if (/^OBRA-GIS_obras_eliminadas/i.test(f.name)) { // lista de obras eliminadas (de esta instalación o de otra anterior)
+      try { const j = JSON.parse(await (await JSZip.loadAsync(f)).file('obras_eliminadas.json').async('string'));
+        for (const [k, t] of Object.entries(j.eliminadas || {})) if (typeof t === 'number' && !(del[k] >= t)) del[k] = t; } catch (e) { /* no sirve: se ignora */ }
+      continue; }
+    const z = await isObraPackage(f);
     if (!z && /\.(zip|tmp)$/i.test(f.name)) { toast(`«${f.name}» está dañado o incompleto y no se ha importado.`, 7000); await new Promise(r => setTimeout(r, 1500)); continue; }
     if (!z) { await fichaImportFiles([f]); continue; }
     let m = null; try { m = JSON.parse(await z.file(/(^|\/)obra\.json$/)[0].async('string')); } catch (e) { /* lo dirá la importación */ }
     pk.push({ f, z, id: m && m.obra && m.obra.id, t: Date.parse(m && m.exportado) || f.lastModified || 0 }); }
   const best = new Map(), skipped = [];
   for (const x of pk) { const k = x.id || x.f.name, b = best.get(k); if (!b || x.t > b.t) { if (b) skipped.push(b); best.set(k, x); } else skipped.push(x); }
+  // varias copias a la vez (la carpeta entera): no vuelven las obras eliminadas después de esa copia.
+  // Si se elige a mano una sola copia, se importa siempre (es lo que se ha pedido).
+  const gone = [];
+  if (pk.length > 1) for (const [k, x] of [...best]) if ((x.id && del[x.id] >= x.t) || /_borrada(_anterior)?\.zip$/i.test(x.f.name)) { gone.push(x); best.delete(k); }
   for (const x of [...best.values()].sort((a, b) => a.t - b.t)) await importObraPackage(x.f, x.z, { fecha: x.t });
+  if (gone.length) { toast(`No se ${gone.length > 1 ? 'han' : 'ha'} recuperado ${plural(gone.length, 'obra que habías eliminado', 'obras que habías eliminado')}. Si la quieres, elige solo su .zip.`, 9000); if (skipped.length) await new Promise(r => setTimeout(r, 9000)); }
   if (skipped.length) toast(`Recuperada la copia más reciente de cada obra (${plural(best.size, 'obra', 'obras')}). ${plural(skipped.length, 'copia más antigua se ha descartado', 'copias más antiguas se han descartado')}: ${skipped.map(x => x.f.name).slice(0, 3).join(', ')}${skipped.length > 3 ? '…' : ''}.`, 10000); // al final: no lo tapa «Importando…»
 }
 function restoreFromBackup() {
