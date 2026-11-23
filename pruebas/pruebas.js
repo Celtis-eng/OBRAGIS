@@ -482,6 +482,7 @@ async function ronda10() {
   await atras();
   const sx = await p.evaluate(() => { const x = $('#sheetX').getBoundingClientRect(), m = $('#sheetBody [data-a=map1]').getBoundingClientRect(), k = $('#aPk1').getBoundingClientRect();
     return { solapa: !(m.right < x.left || m.left > x.right || m.bottom < x.top || m.top > x.bottom), pkVisible: k.top >= x.bottom - 4 && k.bottom <= innerHeight }; });
+  ok('Tras «Terminar»: resumen fijo con tipo y PK a la vista (P12-4)', await p.evaluate(() => { const w = $('#sheetBody .walksum'); if (!w) return false; const r = w.getBoundingClientRect(), s = $('#sheet').getBoundingClientRect(); return /Limpieza/.test(w.textContent) && /0\+800/.test(w.textContent) && r.top >= s.top - 1 && r.bottom < innerHeight; }));
   ok('Tras «Terminar»: PK a la vista y la ✕ no tapa «Mapa»', !sx.solapa && sx.pkVisible, JSON.stringify(sx));
   // M10-1: «Mapa» en «Hasta PK» con un toque real en el mapa alarga el tramo (780–900), no lo recorta
   await p.click('#sheetBody [data-a=map1]'); await esperar(500);
@@ -551,6 +552,13 @@ async function copiaAutomatica() {
   const fs2 = await p.evaluate(() => Object.keys(window.__fs).sort());
   ok('Segunda copia: se conserva la anterior', fs2.length === 2 && fs2.some(x => /_anterior\.zip$/.test(x)), JSON.stringify(fs2));
   const b64 = await p.evaluate(() => window.__fs[Object.keys(window.__fs).find(x => !/_anterior/.test(x))]);
+  const b64ant = await p.evaluate(() => window.__fs[Object.keys(window.__fs).find(x => /_anterior/.test(x))]);
+  await p.evaluate(async () => { const a = [...acts.values()][0]; a.text = 'tercero'; await DB.put('acts', a); await autoBackup(true); });
+  ok('Tercera copia el mismo día: «_anterior» no se renueva (un error no llega a las dos copias)', await p.evaluate(b => window.__fs[Object.keys(window.__fs).find(x => /_anterior/.test(x))] === b, b64ant));
+  ok('Primer arranque tras actualizar: se copian todas las obras aunque no se toquen', await p.evaluate(async () => { delete settings.abInit; settings.abDirty = []; return (await autoBackup(true)) === true; }));
+  ok('Un fallo de escritura se ve en «Obras» y deja la copia buena', await p.evaluate(async b => { const F = window.Capacitor.Plugins.Filesystem, ap = F.appendFile, wr = F.writeFile; F.writeFile = async () => { throw new Error('disco lleno'); };
+    const a = [...acts.values()][0]; a.text = 'cuarto'; await DB.put('acts', a); const r = await autoBackup(true); F.writeFile = wr; await obrasSheet();
+    return r === false && /no se pudo copiar/.test($('#sheetBody').textContent) && Object.keys(window.__fs).filter(x => /\.zip$/.test(x)).length === 2; }, b64ant));
   ok('El estado de la copia sale en «Obras»', await p.evaluate(async () => { await obrasSheet(); return /Copia automática activada/.test($('#sheetBody').textContent); }));
   ok('Sin errores JS', !errores.length, errores.join(' | '));
   await browser.close();
@@ -558,8 +566,9 @@ async function copiaAutomatica() {
   const zipPath = path.join(__dirname, 'capturas', 'copia_auto.zip'); fs.mkdirSync(path.dirname(zipPath), { recursive: true }); fs.writeFileSync(zipPath, Buffer.from(b64, 'base64'));
   const n = await abrir({ ancho: 400, alto: 820 });
   ok('Tras reinstalar, el mapa vacío ofrece recuperar las obras', await n.page.evaluate(() => !$('#mapEmpty').hidden && !!$('#mapEmpty [data-a=restore]')));
-  await n.page.setInputFiles('#inObra', [zipPath]); await esperar(2500);
-  ok('Obra recuperada desde la copia automática', await n.page.evaluate(async () => (await DB.all('acts')).some(a => a.text === 'cambio')));
+  const antPath = path.join(__dirname, 'capturas', 'copia_auto_anterior.zip'); fs.writeFileSync(antPath, Buffer.from(b64ant, 'base64'));
+  await n.page.setInputFiles('#inObra', [zipPath, antPath]); await esperar(3500); // la carpeta entera: la buena y la anterior
+  ok('Recuperar la carpeta entera: queda la copia más reciente y una sola obra (M12-1)', await n.page.evaluate(async () => { const A = await DB.all('acts'); return A.some(a => a.text === 'cambio') && !A.some(a => a.text === 'copia') && (await DB.all('obras')).length <= 2; }), await n.page.evaluate(async () => JSON.stringify([(await DB.all('acts')).map(a => a.text), (await DB.all('obras')).map(o => o.name)])));
   ok('Sin errores JS', !n.errores.length, n.errores.join(' | '));
   await n.browser.close();
 }

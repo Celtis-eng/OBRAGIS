@@ -63,7 +63,7 @@ async function obrasSheet() {
     <div class="field row"><input type="text" id="newObra" placeholder="Nombre (p. ej. Modernización regadío Cuevas del Campo)"><button class="mini" data-a="create">Crear</button></div>
     <div class="acts"><button class="btn pri full" data-a="backup">Copia de seguridad de todas las obras</button><button class="btn full" data-a="import">${ICON.folder}Importar obra o recuperar copia (.zip)</button></div>
     ${abStatusHtml()}
-    <p class="hint">${settings.lastBackup ? `Última copia: ${fmtDate(settings.lastBackup)}.` : '<b>Aún no has hecho ninguna copia de seguridad.</b>'} ${NATIVE ? 'Las copias se guardan en <b>Documentos › OBRA-GIS</b> y no se borran al desinstalar la app.' : 'Las copias se guardan en Descargas.'} Haz una antes de actualizar o desinstalar la app.</p>
+    <p class="hint">${settings.lastBackup ? `Última copia manual: ${fmtDate(settings.lastBackup)}.` : abOn() ? 'Copia manual: úsala para llevar las obras a otro móvil o a Drive.' : '<b>Aún no has hecho ninguna copia de seguridad.</b>'} ${NATIVE ? 'Las copias se guardan en <b>Documentos › OBRA-GIS</b> y no se borran al desinstalar la app.' : 'Las copias se guardan en Descargas.'} Haz una antes de actualizar o desinstalar la app.</p>
     <p class="hint">«Exportar / compartir» crea un .zip con toda la obra: capas, KML originales, anotaciones, actuaciones, fotos, vídeos y notas de voz. Al abrir ese .zip en otro móvil con OBRA-GIS, la obra aparece completa.</p>`);
   b.querySelectorAll('[data-open]').forEach(bt => bt.onclick = () => loadObra(bt.dataset.open, true).then(() => toast(`Obra activa: ${obras.get(bt.dataset.open).name}`)));
   b.querySelectorAll('[data-share]').forEach(bt => bt.onclick = () => exportObraPackage(bt.dataset.share));
@@ -182,7 +182,7 @@ async function isObraPackage(file) {
 }
 // La importación no toca nada de lo que ya hay hasta terminar bien: se lee y valida todo el paquete,
 // se escribe como obra nueva y solo al final, si se eligió «Reemplazar», se borra la obra antigua.
-async function importObraPackage(file, zipIn) {
+async function importObraPackage(file, zipIn, iopts = {}) {
   const fname = file && file.name ? `«${file.name}»` : 'El paquete';
   let zip, meta, pre;
   try {
@@ -198,7 +198,8 @@ async function importObraPackage(file, zipIn) {
   } catch (e) { toast(`${fname} está dañado y no se ha importado (${e.message || e}). No se ha cambiado nada.`, 8000); return; }
   // la obra se reconoce por su identificador original (srcId), aunque ya se haya reemplazado antes
   const exists = obras.get(meta.obra.id) || [...obras.values()].find(x => x.srcId === meta.obra.id);
-  const mode = exists ? await askImportMode(exists.name) : 'new';
+  const pkT = Date.parse(meta.exportado) || 0, curT = Math.max(exists ? exists.created || 0 : 0, ...[...acts.values()].filter(a => exists && a.obraId === exists.id).map(a => a.updated || a.created || 0));
+  const mode = exists ? await askImportMode(exists.name, pkT, exists.id === settings.activeObra ? curT : 0) : 'new';
   if (!mode) return;
   toast('Importando la obra…', 15000);
   const obraId = exists ? uid() : meta.obra.id;
@@ -280,10 +281,13 @@ function cleanActParams(p) {
   if (ACT_FORMS[p.forma]) out.forma = p.forma;
   return out;
 }
-function askImportMode(name) {
+function askImportMode(name, pkT, curT) {
   return new Promise(res => {
-    const b = openSheet(`<h2>La obra ya existe</h2><p class="sub">Ya tienes «${esc(name)}» en este móvil.</p><div class="acts">
-      <button class="btn pri full" data-m="replace">Reemplazarla por la del paquete</button>
+    const older = pkT && curT && pkT < curT; // el paquete es más antiguo que lo que hay: se avisa y «Reemplazar» deja de ser el botón principal
+    const b = openSheet(`<h2>La obra ya existe</h2><p class="sub">Ya tienes «${esc(name)}» en este móvil.</p>
+      ${pkT ? `<p>Copia del paquete: <b>${fmtDate(pkT)}</b>${curT ? ` · último cambio en el móvil: <b>${fmtDate(curT)}</b>` : ''}.</p>` : ''}
+      ${older ? '<div class="fwarn" role="alert"><b>El paquete es más antiguo</b> que lo que tienes en el móvil: si lo reemplazas, perderás los cambios posteriores.</div>' : ''}<div class="acts">
+      <button class="btn ${older ? '' : 'pri '}full" data-m="replace">Reemplazarla por la del paquete</button>
       <button class="btn full" data-m="copy">Importarla como copia</button>
       <button class="btn full" data-m="">Cancelar</button></div>
       <p class="hint">Reemplazar borra lo que tienes ahora de esa obra en este móvil y lo sustituye por el contenido del paquete.</p>`);

@@ -102,7 +102,7 @@ function showWalkBar() {
 }
 async function walkEnd(split) {
   if (!walkAct) return;
-  if (Date.now() - (walkAct.shown || 0) < 1500) return; // la barra acaba de aparecer bajo el dedo: un toque de más no termina el tramo
+  if (Date.now() - (walkAct.shown || 0) < 1500) { if (Date.now() - (walkAct.shown || 0) > 400) toast('Vuelve a pulsar «Terminar aquí».', 2500); return; } // la barra acaba de aparecer bajo el dedo: un toque de más no termina el tramo
   const d = walkAct.draft; let ctx = featOf(d);
   if (!ctx || !ctx.f) { // la capa se borró y se volvió a cargar: se busca por nombre
     const e = [...layers.values()].find(x => x.rec.type === 'kml' && x.rec.name === d.layerName && x.feats[d.featIdx] && x.feats[d.featIdx].name === d.traceName);
@@ -127,11 +127,10 @@ async function walkEnd(split) {
     return; }
   d._walk = true; d._dir = endAt < startAt ? -1 : 1; actDraft = d; renderActEditor(); sheetOpenAt = Date.now() + 1150; // 1,5 s sin toques: el dedo que pulsó «Terminar» está sobre «Guardar»
   setTimeout(() => { // se ve el tipo, los PK y, si cabe, la medida que falta (sin quedar nada bajo la ✕)
-    const ty = $('#aType') && $('#aType').closest('.field'), pr = $('#sheetBody .pkrow'), sb = $('#sheetBody .savebar');
-    if (ty) ty.scrollIntoView({ block: 'start' });
-    if (pr && sb && pr.getBoundingClientRect().bottom > sb.getBoundingClientRect().top - 8) pr.scrollIntoView({ block: 'start' }); // pantalla pequeña: primero los PK
+    const ty = $('#aType') && $('#aType').closest('.field');
     const it = actItem(d.type), f0 = it.fields.find(k => !(d.params && d.params[k] > 0)), el = f0 && $('#pf_' + f0);
-    if (el && it.fields.some(k => ['w', 'e', 'h', 'b', 'S'].includes(k))) { el.classList.add('need'); el.insertAdjacentHTML('afterend', `<small class="fneed" id="need_${el.id}">Falta: escribe ${esc(ACT_FIELDS[f0].l.toLowerCase())}</small>`); } }, 300);
+    if (el && it.fields.some(k => ['w', 'e', 'h', 'b', 'S'].includes(k))) { el.classList.add('need'); el.insertAdjacentHTML('afterend', `<small class="fneed" id="need_${el.id}">Falta: escribe ${esc(ACT_FIELDS[f0].l.toLowerCase())}</small>`); el.scrollIntoView({ block: 'center' }); } // lo que falta, a la vista (el resumen fijo de arriba dice tipo y PK)
+    else if (ty) ty.scrollIntoView({ block: 'start' }); }, 300);
 }
 // «Repetir la última»: misma actuación, margen y datos, empezando donde terminó la anterior
 function lastAct() { return [...acts.values()].filter(a => a.obraId === settings.activeObra).sort((a, b) => (b.updated || b.created) - (a.updated || a.created))[0] || null; }
@@ -206,14 +205,15 @@ async function sendToOffice() {
 function applySimple() { document.body.classList.toggle('simple', !!settings.simple); }
 function welcomeSheet() {
   const b = openSheet(`<h2>Bienvenido a OBRA-GIS</h2>
+    ${NATIVE || window.__abTest ? '<div class="restorebox"><span>¿Ya usabas la app y la has reinstalado?</span><button type="button" class="btn full" data-a="restore">Recuperar mis obras</button></div>' : ''}
     <ol class="steps"><li><b>Abre el plano del camino</b> que te manden (KML o KMZ) con «Importar» o desde WhatsApp/correo con «Abrir con OBRA-GIS».</li>
       <li><b>Pulsa el botón naranja +</b> donde estés para apuntar lo que ves: la app pone sola el punto kilométrico (PK).</li>
       <li><b>Al terminar</b>, pulsa el botón naranja <b>+</b> o el <b>menú</b> (arriba a la izquierda) y elige <b>«Enviar a la oficina»</b>.</li></ol>
     <p><b>¿Cómo vas a usar la app?</b></p>
     <div class="acts"><button class="btn go full" data-r="simple">Apuntar en campo (modo sencillo, letra grande)</button><button class="btn pri full" data-r="full">Técnico: todas las herramientas</button></div>
     <p class="hint">Se puede cambiar cuando quieras en el menú (arriba a la izquierda) → Ajustes.</p>
-    <p class="hint">¿Has reinstalado la app? <button type="button" class="linkbtn" data-a="restore">Recuperar mis obras de la copia</button> (Documentos › OBRA-GIS).</p>`);
-  b.querySelector('[data-a=restore]').onclick = () => { if (!settings.welcomed) { settings.welcomed = true; saveSettings(); } closeSheet(); restoreFromBackup(); };
+`);
+  { const rb = b.querySelector('[data-a=restore]'); if (rb) rb.onclick = () => { if (!settings.welcomed) { settings.welcomed = true; saveSettings(); } closeSheet(); restoreFromBackup(); }; }
   b.querySelectorAll('[data-r]').forEach(bt => bt.onclick = () => { settings.simple = bt.dataset.r === 'simple'; settings.welcomed = true; saveSettings(); applySimple(); closeSheet(); });
   onSheetClose(() => { if (!settings.welcomed) { settings.welcomed = true; saveSettings(); } });
 }

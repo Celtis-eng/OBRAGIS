@@ -259,6 +259,7 @@ function renderActEditor() {
   editorRerender = true;
   const b = openSheet(`<h2>${isNew ? 'Nueva actuación' : 'Editar actuación'}</h2>
     <p class="sub">${esc(a.traceName)} · ${esc(a.layerName || '')}${f ? ' · longitud ' + fmtLen(f.length) : ''}</p>
+    ${a._walk ? `<div class="walksum" aria-live="polite"><b>${esc(a.type || 'Tramo')}</b> · ${fmtPK(Math.min(a.d0, a.d1))} → ${fmtPK(Math.max(a.d0, a.d1))} · ${fmtLen(Math.abs(a.d1 - a.d0))}</div>` : ''}
     <h3 class="sh">1 · Qué</h3>
     <div class="field"><label for="aType">Tipo de actuación</label><div class="row">${actTypeSelect(a.type)}${it && !it.legacy ? `<button type="button" class="mini ic fav ${isFav ? 'on' : ''}" data-a="fav" title="Favorita" aria-label="Marcar como favorita">${isFav ? '★' : '☆'}</button>` : ''}</div>
       ${it ? `<p class="hint"><span class="dot" style="background:${it.color}"></span>${esc(it.catName)}${it.hint ? ' · ' + esc(it.hint) : ''}</p>` : ''}</div>
@@ -289,7 +290,7 @@ function renderActEditor() {
       ${isNew ? '' : '<div class="acts"><button class="btn" data-a="dup">Duplicar en otro tramo</button><button class="btn del" data-a="delete">Eliminar actuación</button></div>'}
     </details>
     <div class="savebar">${a._walk && isNew ? '<div class="row2"><button class="btn pri" data-a="save">Guardar</button><button class="btn go" data-a="savecont">Guardar y seguir andando</button></div>' : '<button class="btn pri full" data-a="save">Guardar actuación</button>'}</div>`);
-  { const sc = $('#sheetBody [data-a=savecont]'); if (sc) sc.onclick = () => { if (!actDraft) return; actDraft._cont = actDraft._dir || 1; saveAct().then(ok => { if (!ok && actDraft && !$('#measWarn') && !$('#zeroWarn')) delete actDraft._cont; }); }; } // con un aviso pendiente se recuerda que hay que seguir
+  { const sc = $('#sheetBody [data-a=savecont]'); if (sc) sc.onclick = () => { if (!actDraft) return; actDraft._cont = actDraft._dir || 1; saveAct().then(ok => { if (!ok && actDraft && !$('#measWarn') && !$('#zeroWarn') && !$('#invWarn')) delete actDraft._cont; }); }; } // con un aviso pendiente se recuerda que hay que seguir
   { const mo = $('#aMore'); if (mo) mo.ontoggle = () => { if (actDraft) actDraft._moreOpen = mo.open; }; }
   editorRerender = false;
   actDraft = keep;
@@ -324,7 +325,8 @@ function renderActEditor() {
       $('#' + id + 'rb').textContent = t; el.classList.toggle('bad', t.startsWith('⚠')); };
     // sin volver a dibujar la ficha: así no se pierde el toque en «Guardar» justo después de escribir el PK
     el.onchange = () => { if (!isFinite(parsePK(el.value))) { $('#' + id + 'rb').textContent = pkReadBack(el.value); return; }
-      syncAct(); el.value = fmtPK(actDraft[id === 'aPk0' ? 'd0' : 'd1']); // escrito a mano: se respeta tal cual (para mover un tramo se escriben los dos PK en cualquier orden)
+      const p0 = actDraft.d0, p1 = actDraft.d1; syncAct(); el.value = fmtPK(actDraft[id === 'aPk0' ? 'd0' : 'd1']); { const w = $('#invWarn'); if (w) w.remove(); } // el aviso viejo ya no vale
+      if (actDraft.d1 < actDraft.d0 - 0.01 && p1 > p0) actDraft._ext = [Math.min(p0, actDraft.d0, actDraft.d1), Math.max(p1, actDraft.d0, actDraft.d1)]; else delete actDraft._ext; // por si quería alargar // escrito a mano: se respeta tal cual (para mover un tramo se escriben los dos PK en cualquier orden)
       const inv = actDraft.d1 < actDraft.d0 - 0.01, other = id === 'aPk0' ? 'aPk1' : 'aPk0';
       $('#' + other + 'rb').textContent = inv ? `⚠ «Desde» queda después de «Hasta»: escribe también este PK` : ''; $('#' + other).classList.toggle('bad', inv);
       if (!inv) $('#' + id + 'rb').textContent = '';
@@ -412,11 +414,16 @@ async function saveAct() {
   for (const inp of document.querySelectorAll('[data-pf]')) { const er = actFieldError(inp.dataset.pf, inp.value); if (er) { fieldErr(inp, er); inp.focus(); inp.scrollIntoView({ block: 'center' }); return; } }
   for (const [id, k] of [['aPk0', 'd0'], ['aPk1', 'd1']]) { const el = $('#' + id); // PK mal escrito: no se guarda el anterior en silencio
     if (el && el.value.trim() !== fmtPK(a[k]) && !isFinite(parsePK(el.value))) { fieldErr(el, 'PK no válido: escribe por ejemplo 1+250'); el.focus(); el.scrollIntoView({ block: 'center' }); return; } }
+  { const c0 = featOf(a), Lf = c0 && c0.f && c0.f.length;
+    if (Lf && $('#aText')) for (const [id, k] of [['aPk0', 'd0'], ['aPk1', 'd1']]) if (a[k] > Lf + 0.5) { const el = $('#' + id); if (el) { fieldErr(el, `Pasa del final de la traza (${fmtPK(Lf)})`); el.focus(); el.scrollIntoView({ block: 'center' }); } return; } }
   if (!isFinite(a.d0) || !isFinite(a.d1)) { toast('Revisa los PK: escribe por ejemplo 1+250.'); return; }
   if (a.d1 < a.d0 - 0.01 && $('#aText') && a._swapOk !== a.d0 + '|' + a.d1) { // PK escritos al revés: se pregunta (antes se daban la vuelta en silencio)
     let w = $('#invWarn'); if (!w) { $('#sheetBody .savebar').insertAdjacentHTML('afterbegin', '<div class="fwarn" id="invWarn" role="alert"></div>'); w = $('#invWarn'); }
-    w.innerHTML = `<b>«Desde PK» (${fmtPK(a.d0)}) va después de «Hasta PK» (${fmtPK(a.d1)})</b>. Corrige uno de los dos arriba o:<div class="row"><button type="button" class="mini" data-a="saveinv">Guardar de ${fmtPK(a.d1)} a ${fmtPK(a.d0)} (${fmtLen(a.d0 - a.d1)})</button></div>`;
-    const t0 = Date.now(); w.querySelector('[data-a=saveinv]').onclick = () => { if (Date.now() - t0 < 600 || !actDraft) return; actDraft._swapOk = actDraft.d0 + '|' + actDraft.d1; saveAct(); };
+    const ex = a._ext && a._ext[1] - a._ext[0] > a.d0 - a.d1 + 0.5 ? a._ext : null;
+    w.innerHTML = `<b>«Desde PK» (${fmtPK(a.d0)}) va después de «Hasta PK» (${fmtPK(a.d1)})</b>. Corrige uno de los dos arriba o elige:<div class="row">${ex ? `<button type="button" class="mini" data-a="saveext">Alargar: ${fmtPK(ex[0])} a ${fmtPK(ex[1])} (${fmtLen(ex[1] - ex[0])})</button>` : ''}<button type="button" class="mini" data-a="saveinv">${fmtPK(a.d1)} a ${fmtPK(a.d0)} (${fmtLen(a.d0 - a.d1)})</button></div>`;
+    const t0 = Date.now(), go = fn => () => { if (Date.now() - t0 < 600 || !actDraft) return; fn(); ['aPk0', 'aPk1'].forEach((k, i) => { const e2 = $('#' + k); if (e2) { e2.value = fmtPK(i ? actDraft.d1 : actDraft.d0); e2.classList.remove('bad'); } }); saveAct(); };
+    w.querySelector('[data-a=saveinv]').onclick = go(() => { actDraft._swapOk = actDraft.d0 + '|' + actDraft.d1; });
+    { const be = w.querySelector('[data-a=saveext]'); if (be) be.onclick = go(() => { [actDraft.d0, actDraft.d1] = ex; delete actDraft._ext; }); }
     return; }
   if (a.d1 < a.d0) [a.d0, a.d1] = [a.d1, a.d0];
   const ctx = featOf(a);
@@ -440,7 +447,7 @@ async function saveAct() {
       w.innerHTML = `<b>Sin medidas</b>: no saldrá superficie ni volumen. Escribe ${mf.map(k => ACT_FIELDS[k].l.toLowerCase()).join(' / ')} o:<div class="row"><button type="button" class="mini" data-a="savenm">Guardar sin medidas</button></div>`;
       const t0 = Date.now(); w.querySelector('[data-a=savenm]').onclick = () => { if (Date.now() - t0 < 600 || !actDraft) return; actDraft._noMeasOk = true; saveAct(); };
       return; } }
-  const cont = a._cont, fromSplit = a._split, noMeasUsed = a._noMeasOk === true || !!a._noMeasChain; delete a._cont; delete a._split; delete a._noMeasChain; delete a._dir; delete a._noMeasOk; delete a._zeroWarn; delete a._zeroOk; delete a._swapOk; delete a._moreOpen; delete a._init; delete a._walk; if (a.params) { delete a.params._wAuto; Object.keys(a.params).forEach(k => { if (a.params[k] === null || a.params[k] === '') delete a.params[k]; }); }
+  const cont = a._cont, fromSplit = a._split, noMeasUsed = a._noMeasOk === true || !!a._noMeasChain; delete a._cont; delete a._split; delete a._noMeasChain; delete a._dir; delete a._noMeasOk; delete a._zeroWarn; delete a._zeroOk; delete a._swapOk; delete a._ext; delete a._moreOpen; delete a._init; delete a._walk; if (a.params) { delete a.params._wAuto; Object.keys(a.params).forEach(k => { if (a.params[k] === null || a.params[k] === '') delete a.params[k]; }); }
   a.updated = Date.now();
   hideUndo(); // solo cuando de verdad se guarda (un toque fallido no borra el «Deshacer»)
   try { await DB.put('acts', a); } catch (e) { toast('No se pudo guardar: ' + (e.message || 'almacenamiento lleno'), 7000); return; }

@@ -13,7 +13,7 @@ $('#sheetX').onclick = closeSheet;
 $('#btnImport').onclick = importMenu;
 $('#inKml').addEventListener('change', e => { const f = Array.from(e.target.files || []); e.target.value = ''; if (f.length) importFiles(f); });
 $('#inObra').addEventListener('change', async e => { const fs = [...(e.target.files || [])]; e.target.value = ''; // varios .zip a la vez (recuperar todas las obras de la copia)
-  for (const f of fs) { if (/\.tmp$/i.test(f.name)) continue; const z = await isObraPackage(f); z ? await importObraPackage(f, z) : await fichaImportFiles([f]); } });
+  if (fs.length) await importManyPackages(fs); });
 $('#btnObra').onclick = obrasSheet;
 $('#inPhotosImport').addEventListener('change', e => { const f = Array.from(e.target.files || []); e.target.value = ''; if (f.length) importPhotos(f); });
 $('#fabLocate').onclick = locate;

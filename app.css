@@ -874,3 +874,7 @@ body:has(#walkBar:not([hidden])) .savebar.plusfoot{padding-bottom:calc(var(--wbh
 @media (prefers-color-scheme:dark){:root:not([data-theme=light]) .fneed{color:#ffb86b}}
 :root[data-theme=dark] .fneed{color:#ffb86b}
 #sheetBody input::placeholder,#sheetBody textarea::placeholder{font-style:italic;opacity:.55}
+/* P12-4 · resumen fijo del tramo andado (tipo y PK siempre a la vista); P12-6 · recuperar arriba en la bienvenida */
+.walksum{position:sticky;top:0;z-index:3;margin:0 52px 8px 0;padding:8px 10px;border-radius:10px;background:var(--surface-2,var(--bg2));border:1px solid var(--border-strong,#888);font-size:1rem;line-height:1.3}
+.restorebox{display:flex;flex-direction:column;gap:6px;margin:4px 0 12px;padding:10px;border-radius:12px;border:2px dashed var(--border-strong,#888)}
+.restorebox span{font-weight:600}

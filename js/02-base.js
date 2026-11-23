@@ -233,7 +233,8 @@ function showDraftBar() {
 function closeSheet(replacing) {
   const fns = sheetCleanup; sheetCleanup = [];
   fns.forEach(fn => { try { fn(); } catch (e) { console.error(e); } });
-  if (replacing !== true) { $('#sheet').hidden = true; if (walkAct) walkAct.shown = Date.now(); if (lastFocus && lastFocus.isConnected && lastFocus !== document.body) try { lastFocus.focus({ preventScroll: true }); } catch (e) { /* nada */ } lastFocus = null; } // la barra del tramo reaparece bajo el dedo: 1,5 s sin toques // al sustituir una ficha por otra no se oculta (evita parpadeos y toques perdidos)
+  // al cerrar una ficha la barra del tramo reaparece bajo el dedo: 0,7 s sin toques (no 1,5 s)
+  if (replacing !== true) { $('#sheet').hidden = true; if (walkAct) walkAct.shown = Date.now() - 800; if (lastFocus && lastFocus.isConnected && lastFocus !== document.body) try { lastFocus.focus({ preventScroll: true }); } catch (e) { /* nada */ } lastFocus = null; } // la barra del tramo reaparece bajo el dedo: 1,5 s sin toques // al sustituir una ficha por otra no se oculta (evita parpadeos y toques perdidos)
   $('#sheetBody').innerHTML = '';
 }
 const objectUrl = blob => { const u = URL.createObjectURL(blob); pendingUrls.push(u); return u; };
