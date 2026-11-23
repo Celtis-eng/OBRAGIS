@@ -6,9 +6,10 @@
 /* ---------------- Versión de la app ----------------
    Cambia APP_VERSION en cada entrega (también se usa como versión de la app Android).
    Formato MAYOR.MENOR.CORRECCIÓN: menor = función nueva, corrección = arreglo. */
-const APP_VERSION = '1.19.0';
+const APP_VERSION = '1.19.1';
 const APP_DATE = '2026-11-23';
 const CHANGELOG = [
+  ['1.19.1', '23/11/2026', 'Depuración: varios borrados seguidos se recuperan con un solo «Deshacer»; «Otro» puntual con nombre propio no pide 0 m; badenes y demás puntuales guardados en metros por versiones antiguas salen por unidad en el BC3.'],
   ['1.19.0', '23/11/2026', 'Copia automática: cada obra se guarda sola en Documentos › OBRA-GIS › Copia automática, que no se borra al desinstalar; tras reinstalar, «Recuperar mis obras» (se pueden elegir varios .zip). Al actualizar los datos se conservan. Además: los PK escritos a mano se respetan (para mover un tramo se escriben los dos en cualquier orden) y si quedan al revés se pregunta; PK no válido avisa junto al campo; tras «Terminar» se ve el tipo y la medida que falta lo dice.'],
   ['1.18.9', '23/11/2026', 'Depuración: «Mapa» y el PK escrito en «Desde/Hasta» ya no recortan el tramo (se alarga y lo dice); tras «Terminar» se ven los PK y la ✕ no tapa «Mapa»; andando no sale «Repetir la última»; avisos de datos junto al campo; «Fin del camino» visible; aviso para abrir el plano en el primer uso; código partido en módulos.'],
   ['1.18.8', '22/11/2026', 'Depuración: los puntuales del «+» ya no quedan bajo «Cerrar» y van arriba; caño, arqueta, entronque y badén sin número cuentan 1 ud en todas las salidas (el bacheo, por superficie, no); andando hacia atrás «Aquí» en «Hasta PK» alarga el tramo sin perder metros; «Guardar y seguir andando» desde el editor también ofrece «Deshacer»; un toque fallido ya no borra el «Deshacer»; en una cadena «sin medidas» no se vuelve a preguntar en cada corte; un tramo de milímetros avisa de 0 m; nombres claros en «▶ Seguir»; un doble toque sin querer ya no amplía el mapa; avisos arriba, sin tapar «▶ Seguir».'],

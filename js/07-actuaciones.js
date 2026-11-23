@@ -406,6 +406,7 @@ slopePickPoint = function (ll) { // también atiende la selección de inicio/fin
 async function saveAct() {
   syncAct();
   const a = actDraft; if (!a) return false;
+  const wasPoint = ACT_POINT.has(a.type); // «Otro» puntual con nombre propio sigue siendo puntual (no pide «Guardar con 0 m»)
   if (a.type === 'Otro') a.type = (a.custom || '').trim() || 'Otro';
   if (!a.type) { toast('Elige el tipo de actuación.'); return; }
   for (const inp of document.querySelectorAll('[data-pf]')) { const er = actFieldError(inp.dataset.pf, inp.value); if (er) { fieldErr(inp, er); inp.focus(); inp.scrollIntoView({ block: 'center' }); return; } }
@@ -425,7 +426,7 @@ async function saveAct() {
     if (a.d1 > Lf + 0.5 && !confirm(`El PK final ${fmtPK(a.d1)} pasa del final de la traza (${fmtPK(Lf)}). ¿Guardar la actuación hasta el final de la traza?`)) return;
     a.d0 = Math.max(0, Math.min(Lf, a.d0)); a.d1 = Math.max(a.d0, Math.min(Lf, a.d1)); a.coords = segmentCoords(ctx.f, a.d0, a.d1);
   }
-  { const pp = a.params || {}, puntual = ACT_POINT.has(a.type) || pp.area > 0 || pp.vol > 0 || pp.n > 0; // un tramo de milímetros no cuenta como puntual
+  { const pp = a.params || {}, puntual = wasPoint || ACT_POINT.has(a.type) || pp.area > 0 || pp.vol > 0 || pp.n > 0; // un tramo de milímetros no cuenta como puntual
     if (a.d1 - a.d0 < 0.5 && !puntual && a._zeroOk !== a.d0 + '|' + a.d1) { // aviso dentro de la ficha, con su propio botón (no se guarda con toques repetidos en «Guardar»)
       const f1 = $('#aPk1'); if (f1) { f1.classList.add('bad'); setTimeout(() => f1.scrollIntoView({ block: 'start' }), 50); }
       let w = $('#zeroWarn'); if (!w) { const sb = $('#sheetBody .savebar'); sb.insertAdjacentHTML('afterbegin', '<div class="fwarn" id="zeroWarn" role="alert"></div>'); w = $('#zeroWarn'); } // dentro de la barra fija: siempre a la vista
@@ -457,10 +458,16 @@ async function saveAct() {
       await DB.put('kv', walkAct, 'walk').catch(() => {}); showWalkBar(); keepAwake(true); }); }
   return true;
 }
+let delStack = [];
 async function deleteAct(id) { // sin pregunta: se puede deshacer unos segundos
   const old = acts.get(id); if (!old) return;
   await DB.del('acts', id); acts.delete(id); actDraft = null; slopeHL.clearLayers(); clearDraft(id);
-  closeSheet(); drawActs(); showUndo(`Actuación eliminada: ${old.type}`, async () => { if (old.obraId !== settings.activeObra) { toast('Esa actuación es de otra obra.'); return; } await DB.put('acts', old); acts.set(old.id, old); drawActs(); if (!$('#drawer').hidden) renderDrawer(); toast('Actuación recuperada'); });
+  // varios borrados seguidos: un solo «Deshacer» los recupera todos (antes solo el último)
+  const ub = $('#undoBar'), list = ub && !ub.hidden && undoKind === 'del' && delStack.length && delStack[0].obraId === old.obraId ? [...delStack, old] : [old]; delStack = list;
+  closeSheet(); drawActs(); showUndo(list.length > 1 ? `${list.length} actuaciones eliminadas` : `Actuación eliminada: ${old.type}`, async () => { delStack = [];
+    if (old.obraId !== settings.activeObra) { toast(list.length > 1 ? 'Esas actuaciones son de otra obra.' : 'Esa actuación es de otra obra.'); return; }
+    for (const x of list) { await DB.put('acts', x); acts.set(x.id, x); } drawActs(); if (!$('#drawer').hidden) renderDrawer(); toast(list.length > 1 ? `${list.length} actuaciones recuperadas` : 'Actuación recuperada'); });
+  undoKind = 'del';
   if (!$('#drawer').hidden) renderDrawer();
 }
 function viewAct(id, at) {

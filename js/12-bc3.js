@@ -34,7 +34,8 @@ function bc3Map(type) {
   const it = actItem(type), m = (settings.bc3Map || {})[type] || {}, auto = bc3AutoCode(type);
   const code = bc3Code(m.code) && bc3Code(m.code) !== auto ? bc3Code(m.code) : '';
   const price = typeof m.price === 'number' && isFinite(m.price) && m.price >= 0 && m.price < 1e9 ? m.price : 0;
-  return { code: code || auto, unit: isUnit(m.unit) ? m.unit : defaultUnit(it), price, summary: typeof m.summary === 'string' && m.summary ? m.summary : type, own: !!code, auto };
+  const du = defaultUnit(it), stale = m.unit === 'm' && du === 'ud' && ACT_POINT.has(it.name); // badén y demás puntuales guardados en «m» por versiones antiguas (salían 0)
+  return { code: code || auto, unit: isUnit(m.unit) && !stale ? m.unit : du, price, summary: typeof m.summary === 'string' && m.summary ? m.summary : type, own: !!code, auto };
 }
 const bc3Round = (v, d) => Math.round(v * 10 ** d) / 10 ** d;
 // Cantidad y línea de medición de una actuación en la unidad elegida. Las dimensiones de la línea reproducen siempre la

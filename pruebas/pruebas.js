@@ -564,6 +564,24 @@ async function copiaAutomatica() {
   await n.browser.close();
 }
 
+async function pendientesViejos() {
+  const { browser, page: p, errores } = await abrir({ ancho: 400, alto: 820 });
+  await p.setInputFiles('#inKml', [DATOS + 'pendientes_rangos.kml']); await esperar(600);
+  const ids = await p.evaluate(async () => { const e = [...layers.values()][0], f = e.feats[0], out = [];
+    for (const [d0, d1] of [[0, 50], [100, 150], [200, 250]]) { const a = { id: uid(), obraId: settings.activeObra, layerId: e.rec.id, featIdx: 0, traceName: f.name, layerName: e.rec.name, d0, d1, type: 'Limpieza de cunetas', side: 'ambos', text: '', media: [], created: Date.now(), coords: segmentCoords(f, d0, d1), params: {}, prio: '' }; await DB.put('acts', a); acts.set(a.id, a); out.push(a.id); }
+    return out; });
+  await p.evaluate(async ids => { await deleteAct(ids[0]); await deleteAct(ids[1]); }, ids); await esperar(700);
+  ok('Dos borrados seguidos: la barra lo dice', await p.evaluate(() => /2 actuaciones eliminadas/.test($('#undoBar').textContent)));
+  await p.click('#undoBar .mini'); await esperar(500);
+  ok('Un «Deshacer» recupera las dos (M6-7)', await p.evaluate(ids => ids.every(id => acts.has(id)), ids));
+  await p.evaluate(() => { const e = [...layers.values()][0]; openActEditor({ rec: e.rec, f: e.feats[0], d0: 1000, d1: 1000, type: 'Otro' }); }); await esperar(500);
+  await p.fill('#aOther', 'Hito kilométrico'); await p.click('#sheetBody [data-a=save]'); await esperar(500);
+  ok('«Otro» puntual con nombre propio se guarda sin pedir 0 m (M7-7)', await p.evaluate(() => !$('#zeroWarn') && [...acts.values()].some(a => a.type === 'Hito kilométrico')));
+  ok('Badén guardado en «m» por versiones antiguas sale por unidad (M8-4)', await p.evaluate(() => { settings.bc3Map = { 'Badén': { unit: 'm' } }; return bc3Map('Badén').unit === 'ud'; }));
+  ok('Sin errores JS', !errores.length, errores.join(' | '));
+  await browser.close();
+}
+
 async function modoSencillo() {
   const { browser, page: p, errores } = await abrir({ ancho: 360, alto: 740, tactil: true });
   await p.evaluate(() => { settings.simple = true; applySimple(); openDrawer(); }); await esperar(300);
@@ -576,7 +594,7 @@ async function modoSencillo() {
 }
 
 (async () => {
-  for (const t of [pkYNumeros, geometriaYPendientes, actuacionesYBorradores, tramoAndandoYRepetir, bc3, paqueteYEnvio, toquesYBarras, borradoresYDictado, ronda4, ronda5, ronda6, ronda7, ronda8, ronda9, ronda10, copiaAutomatica, modoSencillo]) {
+  for (const t of [pkYNumeros, geometriaYPendientes, actuacionesYBorradores, tramoAndandoYRepetir, bc3, paqueteYEnvio, toquesYBarras, borradoresYDictado, ronda4, ronda5, ronda6, ronda7, ronda8, ronda9, ronda10, copiaAutomatica, pendientesViejos, modoSencillo]) {
     console.log(`\n— ${t.name}`);
     try { await t(); } catch (e) { ok(t.name + ' terminó sin excepciones', false, e.message.split('\n')[0]); }
   }

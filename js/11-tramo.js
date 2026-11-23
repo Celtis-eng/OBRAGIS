@@ -44,8 +44,8 @@ async function startWalk(type, side, params) {
   startWatch(); keepAwake(true); buzz(60); closeSheet(); showWalkBar(); toast(`Tramo de «${type}» empezado en el PK ${fmtPK(n.d)}. Pulsa «Terminar aquí» al llegar al final.`, 6000);
 }
 // Deshacer en lugar de preguntar: una barra con «Deshacer» durante unos segundos
-let undoT = null;
-function showUndo(msg, fn, ms = 8000) {
+let undoT = null, undoKind = '';
+function showUndo(msg, fn, ms = 8000) { undoKind = '';
   let el = $('#undoBar'); if (!el) { el = document.createElement('div'); el.id = 'undoBar'; el.className = 'undobar'; el.setAttribute('role', 'status'); document.body.appendChild(el); }
   el.innerHTML = `<span>${esc(msg)}</span><button class="mini" type="button">Deshacer</button>`; el.hidden = false; $('#toast').hidden = true;
   clearTimeout(undoT); undoT = setTimeout(() => { el.hidden = true; }, ms);
