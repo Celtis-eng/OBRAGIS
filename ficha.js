@@ -3,7 +3,7 @@
    · Parte de PROYECTO: se rellena sola a partir del presupuesto (BC3 de Presto) y de los KMZ de las actuaciones.
    · Parte de CAMPO: se rellena en la visita con el móvil (botones grandes, fotos con GPS y PK, sin conexión).
    · Exporta la ficha para imprimir (PDF) y en JSON para la revisión del presupuesto.
-   Este fichero se carga después de app.js y usa sus funciones (DB, openSheet, layers, pkAt…). */
+   Este fichero se carga después de los módulos de js/ y usa sus funciones (DB, openSheet, layers, pkAt…). */
 
 const FICHA_HEAD = 'RESTAURACIÓN DE CAMINOS AGRARIOS DE USO PÚBLICO E INFRAESTRUCTURAS ASOCIADAS EN ANDALUCÍA ORIENTAL, EN EL ÁMBITO DE LAS ACTUACIONES DE EMERGENCIA DEL ARTÍCULO 12 DEL REAL DECRETO LEY 5/2026, DE 17 DE FEBRERO';
 const FICHA_TITLE = 'FICHA DE INSPECCIÓN DE CAMPO – RESTAURACIÓN DE CAMINOS AGRARIOS';

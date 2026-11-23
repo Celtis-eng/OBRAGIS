@@ -1,0 +1,78 @@
+'use strict';
+/* OBRA-GIS — visor de KML/KMZ sobre ortofoto con gestor de capas, anotaciones georreferenciadas, actuaciones por PK,
+   informes y BC3. Funciona como web instalable y como app nativa (Capacitor). */
+/* OBRA-GIS · Versión, fecha y novedades (cambiar aquí en cada entrega).
+   Parte de la app (los ficheros js/ se cargan en orden desde index.html y comparten el ámbito global). */
+/* ---------------- Versión de la app ----------------
+   Cambia APP_VERSION en cada entrega (también se usa como versión de la app Android).
+   Formato MAYOR.MENOR.CORRECCIÓN: menor = función nueva, corrección = arreglo. */
+const APP_VERSION = '1.18.8';
+const APP_DATE = '2026-11-22';
+const CHANGELOG = [
+  ['1.18.8', '22/11/2026', 'Depuración: los puntuales del «+» ya no quedan bajo «Cerrar» y van arriba; caño, arqueta, entronque y badén sin número cuentan 1 ud en todas las salidas (el bacheo, por superficie, no); andando hacia atrás «Aquí» en «Hasta PK» alarga el tramo sin perder metros; «Guardar y seguir andando» desde el editor también ofrece «Deshacer»; un toque fallido ya no borra el «Deshacer»; en una cadena «sin medidas» no se vuelve a preguntar en cada corte; un tramo de milímetros avisa de 0 m; nombres claros en «▶ Seguir»; un doble toque sin querer ya no amplía el mapa; avisos arriba, sin tapar «▶ Seguir».'],
+  ['1.18.7', '22/11/2026', 'Depuración: «Deshacer» caduca en cuanto cambia la situación (no puede borrar un tramo viejo ni solapar tramos); «Guardar y seguir andando» sigue desde el PK guardado aunque se corrija en el editor y también después de «Guardar sin medidas» o «Guardar con 0 m»; la ficha «+» tiene un pie «Cerrar» bajo el dedo (un toque de más ya no apunta un puntual); badén y puntuales sin número cuentan 1 ud en pantalla, CSV, informe y BC3; «▶ Seguir» muestra el tipo y ofrece el último tramo aunque luego se apunte un caño; el «+» ya no se mueve; el PK en directo no se queda con una lectura vieja; pulido de Irene.'],
+  ['1.18.6', '22/11/2026', '«▶ Seguir» junto al «+»: un toque empieza andando otro tramo como el último. «Deshacer» siempre arriba, sin tapar nada. «Terminar aquí» desde el «+» vuelve a funcionar. «Guardar y seguir andando» desde el editor, también hacia atrás, sin tramos repetidos. Si no hay medidas que copiar, «Guardar y seguir» abre el editor. Badén puntual por unidad en el BC3. Puntuales protegidos 1,5 s frente a toques de más. Foco accesible en las fichas.'],
+  ['1.18.5', '21/11/2026', 'Actuaciones puntuales (caño, badén, arqueta) con un toque desde el «+». «Guardar y seguir» en la barra del tramo (antes «Y seguir»), también andando hacia atrás. «Deshacer» ya no tapa la barra del tramo. Toques de más protegidos al abrir el «+», al terminar un tramo y al cerrar fichas. Aviso de actuaciones sin medidas con «Guardar sin medidas». Tramos andando solo de tipos lineales. Total del BC3 siempre a la vista.'],
+  ['1.18.4', '21/11/2026', 'Trabajo más fluido: «Y seguir» en la barra del tramo guarda el tramo y empieza el siguiente igual sin abrir nada; al terminar un tramo, sus medidas se rellenan con las de la última del mismo tipo y hay «Guardar y seguir andando»; tipos recientes como atajo en el «+»; «Deshacer» en lugar de preguntas al cancelar un tramo o eliminar una actuación; vibración al empezar y terminar; pantalla encendida durante el tramo; revisión antes de enviar a la oficina. Arreglos: «Guardar con 0 m» ya no queda tapado, un toque de más al aparecer la barra no termina el tramo, no se puede terminar un tramo sin haber andado, precios «0.125» y aviso en «24.800», cambiar una foto cuenta como cambio, y más.'],
+  ['1.18.3', '21/11/2026', 'Nuevo diseño: colores con buen contraste (también en modo oscuro y a pleno sol), botones de 48 px, opción elegida con ✓ distinta de «Guardar», naranja solo para las acciones de campo. Menú por secciones (informes, herramientas, más, ajustes), ficha «+» más corta con «Repetir» en una fila, editor de actuación en 4 pasos con «Más opciones». Tramo andando: se elige y luego se pulsa «Empezar» (un toque de más nunca empieza un tramo) y el mapa acompaña. Aviso de 0 m dentro de la ficha con su botón. BC3: importe y total a la vista, precios con punto de miles, bases sin «#», partidas auxiliares, caño por unidad. Borradores más robustos y por obra. El APK lleva el código ofuscado.'],
+  ['1.18.2', '21/11/2026', 'Arreglos de la tercera ronda de pruebas. Borradores: uno por anotación o actuación (guardar o cerrar otra ya no borra el que tenías pendiente), copia al pasar la app a segundo plano y sin avisos falsos. Tramo andando: un toque rápido de más ya no elige un tipo, «Repetir la última andando», aviso antes de descartar un tramo en curso, barra a todo el ancho y sin avisos de GPS pasajeros. 0 m: los puntuales (badén, caño, arqueta…) se guardan sin aviso; los demás piden un segundo «Guardar» pausado. BC3: sin precios básicos de las descomposiciones en las propuestas, palabra principal obligatoria (caño ≠ limpieza de drenaje), unidades «Tn», «ml», «Ud»…, propuestas no fijadas al cambiar de base, resumen conservado sin la base, ajustes dañados saneados, sin notación científica y códigos únicos. Aviso al escribir un PK que pasa del final, etiquetas que no se montan, nombres con segundos.'],
+  ['1.18.1', '21/11/2026', 'Arreglos de la segunda ronda de pruebas. BC3: precios con coma de la base, unidad y precio tomados de la partida elegida, propuestas más prudentes y sin códigos repetidos, líneas de medición que suman el total, códigos propios únicos y BC3 incluido en «Enviar a la oficina». Los avisos ya no tapan botones; la barra del tramo deja libre la cámara. Toques repetidos que ya no abren otra ficha por error. Borradores guardados mientras se escribe. Tramo andando por obra, con margen automático y a menos de 50 m del camino. Dictado que avisa si no responde. Modo sencillo más limpio.'],
+  ['1.18.0', '20/11/2026', 'Tramo andando: «Empezar tramo aquí» y «Terminar aquí» con el GPS, sin tener el editor abierto. «Repetir la última» actuación desde donde acabó la anterior. «Enviar a la oficina» en un paso (paquete de obra + informe de la visita + mediciones). Exportación de mediciones a BC3 (FIEBDC-3) con los códigos de tu base de precios o presupuesto. Modo sencillo con letra grande, guía de primer uso y dictado por voz en las observaciones.'],
+  ['1.17.1', '20/11/2026', 'Arreglos tras las pruebas con usuarios: PK bien escritos (nunca «0+1000») y bien leídos («1.250», «1+250», «250 m»), con comprobación al escribir; números con unidades y avisos de valores imposibles; lo escrito en actuaciones y anotaciones ya no se pierde (borrador recuperable); sin toques fantasma; botón Atrás cierra fichas; importación de obras que no borra nada si falla; fotos y copias con nombres únicos; invertir trazas sin riesgo; actuaciones conservadas al borrar una capa y reenlazadas al recargarla; polígonos con huecos; distancias sobre el elipsoide; tramificación exacta con cotas del KML; mismas cifras en pantalla, CSV, KMZ e informe; botones más grandes y «Guardar» siempre visible.'],
+  ['1.17.0', '20/11/2026', 'Actuaciones completas: catálogo en desplegable por familias (desbroces, demoliciones, explanada, firmes, drenaje, contención, sobreanchos/abanicos…) con favoritas y recientes, datos de cada una (ancho, espesor, altura, unidades, material…) y mediciones automáticas (m, m², m³, t). Informe de la visita con resumen de mediciones, croquis y fotos. Etiquetas de actuación que se pueden tocar. Ocultar elementos. Ancho en el punto tocado y anchos a mano. Subcalibración de PK hasta 10 m. PK en directo con el GPS. Copias de seguridad en Documentos y arreglo de la exportación de obras en Android. La app Android ya se actualiza sin desinstalar (firma fija).'],
+  ['1.16.0', '10/11/2026', 'Ficha de inspección de campo (restauración de caminos agrarios): al cargar el previo (BC3 del presupuesto y .zip con los KMZ del camino y de las actuaciones y sus fotos) la app sitúa trazas y fotos y rellena sola la parte de PROYECTO de la ficha con las partidas del presupuesto, su medición y su tramo de PK. En la visita se rellena la parte de CAMPO con botones grandes: ¿coincide con la realidad?, lo detectado en campo, otras actuaciones in situ situadas con GPS, anchos cada 100 m («¿En qué PK estoy?»), vías de acceso, zona de actuación, recursos y fotos de cada casilla con su PK. Se exporta para imprimir o PDF y en JSON para la revisión del presupuesto, y viaja en el paquete de obra.'],
+  ['1.15.0', '09/11/2026', 'Tramificación de pendientes: la traza se divide en rangos (menos del 5 %, 5–10 %, 10–20 % y 20 % o más, editables) con la longitud y el porcentaje de cada uno, sus tramos con PK, colores en el mapa, pendiente media, pendiente media absoluta y desnivel medio (m/km). Exportación a CSV y KMZ.'],
+  ['1.14.0', '07/11/2026', 'Informe de afecciones de las trazas que elijas: recorre cada traza consultando las capas de servicios marcadas, con banda a cada lado del eje, y da las afecciones por tramos de PK con los organismos a consultar. Se exporta como informe para imprimir o PDF, CSV y KMZ, y va en el paquete de obra.'],
+  ['1.13.0', '07/11/2026', 'Calibración de los KML: distancia entre marcas de PK configurable en Ajustes para todas las trazas (5 m a 1 km u otra distancia) y, si se quiere, distinta para cada capa. Las marcas y rótulos se adaptan al zoom para no amontonarse.'],
+  ['1.12.0', '04/11/2026', 'Carpetas en árbol y selección múltiple de capas (mantener pulsado): mostrar, ocultar, subir, bajar, mover a carpeta, unir, exportar y borrar. Invertir el sentido de una traza con sus PK. KML de puntos. Unión de KML sin perder información. Tabla de atributos con exportación e importación CSV (Excel/Calc). Propiedades de la capa. Capa de recursos (plantas de RCD, hormigón, canteras, aglomerado…). Calculadora: distancias, áreas, pendientes, coordenadas y distancia por carretera. Pendientes por tramos ≤/≥. Fecha de la ortofoto. Modo sin conexión por municipio o tocando el mapa. Licencia de uso. Se retira Google híbrido.'],
+  ['1.11.0', '27/10/2026', 'Fotos con marca de agua: la app lee el texto de la marca (coordenadas, UTM, fecha, altitud), sitúa la foto y le vuelve a escribir los metadatos GPS. Las fotos hechas con la app llevan también GPS en sus metadatos. Compartir fotos con GPS.'],
+  ['1.10.0', '27/10/2026', 'Anchos del camino: datos cada X metros o en cada cambio de ancho, ancho medio, mínimo, máximo y superficie, también por tramos. Plataforma dibujada en el mapa. Trazas nuevas dibujando en el mapa o grabando con el GPS.'],
+  ['1.9.0', '25/10/2026', 'Control de versiones: número de versión visible, historial de novedades y versión en los paquetes de obra.'],
+  ['1.8.0', '25/10/2026', 'Obras: cada obra guarda sus capas y datos. Árbol de capas por carpetas. Paquete de obra (.zip) para exportar, compartir e importar en otro móvil.'],
+  ['1.7.0', '25/10/2026', 'Actuaciones en trazas (escolleras, badenes, cunetas…) por PK, margen y fotos. Listado y exportación a Excel (CSV) y KMZ.'],
+  ['1.6.0', '25/10/2026', 'Pendiente media y perfil longitudinal de una traza o un tramo (por PK o tocando el mapa). Cotas del KML o del MDT05 del IGN.'],
+  ['1.5.0', '25/10/2026', 'Marcas de PK cada 100 m en las trazas según el zoom. PK del punto tocado.'],
+  ['1.4.0', '23/10/2026', 'La app pasa a llamarse OBRA-GIS.'],
+  ['1.3.0', '23/10/2026', 'Catálogo de servicios públicos (DERA, REDIAM, MITECO, Catastro, SIGPAC), kit de afecciones y consulta de afecciones en un punto.'],
+  ['1.2.0', '22/10/2026', 'Fotos con GPS, gestor de capas con servicios WMS y versión nativa Android compilada en GitHub.'],
+  ['1.1.0', '22/10/2026', 'Abrir KML/KMZ compartidos desde otras apps.'],
+  ['1.0.0', '22/10/2026', 'Primera versión: visor de KML/KMZ sobre ortofoto, navegación con Google Maps, anotaciones con fotos, vídeo y voz.'],
+];
+
+const $ = (s, r = document) => r.querySelector(s);
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const NATIVE = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+const Plug = name => (window.Capacitor && window.Capacitor.Plugins ? window.Capacitor.Plugins[name] : null);
+
+const ICON = {
+  menu: '<svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>',
+  layers: '<svg viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>',
+  locate: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>',
+  photo: '<svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+  video: '<svg viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3z"/></svg>',
+  audio: '<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>',
+  note: '<svg viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 9h8M8 13h8M8 17h5"/></svg>',
+  plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
+  nav: '<svg viewBox="0 0 24 24"><path d="M3 11l18-8-8 18-2-8z"/></svg>',
+  close: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  dots: '<svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/></svg>',
+  swap: '<svg viewBox="0 0 24 24"><path d="M7 4v16M7 20l-3-3M7 20l3-3M17 20V4M17 4l-3 3M17 4l3 3"/></svg>',
+  info: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>',
+  calc: '<svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h2M12 12h2M8 16h2M12 16h2M16 12v4"/></svg>',
+  pin: '<svg viewBox="0 0 24 24"><path d="M12 21s-6-6-6-11a6 6 0 0 1 12 0c0 5-6 11-6 11z"/><circle cx="12" cy="10" r="2"/></svg>',
+  table: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 9h18M3 14h18M9 4v16"/></svg>',
+  width: '<svg viewBox="0 0 24 24"><path d="M5 3v18M19 3v18M8 12h8M8 12l2-2M8 12l2 2M16 12l-2-2M16 12l-2 2"/></svg>',
+  pen: '<svg viewBox="0 0 24 24"><path d="M4 20l4-1 11-11-3-3L5 16z"/></svg>',
+  road: '<svg viewBox="0 0 24 24"><path d="M8 3L4 21M16 3l4 18M12 4v3M12 10v3M12 16v3"/></svg>',
+  slope: '<svg viewBox="0 0 24 24"><path d="M3 19L21 7M3 19h18M15 19v-8"/></svg>',
+  ruler: '<svg viewBox="0 0 24 24"><path d="M3 17L17 3l4 4L7 21zM7 13l2 2M10 10l2 2M13 7l2 2"/></svg>',
+  copy: '<svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4H4v12h4"/></svg>',
+  gallery: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 16l5-5 4 4 3-3 6 6"/></svg>',
+  right: '<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>',
+  folder: '<svg viewBox="0 0 24 24"><path d="M3 6h6l2 2h10v11H3z"/></svg>',
+  up: '<svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg>',
+  down: '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>',
+  kml: '<svg viewBox="0 0 24 24"><path d="M3 18l6-8 4 5 3-3 5 6"/></svg>',
+  wms: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>',
+};

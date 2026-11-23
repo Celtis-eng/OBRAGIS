@@ -4,12 +4,12 @@ const fs = require('fs'), path = require('path');
 const JO = require('javascript-obfuscator');
 const dir = path.resolve(__dirname, process.argv[2] || 'www');
 const OPC = {
-  compact: true, renameGlobals: false, // las funciones globales se llaman entre app.js y ficha.js: se conservan sus nombres
+  compact: true, renameGlobals: false, // las funciones globales se llaman entre los módulos de js/ y ficha.js: se conservan sus nombres
   identifierNamesGenerator: 'hexadecimal', stringArray: true, stringArrayThreshold: 0.5, stringArrayEncoding: ['base64'],
   splitStrings: false, controlFlowFlattening: false, deadCodeInjection: false, selfDefending: false, // sin penalizar la velocidad en móviles modestos
   transformObjectKeys: false, unicodeEscapeSequence: false, sourceMap: false, target: 'browser'
 };
-for (const f of ['app.js', 'ficha.js']) {
+for (const f of ['ficha.js', ...(fs.existsSync(path.join(dir, 'js')) ? fs.readdirSync(path.join(dir, 'js')).filter(n => n.endsWith('.js')).map(n => 'js/' + n) : ['app.js'])]) {
   const p = path.join(dir, f); if (!fs.existsSync(p)) continue;
   const src = fs.readFileSync(p, 'utf8'), out = JO.obfuscate(src, OPC).getObfuscatedCode();
   fs.writeFileSync(p, '/* OBRA-GIS © Celtis-eng · Todos los derechos reservados. Prohibida su copia, modificación o distribución sin permiso. */\n' + out);

@@ -1,4 +1,4 @@
-// Prepara el proyecto Android de OBRA-GIS. La versión se toma de APP_VERSION en app.js.
+// Prepara el proyecto Android de OBRA-GIS. La versión se toma de APP_VERSION en js/01-version.js.
 //   node prepare.js www      → copia la web (carpeta raíz del repositorio) a www/
 //   node prepare.js android  → personaliza el proyecto generado por "npx cap add android"
 const fs = require('fs');
@@ -19,7 +19,7 @@ if (step === 'www') {
   const www = path.join(HERE, 'www');
   fs.rmSync(www, { recursive: true, force: true });
   fs.mkdirSync(www, { recursive: true });
-  for (const f of ['index.html', 'app.css', 'app.js', 'ficha.js', 'manifest.webmanifest', 'icons', 'vendor']) copy(path.join(ROOT, f), path.join(www, f));
+  for (const f of ['index.html', 'app.css', 'js', 'ficha.js', 'manifest.webmanifest', 'icons', 'vendor']) copy(path.join(ROOT, f), path.join(www, f));
   console.log('Web copiada a www/');
   // código ofuscado en el APK (protección frente a copias); si el paquete no está instalado se avisa y se sigue
   try { require.resolve('javascript-obfuscator'); require('child_process').execFileSync(process.execPath, [path.join(HERE, 'ofuscar.js'), www], { stdio: 'inherit' }); }
@@ -89,7 +89,7 @@ ${data(['image/*', ...kmlTypes, 'application/octet-stream'])}
   const run = parseInt(process.env.GITHUB_RUN_NUMBER || '1', 10);
   const bg = path.join(app, 'build.gradle');
   let g = fs.readFileSync(bg, 'utf8');
-  const m = /const APP_VERSION = '([^']+)'/.exec(fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8'));
+  const m = /const APP_VERSION = '([^']+)'/.exec(fs.readFileSync(path.join(ROOT, 'js', '01-version.js'), 'utf8'));
   const ver = m ? m[1] : '1.0.0';
   g = g.replace(/versionCode \d+/, `versionCode ${run}`).replace(/versionName "[^"]*"/, `versionName "${ver}"`);
   // 5. Firma SIEMPRE con android-build/debug.keystore. Sin esto, Gradle firmaba cada compilación con una clave nueva

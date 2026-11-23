@@ -48,7 +48,7 @@ La cámara, el GPS y el micrófono solo funcionan si la app se abre desde una di
 3. Ya tienes el icono de OBRA-GIS, y la app se abre a pantalla completa como cualquier otra.
 4. La primera vez acepta los permisos de ubicación, cámara y micrófono.
 
-Para actualizar la app, sube los ficheros nuevos al mismo sitio. Los móviles cogen la nueva versión al abrirla dos veces. Si cambias `app.js`, sube también el número de `SHELL = 'shell-v1'` en `sw.js`.
+Para actualizar la app, sube los ficheros nuevos al mismo sitio. Los móviles cogen la nueva versión al abrirla dos veces. Si cambias algo de `js/`, sube también el número de `SHELL = 'shell-v1'` en `sw.js`.
 
 ## Copias de seguridad
 
@@ -56,7 +56,11 @@ Los datos viven en el navegador del móvil. Si desinstalas la app o borras los d
 
 ## Archivos
 
-- `index.html`, `app.css`, `app.js`: la aplicación.
+- `index.html`, `app.css` y la carpeta `js/`: la aplicación, partida en módulos que se cargan en orden (ver `js/ORDEN.txt`):
+  `01-version.js` (versión y novedades), `02-base.js` (almacenamiento, avisos, fichas, borradores), `03-mapa.js` (mapa, KML, capas, PK),
+  `04-capas.js` (importar, OCR, consultas), `05-campo.js` (GPS, fotos, anotaciones), `06-pendiente.js`, `07-actuaciones.js`, `08-obras.js`
+  (paquete de obra), `09-herramientas.js` (anchos, trazas, calculadora, recursos, afecciones), `10-informes.js`, `11-tramo.js` (tramo andando,
+  Deshacer, puntuales, enviar a la oficina, dictado), `12-bc3.js`, `13-licencia.js` (licencia, KMZ, sin conexión), `14-panel.js` (menú) y `15-arranque.js`.
 - `ficha.js`: ficha de inspección de campo (lector de BC3, formulario y exportación).
 - `sw.js`: funcionamiento sin conexión y recepción de ficheros compartidos.
 - `manifest.webmanifest`, `icons/`: instalación como app.
