@@ -61,7 +61,8 @@ async function obrasSheet() {
       </div>`; }).join('')}</div>
     <h3 class="sh">Nueva obra</h3>
     <div class="field row"><input type="text" id="newObra" placeholder="Nombre (p. ej. Modernización regadío Cuevas del Campo)"><button class="mini" data-a="create">Crear</button></div>
-    <div class="acts"><button class="btn pri full" data-a="backup">Copia de seguridad de todas las obras</button><button class="btn full" data-a="import">${ICON.folder}Importar obra (paquete .zip)</button></div>
+    <div class="acts"><button class="btn pri full" data-a="backup">Copia de seguridad de todas las obras</button><button class="btn full" data-a="import">${ICON.folder}Importar obra o recuperar copia (.zip)</button></div>
+    ${abStatusHtml()}
     <p class="hint">${settings.lastBackup ? `Última copia: ${fmtDate(settings.lastBackup)}.` : '<b>Aún no has hecho ninguna copia de seguridad.</b>'} ${NATIVE ? 'Las copias se guardan en <b>Documentos › OBRA-GIS</b> y no se borran al desinstalar la app.' : 'Las copias se guardan en Descargas.'} Haz una antes de actualizar o desinstalar la app.</p>
     <p class="hint">«Exportar / compartir» crea un .zip con toda la obra: capas, KML originales, anotaciones, actuaciones, fotos, vídeos y notas de voz. Al abrir ese .zip en otro móvil con OBRA-GIS, la obra aparece completa.</p>`);
   b.querySelectorAll('[data-open]').forEach(bt => bt.onclick = () => loadObra(bt.dataset.open, true).then(() => toast(`Obra activa: ${obras.get(bt.dataset.open).name}`)));
@@ -90,11 +91,11 @@ async function obrasSheet() {
 const MIME_EXT = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', mp4: 'video/mp4', webm: 'video/webm', m4a: 'audio/mp4', ogg: 'audio/ogg' };
 async function exportObraPackage(id, opts = {}) {
   try { return await buildObraPackage(id, opts); }
-  catch (e) { console.error(e); toast('No se pudo exportar la obra: ' + (e.message || e), 8000); return null; }
+  catch (e) { console.error(e); if (opts.silent) throw e; toast('No se pudo exportar la obra: ' + (e.message || e), 8000); return null; }
 }
 async function buildObraPackage(id, opts = {}) {
   const o = obras.get(id); if (!o) return;
-  toast('Preparando el paquete de la obra…', 15000);
+  if (!opts.blobOnly || !opts.silent) toast('Preparando el paquete de la obra…', 15000);
   const [L0, N0, A0] = await Promise.all([DB.all('layers'), DB.all('notes'), DB.all('acts')]);
   const lays = L0.filter(x => x.obraId === id), nts = N0.filter(x => x.obraId === id), ats = A0.filter(x => x.obraId === id);
   const zip = new JSZip(), root = `OBRA-GIS_${safeName(o.name)}`, Z = zip.folder(root);

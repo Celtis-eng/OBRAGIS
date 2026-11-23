@@ -305,7 +305,7 @@ function renderActEditor() {
       + (actDraft.d1 <= actDraft.d0 && actItem(actDraft.type).fields.some(k => ['w', 'b', 'S', 'h'].includes(k)) ? '<p class="hint">Actuación puntual: indica el PK final o la longitud para calcular superficie y volumen.</p>' : r.length ? '' : '<p class="hint">Rellena los datos para ver las mediciones.</p>'); };
   meas();
   addDictation($('#aText'));
-  b.querySelectorAll('[data-pf]').forEach(inp => inp.oninput = () => { if (inp.dataset.pf === 'w') delete actDraft.params._wAuto; inp.classList.remove('need'); fieldErr(inp, actFieldError(inp.dataset.pf, inp.value)); meas(); });
+  b.querySelectorAll('[data-pf]').forEach(inp => inp.oninput = () => { if (inp.dataset.pf === 'w') delete actDraft.params._wAuto; inp.classList.remove('need'); { const nd = $('#need_' + inp.id); if (nd) nd.remove(); } fieldErr(inp, actFieldError(inp.dataset.pf, inp.value)); meas(); });
   if (f) showSlopeSegment(f, Math.min(a.d0, a.d1), Math.max(a.d0, a.d1));
   onSheetClose(() => setTimeout(() => { if (!actPick && ($('#sheet').hidden || !$('#aText'))) { slopeHL.clearLayers(); if (!$('#aText')) actDraft = actPick ? actDraft : null; } }, 0));
   const setPK = (which, d) => { syncAct(); pkRule(which, Math.max(0, Math.min(f ? f.length : d, d))); if (actDraft.params._wAuto) delete actDraft.params.w; renderActEditor(); };
@@ -319,15 +319,15 @@ function renderActEditor() {
   b.querySelectorAll('[data-prio]').forEach(bt => bt.onclick = () => { syncAct(); actDraft.prio = bt.dataset.prio; renderActEditor(); });
   b.querySelectorAll('[data-side]').forEach(bt => bt.onclick = () => { syncAct(); actDraft.side = bt.dataset.side; actDraft._sideSet = true; renderActEditor(); });
   ['aPk0', 'aPk1'].forEach(id => { const el = $('#' + id);
-    el.oninput = () => { const v = parsePK(el.value); let t = el.value !== el.dataset.v ? pkReadBack(el.value) : '';
+    el.oninput = () => { const v = parsePK(el.value); if (isFinite(v) || !el.value.trim()) fieldErr(el, ''); let t = el.value !== el.dataset.v ? pkReadBack(el.value) : '';
       if (f && isFinite(v) && v > f.length + 0.5) t = `⚠ Pasa del final de la traza (${fmtPK(f.length)})`; // aviso al escribir, no solo al guardar
       $('#' + id + 'rb').textContent = t; el.classList.toggle('bad', t.startsWith('⚠')); };
     // sin volver a dibujar la ficha: así no se pierde el toque en «Guardar» justo después de escribir el PK
     el.onchange = () => { if (!isFinite(parsePK(el.value))) { $('#' + id + 'rb').textContent = pkReadBack(el.value); return; }
-      const p0 = actDraft.d0, p1 = actDraft.d1, which = id === 'aPk0' ? 'd0' : 'd1'; syncAct();
-      if (p1 > p0 && ((which === 'd1' && actDraft.d1 < p0) || (which === 'd0' && actDraft.d0 > p1))) { // escrito al revés: la misma regla que «Aquí» y «Mapa» (no se pierden metros)
-        const v = actDraft[which]; actDraft.d0 = p0; actDraft.d1 = p1; pkRule(which, v);
-        ['d0', 'd1'].forEach((k, i) => { const e2 = $(i ? '#aPk1' : '#aPk0'); e2.value = fmtPK(actDraft[k]); e2.dataset.v = e2.value; $(i ? '#aPk1rb' : '#aPk0rb').textContent = ''; e2.classList.remove('bad'); }); }
+      syncAct(); el.value = fmtPK(actDraft[id === 'aPk0' ? 'd0' : 'd1']); // escrito a mano: se respeta tal cual (para mover un tramo se escriben los dos PK en cualquier orden)
+      const inv = actDraft.d1 < actDraft.d0 - 0.01, other = id === 'aPk0' ? 'aPk1' : 'aPk0';
+      $('#' + other + 'rb').textContent = inv ? `⚠ «Desde» queda después de «Hasta»: escribe también este PK` : ''; $('#' + other).classList.toggle('bad', inv);
+      if (!inv) $('#' + id + 'rb').textContent = '';
       refreshActInline(); }; });
   const refreshActInline = () => {
     const d = actDraft; if (!d) return;
@@ -409,7 +409,14 @@ async function saveAct() {
   if (a.type === 'Otro') a.type = (a.custom || '').trim() || 'Otro';
   if (!a.type) { toast('Elige el tipo de actuación.'); return; }
   for (const inp of document.querySelectorAll('[data-pf]')) { const er = actFieldError(inp.dataset.pf, inp.value); if (er) { fieldErr(inp, er); inp.focus(); inp.scrollIntoView({ block: 'center' }); return; } }
+  for (const [id, k] of [['aPk0', 'd0'], ['aPk1', 'd1']]) { const el = $('#' + id); // PK mal escrito: no se guarda el anterior en silencio
+    if (el && el.value.trim() !== fmtPK(a[k]) && !isFinite(parsePK(el.value))) { fieldErr(el, 'PK no válido: escribe por ejemplo 1+250'); el.focus(); el.scrollIntoView({ block: 'center' }); return; } }
   if (!isFinite(a.d0) || !isFinite(a.d1)) { toast('Revisa los PK: escribe por ejemplo 1+250.'); return; }
+  if (a.d1 < a.d0 - 0.01 && $('#aText') && a._swapOk !== a.d0 + '|' + a.d1) { // PK escritos al revés: se pregunta (antes se daban la vuelta en silencio)
+    let w = $('#invWarn'); if (!w) { $('#sheetBody .savebar').insertAdjacentHTML('afterbegin', '<div class="fwarn" id="invWarn" role="alert"></div>'); w = $('#invWarn'); }
+    w.innerHTML = `<b>«Desde PK» (${fmtPK(a.d0)}) va después de «Hasta PK» (${fmtPK(a.d1)})</b>. Corrige uno de los dos arriba o:<div class="row"><button type="button" class="mini" data-a="saveinv">Guardar de ${fmtPK(a.d1)} a ${fmtPK(a.d0)} (${fmtLen(a.d0 - a.d1)})</button></div>`;
+    const t0 = Date.now(); w.querySelector('[data-a=saveinv]').onclick = () => { if (Date.now() - t0 < 600 || !actDraft) return; actDraft._swapOk = actDraft.d0 + '|' + actDraft.d1; saveAct(); };
+    return; }
   if (a.d1 < a.d0) [a.d0, a.d1] = [a.d1, a.d0];
   const ctx = featOf(a);
   if (ctx && ctx.f) {
@@ -432,7 +439,7 @@ async function saveAct() {
       w.innerHTML = `<b>Sin medidas</b>: no saldrá superficie ni volumen. Escribe ${mf.map(k => ACT_FIELDS[k].l.toLowerCase()).join(' / ')} o:<div class="row"><button type="button" class="mini" data-a="savenm">Guardar sin medidas</button></div>`;
       const t0 = Date.now(); w.querySelector('[data-a=savenm]').onclick = () => { if (Date.now() - t0 < 600 || !actDraft) return; actDraft._noMeasOk = true; saveAct(); };
       return; } }
-  const cont = a._cont, fromSplit = a._split, noMeasUsed = a._noMeasOk === true || !!a._noMeasChain; delete a._cont; delete a._split; delete a._noMeasChain; delete a._dir; delete a._noMeasOk; delete a._zeroWarn; delete a._zeroOk; delete a._moreOpen; delete a._init; delete a._walk; if (a.params) { delete a.params._wAuto; Object.keys(a.params).forEach(k => { if (a.params[k] === null || a.params[k] === '') delete a.params[k]; }); }
+  const cont = a._cont, fromSplit = a._split, noMeasUsed = a._noMeasOk === true || !!a._noMeasChain; delete a._cont; delete a._split; delete a._noMeasChain; delete a._dir; delete a._noMeasOk; delete a._zeroWarn; delete a._zeroOk; delete a._swapOk; delete a._moreOpen; delete a._init; delete a._walk; if (a.params) { delete a.params._wAuto; Object.keys(a.params).forEach(k => { if (a.params[k] === null || a.params[k] === '') delete a.params[k]; }); }
   a.updated = Date.now();
   hideUndo(); // solo cuando de verdad se guarda (un toque fallido no borra el «Deshacer»)
   try { await DB.put('acts', a); } catch (e) { toast('No se pudo guardar: ' + (e.message || 'almacenamiento lleno'), 7000); return; }

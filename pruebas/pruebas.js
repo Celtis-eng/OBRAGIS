@@ -4,6 +4,7 @@
 const { abrir, ok, resumen, DATOS } = require('./entorno.js');
 const { leerBC3 } = require('./bc3check.js');
 const esperar = ms => new Promise(r => setTimeout(r, ms));
+const fs = require('fs'), path = require('path');
 
 async function pkYNumeros() {
   const { browser, page: p, errores } = await abrir();
@@ -468,6 +469,7 @@ async function ronda9() {
 async function ronda10() {
   const { browser, ctx, page: p, errores } = await abrir({ tactil: true, ancho: 400, alto: 820, geo: { latitude: 37.61, longitude: -2.93 } });
   ok('Primer uso sin plano: el mapa dice qué hacer', await p.evaluate(() => !!$('#mapEmpty') && !$('#mapEmpty').hidden && /plano/.test($('#mapEmpty').textContent)));
+  ok('El aviso sin plano deja pasar los toques al mapa', await p.evaluate(() => { const r = $('#mapEmpty p').getBoundingClientRect(), t = document.elementFromPoint(r.x + r.width / 2, r.y + 4); return !!t && !$('#mapEmpty').contains(t); }));
   await p.setInputFiles('#inKml', [DATOS + 'pendientes_rangos.kml']); await esperar(600);
   ok('Con plano cargado el aviso desaparece', await p.evaluate(() => $('#mapEmpty').hidden));
   const enPK = d => p.evaluate(d => { const f = [...layers.values()][0].feats[0], q = pointAtPK(f, d); return { latitude: q.lat + 0.00002, longitude: q.lng }; }, d);
@@ -486,10 +488,19 @@ async function ronda10() {
   const pt = await p.evaluate(() => { const f = [...layers.values()][0].feats[0], q = pointAtPK(f, 780); map.setView([q.lat, q.lng], 17, { animate: false }); const c = map.latLngToContainerPoint([q.lat, q.lng]), r = $('#map').getBoundingClientRect(); return { x: r.left + c.x, y: r.top + c.y }; }); await esperar(400);
   await p.touchscreen.tap(pt.x, pt.y); await esperar(800);
   ok('Hacia atrás, «Mapa» en «Hasta PK»: tramo 780–900 (no se pierden metros)', await p.evaluate(() => actDraft && Math.abs(actDraft.d0 - 780) < 3 && Math.round(actDraft.d1) === 900), await p.evaluate(() => actDraft && [actDraft.d0, actDraft.d1]));
-  // M10-2: escribir «0+780» en «Hasta PK» hace lo mismo
+  // M10-2 / A11-1: lo escrito a mano se respeta; si queda al revés se avisa en el otro PK y al guardar se pregunta
   await atras();
   await p.fill('#aPk1', '0+780'); await p.press('#aPk1', 'Tab'); await esperar(300);
-  ok('Hacia atrás, PK escrito en «Hasta»: tramo 780–900', await p.evaluate(() => actDraft && Math.round(actDraft.d0) === 780 && Math.round(actDraft.d1) === 900 && $('#aPk0').value === '0+780' && $('#aPk1').value === '0+900'), await p.evaluate(() => actDraft && [actDraft.d0, actDraft.d1, $('#aPk0').value, $('#aPk1').value]));
+  ok('PK escrito al revés: aviso en el otro PK, sin dar la vuelta en silencio', await p.evaluate(() => actDraft && Math.round(actDraft.d0) === 800 && Math.round(actDraft.d1) === 780 && /Desde/.test($('#aPk0rb').textContent)), await p.evaluate(() => actDraft && [actDraft.d0, actDraft.d1, $('#aPk0rb').textContent]));
+  await p.evaluate(() => { actDraft.params.w = 1; }); await p.click('#sheetBody [data-a=save]'); await esperar(500);
+  ok('Guardar con PK al revés pregunta (no guarda solo)', await p.evaluate(() => !!$('#invWarn') && /0\+780 a 0\+800/.test($('#invWarn').textContent)), await p.evaluate(() => ($('#invWarn') || {}).textContent));
+  await p.fill('#aPk0', '0+780'); await p.press('#aPk0', 'Tab'); await p.fill('#aPk1', '0+900'); await p.press('#aPk1', 'Tab'); await esperar(300);
+  ok('Escribiendo los dos PK queda 780–900 sin aviso', await p.evaluate(() => Math.round(actDraft.d0) === 780 && Math.round(actDraft.d1) === 900 && !$('#aPk0').classList.contains('bad') && !$('#aPk1').classList.contains('bad')), await p.evaluate(() => [actDraft.d0, actDraft.d1]));
+  // A11-1: mover un tramo escribiendo «Desde» y luego «Hasta» (orden natural)
+  await p.evaluate(async () => { closeSheet(); const e = [...layers.values()][0]; openActEditor({ rec: e.rec, f: e.feats[0], d0: 250, d1: 450, type: 'Zahorra artificial' }); }); await esperar(500);
+  await p.fill('#aPk0', '600'); await p.press('#aPk0', 'Tab'); await p.fill('#aPk1', '700'); await p.press('#aPk1', 'Tab'); await esperar(300);
+  ok('Escribiendo «Desde» 600 y «Hasta» 700 el tramo queda 600–700', await p.evaluate(() => Math.round(actDraft.d0) === 600 && Math.round(actDraft.d1) === 700 && $('#aPk1').value === '0+700' && !$('#aPk0').classList.contains('bad')), await p.evaluate(() => [actDraft.d0, actDraft.d1, $('#aPk1').value]));
+  await p.evaluate(() => { closeSheet(); }); await esperar(300);
   // M10-5: «Guardar sin medidas» + «Guardar y seguir andando» → Deshacer conserva la cadena «sin medidas»
   await atras('Desbroce de márgenes'); await p.evaluate(() => { const w = $('#pf_w'); if (w) w.value = ''; });
   await p.click('#sheetBody [data-a=savecont]'); await esperar(900);
@@ -497,9 +508,10 @@ async function ronda10() {
   await p.click('#undoBar .mini'); await esperar(800);
   ok('Deshacer del editor mantiene la cadena «sin medidas»', await p.evaluate(() => !!walkAct && walkAct.draft._noMeasChain === true), await p.evaluate(() => walkAct && walkAct.draft._noMeasChain));
   // P10-2 y M10-4: andando, el «+» no ofrece «Desde donde acabó» y baja a su sitio sobre el pie «Cerrar»
-  await esperar(1600); await p.click('#fabNote'); await esperar(1200);
-  const pl = await p.evaluate(() => { const r = $('#fabNote').getBoundingClientRect(), u = document.elementsFromPoint(r.x + r.width / 2, r.y + r.height / 2).find(e => e.closest && e.closest('#sheetBody'));
-    return { rep: !!$('#sheetBody [data-a=rep]'), bajo: u ? (u.closest('.plusfoot') ? 'pie' : (u.textContent || '').trim().slice(0, 30)) : 'nada' }; });
+  await esperar(1600); const r0 = await p.evaluate(() => { const r = $('#fabNote').getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; }); // donde está el dedo ANTES de abrir la ficha
+  await p.click('#fabNote'); await esperar(1200);
+  const pl = await p.evaluate(r => { const u = document.elementsFromPoint(r.x + r.width / 2, r.y + r.height / 2).find(e => e.closest && e.closest('#sheetBody'));
+    return { rep: !!$('#sheetBody [data-a=rep]'), bajo: u ? (u.closest('.plusfoot') ? 'pie' : (u.textContent || '').trim().slice(0, 30)) : 'nada' }; }, r0);
   ok('Andando, el «+» no ofrece «Desde donde acabó»', !pl.rep, JSON.stringify(pl));
   ok('Andando, bajo el «+» queda el pie «Cerrar» (o nada)', pl.bajo === 'pie' || pl.bajo === 'nada', JSON.stringify(pl));
   // M10-3: al llegar al final de la traza con «Guardar y seguir», el «Deshacer» dice «Fin del camino»
@@ -510,8 +522,46 @@ async function ronda10() {
   // P7-3: «Enviar a la oficina» la primera vez no muestra una casilla desactivada
   await p.evaluate(() => { hideUndo(); closeSheet(); sendToOffice(); }); await esperar(500);
   ok('Primer envío: sin casilla desactivada', await p.evaluate(() => !!$('#sheetBody [data-a=go]') && !$('#soSince')));
+  // M11-5: PK mal escrito + «Guardar» avisa junto al campo y no guarda
+  await p.evaluate(() => { closeSheet(); const e = [...layers.values()][0]; openActEditor({ rec: e.rec, f: e.feats[0], d0: 300, d1: 400, type: 'Zahorra artificial' }); }); await esperar(500);
+  await p.fill('#aPk1', 'abc'); await p.click('#sheetBody [data-a=save]'); await esperar(400);
+  ok('PK no válido: aviso junto al campo y no se guarda', await p.evaluate(() => /PK no válido/.test(($('#ferr_aPk1') || {}).textContent || '') && $('#aPk1').getAttribute('aria-invalid') === 'true' && !!$('#aText')));
+  await p.evaluate(() => closeSheet());
   ok('Sin errores JS', !errores.length, errores.join(' | '));
   await browser.close();
+}
+
+async function copiaAutomatica() {
+  const { browser, page: p, errores } = await abrir({ ancho: 400, alto: 820 });
+  // Filesystem simulado (como en el móvil): guarda los ficheros en memoria
+  await p.evaluate(() => { window.__abTest = true; const F = window.__fs = {};
+    window.Capacitor = { Plugins: { Filesystem: {
+      writeFile: async ({ path, data }) => { F[path] = data; }, appendFile: async ({ path, data }) => { F[path] += data; },
+      getUri: async ({ path }) => ({ uri: 'file:///Documents/' + path }), deleteFile: async ({ path }) => { if (!(path in F)) throw new Error('no existe'); delete F[path]; },
+      rename: async ({ from, to }) => { if (!(from in F)) throw new Error('no existe'); F[to] = F[from]; delete F[from]; } } } }; });
+  await p.setInputFiles('#inKml', [DATOS + 'pendientes_rangos.kml']); await esperar(600);
+  await p.evaluate(async () => { const e = [...layers.values()][0], f = e.feats[0];
+    const a = { id: uid(), obraId: settings.activeObra, layerId: e.rec.id, featIdx: 0, traceName: f.name, layerName: e.rec.name, d0: 100, d1: 250, type: 'Limpieza de cunetas', side: 'ambos', text: 'copia', media: [], created: Date.now(), coords: segmentCoords(f, 100, 250), params: {}, prio: '' };
+    await DB.put('acts', a); acts.set(a.id, a); });
+  ok('Un cambio marca la obra para la copia automática', await p.evaluate(() => (settings.abDirty || []).includes(settings.activeObra)));
+  const r1 = await p.evaluate(async () => { const ok = await autoBackup(true); return { ok, files: Object.keys(window.__fs), dirty: settings.abDirty }; });
+  ok('Copia automática escrita en Documentos › OBRA-GIS › Copia automática (sin .tmp) y obra ya copiada', r1.ok && r1.files.length === 1 && /^OBRA-GIS\/Copia automática\/OBRA-GIS_.*\.zip$/.test(r1.files[0]) && !r1.dirty.length, JSON.stringify(r1));
+  ok('Sin cambios no se repite la copia', await p.evaluate(async () => (await autoBackup(true)) === false));
+  await p.evaluate(async () => { const a = [...acts.values()][0]; a.text = 'cambio'; await DB.put('acts', a); await autoBackup(true); });
+  const fs2 = await p.evaluate(() => Object.keys(window.__fs).sort());
+  ok('Segunda copia: se conserva la anterior', fs2.length === 2 && fs2.some(x => /_anterior\.zip$/.test(x)), JSON.stringify(fs2));
+  const b64 = await p.evaluate(() => window.__fs[Object.keys(window.__fs).find(x => !/_anterior/.test(x))]);
+  ok('El estado de la copia sale en «Obras»', await p.evaluate(async () => { await obrasSheet(); return /Copia automática activada/.test($('#sheetBody').textContent); }));
+  ok('Sin errores JS', !errores.length, errores.join(' | '));
+  await browser.close();
+  // Reinstalación: app vacía → «Recuperar mis obras» → se elige el .zip → la obra vuelve con su actuación
+  const zipPath = path.join(__dirname, 'capturas', 'copia_auto.zip'); fs.mkdirSync(path.dirname(zipPath), { recursive: true }); fs.writeFileSync(zipPath, Buffer.from(b64, 'base64'));
+  const n = await abrir({ ancho: 400, alto: 820 });
+  ok('Tras reinstalar, el mapa vacío ofrece recuperar las obras', await n.page.evaluate(() => !$('#mapEmpty').hidden && !!$('#mapEmpty [data-a=restore]')));
+  await n.page.setInputFiles('#inObra', [zipPath]); await esperar(2500);
+  ok('Obra recuperada desde la copia automática', await n.page.evaluate(async () => (await DB.all('acts')).some(a => a.text === 'cambio')));
+  ok('Sin errores JS', !n.errores.length, n.errores.join(' | '));
+  await n.browser.close();
 }
 
 async function modoSencillo() {
@@ -526,7 +576,7 @@ async function modoSencillo() {
 }
 
 (async () => {
-  for (const t of [pkYNumeros, geometriaYPendientes, actuacionesYBorradores, tramoAndandoYRepetir, bc3, paqueteYEnvio, toquesYBarras, borradoresYDictado, ronda4, ronda5, ronda6, ronda7, ronda8, ronda9, ronda10, modoSencillo]) {
+  for (const t of [pkYNumeros, geometriaYPendientes, actuacionesYBorradores, tramoAndandoYRepetir, bc3, paqueteYEnvio, toquesYBarras, borradoresYDictado, ronda4, ronda5, ronda6, ronda7, ronda8, ronda9, ronda10, copiaAutomatica, modoSencillo]) {
     console.log(`\n— ${t.name}`);
     try { await t(); } catch (e) { ok(t.name + ' terminó sin excepciones', false, e.message.split('\n')[0]); }
   }

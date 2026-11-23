@@ -126,8 +126,12 @@ async function walkEnd(split) {
     if (ok) showUndo(`Guardado: ${d.type} ${fmtPK(d.d0)}–${fmtPK(d.d1)}${walkAct ? '. Sigue el siguiente tramo.' : '. Fin del camino: no hay más tramo que seguir.'}`, async () => { if (d.obraId !== settings.activeObra) { toast('Ese tramo es de otra obra.'); return; } await DB.del('acts', d.id); acts.delete(d.id); drawActs(); walkAct = { ...prev, shown: Date.now() }; await DB.put('kv', walkAct, 'walk'); showWalkBar(); keepAwake(true); });
     return; }
   d._walk = true; d._dir = endAt < startAt ? -1 : 1; actDraft = d; renderActEditor(); sheetOpenAt = Date.now() + 1150; // 1,5 s sin toques: el dedo que pulsó «Terminar» está sobre «Guardar»
-  setTimeout(() => { const pr = $('#sheetBody .pkrow'); if (pr) pr.scrollIntoView({ block: 'start' }); // PK arriba (bajo la ✕, sin quedar debajo de ella) y las medidas justo debajo
-    const it = actItem(d.type), f0 = it.fields.find(k => !(d.params && d.params[k] > 0)), el = f0 && $('#pf_' + f0); if (el && it.fields.some(k => ['w', 'e', 'h', 'b', 'S'].includes(k))) el.classList.add('need'); }, 300);
+  setTimeout(() => { // se ve el tipo, los PK y, si cabe, la medida que falta (sin quedar nada bajo la ✕)
+    const ty = $('#aType') && $('#aType').closest('.field'), pr = $('#sheetBody .pkrow'), sb = $('#sheetBody .savebar');
+    if (ty) ty.scrollIntoView({ block: 'start' });
+    if (pr && sb && pr.getBoundingClientRect().bottom > sb.getBoundingClientRect().top - 8) pr.scrollIntoView({ block: 'start' }); // pantalla pequeña: primero los PK
+    const it = actItem(d.type), f0 = it.fields.find(k => !(d.params && d.params[k] > 0)), el = f0 && $('#pf_' + f0);
+    if (el && it.fields.some(k => ['w', 'e', 'h', 'b', 'S'].includes(k))) { el.classList.add('need'); el.insertAdjacentHTML('afterend', `<small class="fneed" id="need_${el.id}">Falta: escribe ${esc(ACT_FIELDS[f0].l.toLowerCase())}</small>`); } }, 300);
 }
 // «Repetir la última»: misma actuación, margen y datos, empezando donde terminó la anterior
 function lastAct() { return [...acts.values()].filter(a => a.obraId === settings.activeObra).sort((a, b) => (b.updated || b.created) - (a.updated || a.created))[0] || null; }
@@ -207,7 +211,9 @@ function welcomeSheet() {
       <li><b>Al terminar</b>, pulsa el botón naranja <b>+</b> o el <b>menú</b> (arriba a la izquierda) y elige <b>«Enviar a la oficina»</b>.</li></ol>
     <p><b>¿Cómo vas a usar la app?</b></p>
     <div class="acts"><button class="btn go full" data-r="simple">Apuntar en campo (modo sencillo, letra grande)</button><button class="btn pri full" data-r="full">Técnico: todas las herramientas</button></div>
-    <p class="hint">Se puede cambiar cuando quieras en el menú (arriba a la izquierda) → Ajustes.</p>`);
+    <p class="hint">Se puede cambiar cuando quieras en el menú (arriba a la izquierda) → Ajustes.</p>
+    <p class="hint">¿Has reinstalado la app? <button type="button" class="linkbtn" data-a="restore">Recuperar mis obras de la copia</button> (Documentos › OBRA-GIS).</p>`);
+  b.querySelector('[data-a=restore]').onclick = () => { if (!settings.welcomed) { settings.welcomed = true; saveSettings(); } closeSheet(); restoreFromBackup(); };
   b.querySelectorAll('[data-r]').forEach(bt => bt.onclick = () => { settings.simple = bt.dataset.r === 'simple'; settings.welcomed = true; saveSettings(); applySimple(); closeSheet(); });
   onSheetClose(() => { if (!settings.welcomed) { settings.welcomed = true; saveSettings(); } });
 }

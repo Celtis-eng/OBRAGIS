@@ -34,7 +34,7 @@ Banco de ideas aparcadas para rescatarlas cuando toque. **Ahora la prioridad es 
 - MultiGeometry con huecos: los tramos no deben cruzar el hueco. (Marta MAR-15)
 - Avisar de elementos omitidos al importar un KML con geometrías no válidas. (Marta MAR-13)
 
-## Protección y distribución (versión 1.19.0)
+## Protección y distribución (versión 1.20.0; la 1.19.0 fue la copia automática)
 
 - Repositorio privado y retirar o restringir la versión web pública.
 - Activación con código personal por usuario, comprobada en un servidor gratuito (Cloudflare Workers), con baja individual y periodo sin conexión.
@@ -48,3 +48,8 @@ Banco de ideas aparcadas para rescatarlas cuando toque. **Ahora la prioridad es 
 - APK firmado con clave estable (actualizar sin desinstalar).
 - Vibración y pantalla encendida durante el tramo.
 - Rendimiento con obras grandes y GPS real (Lucía notó una espera de 20 s tras estar quieto en la emulación).
+
+## Copia de seguridad (después de 1.19.0)
+
+- Copia también en la nube (Google Drive) con un toque, por si se pierde o se rompe el móvil.
+- Recuperación automática sin elegir ficheros tras reinstalar (Android no deja leer los ficheros de la instalación anterior sin permisos especiales).

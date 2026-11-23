@@ -1,6 +1,6 @@
 {
-  "version": "1.18.9",
+  "version": "1.19.0",
   "fecha": "2026-11-23",
   "apk": "https://github.com/Celtis-eng/OBRAGIS/releases/download/apk/CampoKML.apk",
-  "notas": "Depuración: los PK de Desde/Hasta ya no recortan tramos, editor más claro tras Terminar, avisos junto al campo y aviso para abrir el plano."
+  "notas": "Copia automática de las obras en Documentos (no se pierden al desinstalar) y recuperación tras reinstalar. Más fiable al escribir PK."
 }

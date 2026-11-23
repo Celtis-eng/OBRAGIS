@@ -60,7 +60,7 @@ Los datos viven en el navegador del móvil. Si desinstalas la app o borras los d
   `01-version.js` (versión y novedades), `02-base.js` (almacenamiento, avisos, fichas, borradores), `03-mapa.js` (mapa, KML, capas, PK),
   `04-capas.js` (importar, OCR, consultas), `05-campo.js` (GPS, fotos, anotaciones), `06-pendiente.js`, `07-actuaciones.js`, `08-obras.js`
   (paquete de obra), `09-herramientas.js` (anchos, trazas, calculadora, recursos, afecciones), `10-informes.js`, `11-tramo.js` (tramo andando,
-  Deshacer, puntuales, enviar a la oficina, dictado), `12-bc3.js`, `13-licencia.js` (licencia, KMZ, sin conexión), `14-panel.js` (menú) y `15-arranque.js`.
+  Deshacer, puntuales, enviar a la oficina, dictado), `12-bc3.js`, `13-licencia.js` (licencia, KMZ, sin conexión), `14-panel.js` (menú) `15-arranque.js` y `16-copia.js` (copia automática de las obras en Documentos y recuperación tras reinstalar).
 - `ficha.js`: ficha de inspección de campo (lector de BC3, formulario y exportación).
 - `sw.js`: funcionamiento sin conexión y recepción de ficheros compartidos.
 - `manifest.webmanifest`, `icons/`: instalación como app.

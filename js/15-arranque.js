@@ -12,7 +12,8 @@ $('#scrim').onclick = closeDrawer;
 $('#sheetX').onclick = closeSheet;
 $('#btnImport').onclick = importMenu;
 $('#inKml').addEventListener('change', e => { const f = Array.from(e.target.files || []); e.target.value = ''; if (f.length) importFiles(f); });
-$('#inObra').addEventListener('change', async e => { const f = (e.target.files || [])[0]; e.target.value = ''; if (f) { const z = await isObraPackage(f); z ? importObraPackage(f, z) : fichaImportFiles([f]); } });
+$('#inObra').addEventListener('change', async e => { const fs = [...(e.target.files || [])]; e.target.value = ''; // varios .zip a la vez (recuperar todas las obras de la copia)
+  for (const f of fs) { if (/\.tmp$/i.test(f.name)) continue; const z = await isObraPackage(f); z ? await importObraPackage(f, z) : await fichaImportFiles([f]); } });
 $('#btnObra').onclick = obrasSheet;
 $('#inPhotosImport').addEventListener('change', e => { const f = Array.from(e.target.files || []); e.target.value = ''; if (f.length) importPhotos(f); });
 $('#fabLocate').onclick = locate;
@@ -173,8 +174,8 @@ function nativeInbox() { // app nativa: «Abrir con» y «Compartir»
 
 // Primer uso: sin ningún plano cargado el mapa no queda en negro sin decir qué hacer
 (() => { const box = document.createElement('div'); box.id = 'mapEmpty'; box.hidden = true;
-  box.innerHTML = '<p><b>Aún no hay ningún plano.</b><br>Abre el plano del camino (KML o KMZ) para empezar.</p><button class="btn pri" type="button">Abrir plano</button>';
-  $('#map').appendChild(box); box.querySelector('button').onclick = () => importMenu();
-  L.DomEvent.disableClickPropagation(box);
+  box.innerHTML = '<p><b>Aún no hay ningún plano.</b><br>Abre el plano del camino (KML o KMZ) para empezar.</p><button class="btn pri" type="button">Abrir plano</button><button class="linkbtn" type="button" data-a="restore">¿Has reinstalado la app? Recuperar mis obras</button>';
+  $('#map').appendChild(box); box.querySelector('button').onclick = () => importMenu(); box.querySelector('[data-a=restore]').onclick = () => restoreFromBackup();
+  box.querySelectorAll('button').forEach(x => L.DomEvent.disableClickPropagation(x)); // el resto del aviso deja pasar los toques al mapa
   let t; const upd = () => { clearTimeout(t); t = setTimeout(() => { box.hidden = layers.size > 0 || notes.size > 0; }, 150); };
   map.on('layeradd layerremove', upd); upd(); })();
