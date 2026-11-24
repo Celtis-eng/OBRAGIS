@@ -112,21 +112,33 @@ async function abObraDeleted(o) {
     await FS.rename({ from: p + '.tmp', to: p + '.zip', directory: D });
   } catch (e) { console.warn('Lista de obras eliminadas', e); }
 }
-// Recuperar tras reinstalar: se eligen uno o varios .zip (de la copia automática o de una copia manual)
-// Varios .zip a la vez (la carpeta entera): se agrupan por obra y se queda la copia más reciente de cada una
-// (antes el «_anterior» podía pisar a la buena y volvían nombres viejos).
-async function importManyPackages(files) {
-  const pk = [], del = { ...(settings.obraDel || {}) };
-  for (const f of files) {
+// Importar lo que sea, todo junto: paquetes de obra (también varios, y los que vienen dentro de otro .zip, como una
+// carpeta descargada de Drive), la lista de obras eliminadas, y lo demás (KML/KMZ, fotos, BC3, previos) a su sitio.
+// Varios paquetes de la misma obra (la carpeta de la copia): se queda el más reciente de cada una.
+async function importAll(files) {
+  const pk = [], otros = [], danados = [], del = { ...(settings.obraDel || {}) }; const cola = [...files]; let nz = 0;
+  if (files.length > 3) toast(`Leyendo ${files.length} ficheros…`, 20000);
+  while (cola.length) {
+    const f = cola.shift();
+    if (/(^|\/)\.|__MACOSX|(^|\/)(Thumbs\.db|desktop\.ini)$/i.test(f.webkitRelativePath || f.name)) continue; // ficheros ocultos del sistema
     if (/^OBRA-GIS_obras_eliminadas/i.test(f.name)) { // lista de obras eliminadas (de esta instalación o de otra anterior)
       try { const j = JSON.parse(await (await JSZip.loadAsync(f)).file('obras_eliminadas.json').async('string'));
         for (const [k, t] of Object.entries(j.eliminadas || {})) if (typeof t === 'number' && !(del[k] >= t)) del[k] = t; } catch (e) { /* no sirve: se ignora */ }
       continue; }
-    const z = await isObraPackage(f);
-    if (!z && /\.(zip|tmp)$/i.test(f.name)) { toast(`«${f.name}» está dañado o incompleto y no se ha importado.`, 7000); await new Promise(r => setTimeout(r, 1500)); continue; }
-    if (!z) { await fichaImportFiles([f]); continue; }
-    let m = null; try { m = JSON.parse(await z.file(/(^|\/)obra\.json$/)[0].async('string')); } catch (e) { /* lo dirá la importación */ }
-    pk.push({ f, z, id: m && m.obra && m.obra.id, t: Date.parse(m && m.exportado) || f.lastModified || 0 }); }
+    if (!(/\.(zip|tmp)$/i.test(f.name) || /zip/.test(f.type))) { otros.push(f); continue; }
+    let z = null; try { z = await JSZip.loadAsync(f); } catch (e) { danados.push(f.name); continue; } // solo es «dañado» si no se puede abrir
+    const oj = z.file(/(^|\/)obra\.json$/)[0];
+    if (oj) { let m = null; try { m = JSON.parse(await oj.async('string')); } catch (e) { /* lo dirá la importación */ }
+      pk.push({ f, z, id: m && m.obra && m.obra.id, t: Date.parse(m && m.exportado) || f.lastModified || 0 }); continue; }
+    const inner = z.file(/\.zip$/i).filter(e => !/(^|\/)(__MACOSX|\.)/.test(e.name));
+    if (inner.length && nz < 300) { // .zip con más .zip dentro (carpeta comprimida, descarga de Drive)
+      for (const e of inner) { nz++; cola.push(new File([await e.async('blob')], e.name.split('/').pop(), { type: 'application/zip' })); }
+      if (z.file(/\.(km[lz]|bc3|jpe?g|png|webp)$/i).length) otros.push(f); // y sus planos o fotos sueltos, si los tiene
+      continue; }
+    if (z.file(/\.(km[lz]|bc3|jpe?g|png|webp)$/i).length) otros.push(f);
+    else danados.push(f.name + ' (no contiene obras, planos ni fotos)');
+  }
+  if (otros.length) await rutaOtros(otros); // primero lo suelto (va a la obra activa); luego las obras
   const best = new Map(), skipped = [];
   for (const x of pk) { const k = x.id || x.f.name, b = best.get(k); if (!b || x.t > b.t) { if (b) skipped.push(b); best.set(k, x); } else skipped.push(x); }
   // varias copias a la vez (la carpeta entera): no vuelven las obras eliminadas después de esa copia.
@@ -134,8 +146,27 @@ async function importManyPackages(files) {
   const gone = [];
   if (pk.length > 1) for (const [k, x] of [...best]) if ((x.id && del[x.id] >= x.t) || /_borrada(_anterior)?\.zip$/i.test(x.f.name)) { gone.push(x); best.delete(k); }
   for (const x of [...best.values()].sort((a, b) => a.t - b.t)) await importObraPackage(x.f, x.z, { fecha: x.t });
-  if (gone.length) { toast(`No se ${gone.length > 1 ? 'han' : 'ha'} recuperado ${plural(gone.length, 'obra que habías eliminado', 'obras que habías eliminado')}. Si la quieres, elige solo su .zip.`, 9000); if (skipped.length) await new Promise(r => setTimeout(r, 9000)); }
-  if (skipped.length) toast(`Recuperada la copia más reciente de cada obra (${plural(best.size, 'obra', 'obras')}). ${plural(skipped.length, 'copia más antigua se ha descartado', 'copias más antiguas se han descartado')}: ${skipped.map(x => x.f.name).slice(0, 3).join(', ')}${skipped.length > 3 ? '…' : ''}.`, 10000); // al final: no lo tapa «Importando…»
+  const avisos = [];
+  if (gone.length) avisos.push(`No se ${gone.length > 1 ? 'han' : 'ha'} recuperado ${plural(gone.length, 'obra que habías eliminado', 'obras que habías eliminado')}. Si la quieres, elige solo su .zip.`);
+  if (skipped.length) avisos.push(`Recuperada la copia más reciente de cada obra (${plural(best.size, 'obra', 'obras')}). ${plural(skipped.length, 'copia más antigua se ha descartado', 'copias más antiguas se han descartado')}: ${skipped.map(x => x.f.name).slice(0, 3).join(', ')}${skipped.length > 3 ? '…' : ''}.`);
+  if (danados.length) avisos.push(`No se ${danados.length > 1 ? 'han' : 'ha'} podido abrir: ${danados.slice(0, 3).join(', ')}${danados.length > 3 ? '…' : ''}. ${danados.some(n => !/no contiene/.test(n)) ? 'El .zip está dañado o incompleto.' : ''}`);
+  for (const a of avisos) { toast(a, 9000); await new Promise(r => setTimeout(r, avisos.length > 1 ? 4500 : 0)); } // al final: no lo tapa «Importando…»
+}
+const importManyPackages = importAll;
+// Elegir una carpeta entera: en el ordenador con el selector de carpetas; en la app de Android con el de Android
+const folderPickOk = () => NATIVE ? !!Plug('Inbox') : !matchMedia('(pointer: coarse)').matches && 'webkitdirectory' in document.createElement('input');
+async function pickFolder() {
+  if (!NATIVE) { $('#inDir').click(); return; }
+  const IB = Plug('Inbox'); if (!IB || !IB.pickFolder) { toast('Esta versión de la app no puede elegir carpetas: usa «Varios ficheros».', 7000); return; }
+  try {
+    const r = await IB.pickFolder(); const list = r.files || [];
+    if (!list.length) { if (!r.cancelled) toast('En esa carpeta no hay planos, fotos, .zip ni BC3.', 6000); return; }
+    toast(`Leyendo ${plural(list.length, 'fichero', 'ficheros')} de la carpeta…`, 20000);
+    const files = [];
+    for (const x of list) { try { const b = await (await fetch(Capacitor.convertFileSrc('file://' + x.path))).blob(); files.push(new File([b], x.name, { type: x.mime || b.type || '' })); } catch (e) { console.warn(x.name, e); } }
+    await importAll(files);
+  } catch (e) { toast('No se pudo leer la carpeta: ' + (e.message || e), 7000); }
+  finally { try { await IB.clearFolder(); } catch (e) { /* nada */ } }
 }
 function restoreFromBackup() {
   toast('Elige los .zip de Documentos › OBRA-GIS › Copia automática (puedes marcar varios).', 8000);

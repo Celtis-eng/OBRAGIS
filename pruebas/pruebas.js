@@ -625,6 +625,53 @@ async function datosASalvo() { // 1.19.4: lo que se graba está a salvo y se gra
   await n.browser.close();
 }
 
+async function importarVarios() { // 1.19.5: varios ficheros, carpetas y .zip que no son paquete de obra
+  const { browser, page: p, errores } = await abrir({ ancho: 400, alto: 820 });
+  await p.setInputFiles('#inKml', [DATOS + 'pendientes_rangos.kml']); await esperar(600);
+  const kmlTxt = fs.readFileSync(DATOS + 'ejemplo-red-riego.kml', 'utf8'), jpg = fs.readFileSync(DATOS + 'foto_con_gps.jpg').toString('base64');
+  const z = await p.evaluate(async ([kml, jpg]) => {
+    const b64 = async b => { const r = new FileReader(); return new Promise(ok => { r.onload = () => ok(String(r.result).split(',')[1]); r.readAsDataURL(b); }); };
+    const e = [...layers.values()][0], f = e.feats[0];
+    const a = { id: uid(), obraId: settings.activeObra, layerId: e.rec.id, featIdx: 0, traceName: f.name, layerName: e.rec.name, d0: 10, d1: 60, type: 'Limpieza de cunetas', side: 'ambos', text: 'obra A', media: [], created: Date.now(), coords: segmentCoords(f, 10, 60), params: {}, prio: '' };
+    await DB.put('acts', a); acts.set(a.id, a); const oa = obras.get(settings.activeObra); oa.name = 'Obra A'; await DB.put('obras', oa);
+    const A = (await exportObraPackage(oa.id, { blobOnly: true, silent: true })).blob;
+    const ob = await createObra('Obra B'); await DB.put('acts', { ...a, id: uid(), obraId: ob.id, text: 'obra B' });
+    const B = (await exportObraPackage(ob.id, { blobOnly: true, silent: true })).blob;
+    const bin = Uint8Array.from(atob(jpg), c => c.charCodeAt(0));
+    const plano = new JSZip(); plano.file('Camino/red.kml', kml); plano.file('Camino/fotos/foto1.jpg', bin);
+    const drive = new JSZip(); drive.file('Copias/OBRA-GIS_Obra_A.zip', A); drive.file('Copias/OBRA-GIS_Obra_B.zip', B); drive.file('Copias/red.kml', kml);
+    return { A: await b64(A), plano: await b64(await plano.generateAsync({ type: 'blob' })), drive: await b64(await drive.generateAsync({ type: 'blob' })) };
+  }, [kmlTxt, jpg]);
+  await browser.close();
+  const dir = path.join(__dirname, 'capturas', 'importar'); fs.rmSync(dir, { recursive: true, force: true }); fs.mkdirSync(path.join(dir, 'carpeta', 'sub'), { recursive: true });
+  const F = n => path.join(dir, n);
+  fs.writeFileSync(F('plano_y_fotos.zip'), Buffer.from(z.plano, 'base64')); fs.writeFileSync(F('drive.zip'), Buffer.from(z.drive, 'base64'));
+  fs.writeFileSync(F('roto.zip'), Buffer.from('PK\x03\x04 esto no es un zip de verdad'));
+  fs.copyFileSync(DATOS + 'ejemplo-red-riego.kml', path.join(dir, 'carpeta', 'red.kml')); fs.writeFileSync(path.join(dir, 'carpeta', 'sub', 'OBRA-GIS_Obra_A.zip'), Buffer.from(z.A, 'base64'));
+  fs.writeFileSync(path.join(dir, 'carpeta', 'notas.txt'), 'nada');
+  const n = await abrir({ ancho: 400, alto: 820 }); const q = n.page;
+  await q.evaluate(() => { window.__t = []; const t0 = window.toast; window.toast = (m, ...r) => { window.__t.push(String(m)); return t0(m, ...r); }; });
+  const L0 = await q.evaluate(() => layers.size);
+  await q.setInputFiles('#inObra', [F('plano_y_fotos.zip')]); await esperar(3500);
+  const r1 = await q.evaluate(() => ({ t: window.__t.slice(), capas: layers.size }));
+  ok('Un .zip con planos y fotos ya no sale como «dañado» y se importa', !r1.t.some(m => /dañado/.test(m)) && r1.capas > 0, JSON.stringify(r1));
+  await q.evaluate(() => { window.__t = []; }); await q.setInputFiles('#inAny', [F('drive.zip')]); await esperar(6000);
+  const r2 = await q.evaluate(async () => ({ obras: (await DB.all('obras')).map(o => o.name), t: window.__t.slice() }));
+  ok('Un .zip con varias obras dentro (carpeta de Drive) recupera todas', r2.obras.includes('Obra A') && r2.obras.includes('Obra B'), JSON.stringify(r2));
+  await q.evaluate(() => { window.__t = []; }); await q.setInputFiles('#inAny', [F('roto.zip')]); await esperar(1500);
+  ok('Un .zip roto de verdad sí avisa de que está dañado', await q.evaluate(() => window.__t.some(m => /roto\.zip/.test(m) && /dañado/.test(m))), await q.evaluate(() => JSON.stringify(window.__t)));
+  await q.evaluate(async () => { window.__t = []; for (const o of [...obras.values()]) if (o.name === 'Obra A') { await deleteObraData(o.id); await DB.del('obras', o.id); obras.delete(o.id); } });
+  const L1 = await q.evaluate(() => layers.size);
+  await q.setInputFiles('#inAny', [DATOS + 'ejemplo-red-riego.kml', DATOS + 'parcela_1ha.kml', DATOS + 'foto_con_gps.jpg']); await esperar(4000);
+  ok('Varios ficheros mezclados a la vez (dos KML y una foto)', await q.evaluate(L1 => [...layers.values()].filter(e => /ejemplo-red-riego|parcela_1ha/.test(e.rec.name)).length >= 2, L1), await q.evaluate(() => JSON.stringify([...layers.values()].map(e => e.rec.name))));
+  await q.evaluate(() => { window.__t = []; }); await q.setInputFiles('#inDir', path.join(dir, 'carpeta')); await esperar(5000);
+  const r5 = await q.evaluate(async () => ({ obras: (await DB.all('obras')).map(o => o.name), t: window.__t.slice() }));
+  ok('Una carpeta entera con subcarpetas: plano y obra', r5.obras.includes('Obra A'), JSON.stringify(r5));
+  ok('Importar: los botones «Varios ficheros» y «Una carpeta»', await q.evaluate(() => { importMenu(); const ok = !!$('#sheetBody [data-a=many]') && !$('#sheetBody [data-a=dir]').hidden; closeSheet(); return ok; }));
+  ok('Sin errores JS', !n.errores.length, n.errores.join(' | '));
+  await n.browser.close();
+}
+
 async function pendientesViejos() {
   const { browser, page: p, errores } = await abrir({ ancho: 400, alto: 820 });
   await p.setInputFiles('#inKml', [DATOS + 'pendientes_rangos.kml']); await esperar(600);
@@ -659,7 +706,7 @@ async function modoSencillo() {
 }
 
 (async () => {
-  for (const t of [pkYNumeros, geometriaYPendientes, actuacionesYBorradores, tramoAndandoYRepetir, bc3, paqueteYEnvio, toquesYBarras, borradoresYDictado, ronda4, ronda5, ronda6, ronda7, ronda8, ronda9, ronda10, copiaAutomatica, datosASalvo, pendientesViejos, modoSencillo]) {
+  for (const t of [pkYNumeros, geometriaYPendientes, actuacionesYBorradores, tramoAndandoYRepetir, bc3, paqueteYEnvio, toquesYBarras, borradoresYDictado, ronda4, ronda5, ronda6, ronda7, ronda8, ronda9, ronda10, copiaAutomatica, datosASalvo, importarVarios, pendientesViejos, modoSencillo]) {
     console.log(`\n— ${t.name}`);
     try { await t(); } catch (e) { ok(t.name + ' terminó sin excepciones', false, e.message.split('\n')[0]); }
   }

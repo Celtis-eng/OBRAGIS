@@ -6,9 +6,10 @@
 /* ---------------- Versión de la app ----------------
    Cambia APP_VERSION en cada entrega (también se usa como versión de la app Android).
    Formato MAYOR.MENOR.CORRECCIÓN: menor = función nueva, corrección = arreglo. */
-const APP_VERSION = '1.19.4';
+const APP_VERSION = '1.19.5';
 const APP_DATE = '2026-11-23';
 const CHANGELOG = [
+  ['1.19.5', '24/11/2026', 'Importar varios ficheros a la vez (planos, fotos, .zip y BC3 mezclados: cada cosa va a su sitio) o una carpeta entera con sus subcarpetas: Importar → «Varios ficheros» o «Una carpeta». Arreglado: un .zip que no era una obra (planos y fotos, un previo, una carpeta descargada de Drive) salía como «dañado»; ahora se importa, y si dentro hay varias obras se recuperan todas.'],
   ['1.19.4', '23/11/2026', 'Datos a salvo: una obra eliminada ya no vuelve al recuperar la carpeta de copias (su copia se guarda como «_borrada» por si fue un error; elegida sola sí se recupera). Tras recuperar, ya no queda la «Mi primera obra» vacía. Un puntual al que escribes «Desde» más adelante se mueve, sin convertirse en un tramo de 50 m. La medición en vivo se recorta al final de la traza y no se calcula con un dato mal escrito.'],
   ['1.19.3', '23/11/2026', 'Al importar una obra que ya existe se compara con su último cambio real (también borrados y anotaciones, esté abierta o no) y se avisa si el paquete es más antiguo. Resumen fijo visible y al día tras «Terminar»; el aviso de PK al revés va bajo los PK y ofrece alargar; «Tu nombre» arriba al enviar; mediciones del BC3 más correctas (cuneta revestida en ambos márgenes, «Otro» con nombre propio, propuestas de la base).'],
   ['1.19.2', '23/11/2026', 'Copia automática más segura: al recuperar la carpeta entera se queda la copia más reciente de cada obra; la primera vez se copian todas las obras; la copia anterior se renueva una vez al día; los fallos se ven en «Obras». Tras «Terminar aquí», resumen fijo con el tipo y los PK. «Recuperar mis obras» arriba en la bienvenida.'],

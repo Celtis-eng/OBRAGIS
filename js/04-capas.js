@@ -296,26 +296,25 @@ async function writeExif(blob, m) {
     return new Blob([o8], { type: 'image/jpeg' });
   } catch (e) { console.warn('EXIF', e); return blob; }
 }
-async function handleIncoming(files) {
-  const rest = []; let previo = false;
-  for (const f of files) {
-    if (/\.zip$/i.test(f.name) || /zip/.test(f.type)) { const z = await isObraPackage(f); if (z) { await importObraPackage(f, z); continue; } previo = true; }
-    if (/\.bc3$/i.test(f.name)) previo = true;
-    rest.push(f);
-  }
-  if (previo) fichaImportFiles(rest); // .zip que no es paquete de obra o BC3: previo de la ficha de inspección
-  else if (rest.length) handleIncomingFiles(rest);
+async function handleIncoming(files) { return importAll(files); } // compartir, «Abrir con» y arrastrar: lo mismo que importar varios
+// Lo que no es un paquete de obra: .zip con planos y fotos o BC3 → previo de la ficha; KML/KMZ y fotos sueltos → capas
+function rutaOtros(files) {
+  const previo = files.some(f => /\.(zip|bc3)$/i.test(f.name) || /zip/.test(f.type));
+  if (previo) return fichaImportFiles(files);
+  return handleIncomingFiles(files);
 }
 function handleIncomingFiles(files) {
   const k = files.filter(f => /\.km[lz]$/i.test(f.name) || /google-earth/.test(f.type));
   const p = files.filter(f => !k.includes(f) && (f.type.startsWith('image/') || /\.jpe?g$/i.test(f.name)));
   if (k.length) importFiles(k);
   if (p.length) importPhotos(p);
-  if (!k.length && !p.length) toast('Solo se pueden abrir ficheros KML, KMZ o fotos JPEG.');
+  if (!k.length && !p.length) toast('No hay nada que importar: se pueden abrir KML, KMZ, fotos, BC3 y .zip (obras, previos o carpetas comprimidas).', 7000);
 }
 function importMenu() {
   const b = openSheet(`<h2>Importar</h2><p class="sub">Elige qué quieres añadir al mapa</p>
     <div class="acts">
+      <div class="row2"><button class="btn pri" data-a="many">${ICON.gallery}Varios ficheros</button><button class="btn pri" data-a="dir" ${folderPickOk() ? '' : 'hidden'}>${ICON.folder}Una carpeta</button></div>
+      <p class="hint" style="margin:0">Planos, fotos, .zip y BC3 a la vez: cada cosa va a su sitio.</p>
       <button class="btn full" data-a="kml">${ICON.kml}KML o KMZ</button>
       <button class="btn full" data-a="photos">${ICON.gallery}Fotos (con GPS o con marca de agua)</button>
       <button class="btn full tech" data-a="service">${ICON.wms}Capa de un servicio (WMS)</button>
@@ -326,6 +325,8 @@ function importMenu() {
       <button class="btn full tech" data-a="drawpts">${ICON.pin}Crear KML de puntos (tocando el mapa o con GPS)</button>
     </div>
     <p class="hint">Las fotos se sitúan solas si la cámara guardó la ubicación. ${NATIVE ? '' : 'En Android, si llegan sin posición, elígelas desde «Archivos» y no desde la galería.'}</p>`);
+  b.querySelector('[data-a=many]').onclick = () => { closeSheet(); $('#inAny').click(); };
+  b.querySelector('[data-a=dir]').onclick = () => { closeSheet(); pickFolder(); };
   b.querySelector('[data-a=kml]').onclick = () => { closeSheet(); $('#inKml').click(); };
   b.querySelector('[data-a=photos]').onclick = () => { closeSheet(); $('#inPhotosImport').click(); };
   b.querySelector('[data-a=service]').onclick = serviceMenu;

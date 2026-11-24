@@ -933,3 +933,8 @@ body:has(#walkBar:not([hidden])) .savebar.plusfoot{padding-bottom:calc(var(--wbh
 .fneed::before{content:"✎ ";font-weight:700}
 #sheet:has(.walksum) .sheet-x::before{display:none} /* con resumen fijo no hace falta la franja de la ✕ */
 .pkrow + #invWarn{margin:4px 0 10px}
+
+/* 1.19.5 · Importar varios ficheros o una carpeta */
+.acts .row2{display:flex;gap:8px}
+.acts .row2>.btn{flex:1;min-width:0}
+.acts .row2>[hidden]{display:none}

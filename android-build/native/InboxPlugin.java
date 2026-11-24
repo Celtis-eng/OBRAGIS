@@ -1,6 +1,13 @@
 package es.obragis.campokml;
 
+import android.app.Activity;
 import android.content.Intent;
+import android.provider.DocumentsContract;
+import androidx.activity.result.ActivityResult;
+import com.getcapacitor.annotation.ActivityCallback;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.util.Locale;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
@@ -51,6 +58,102 @@ public class InboxPlugin extends Plugin {
         JSObject ret = new JSObject();
         ret.put("files", arr);
         call.resolve(ret);
+    }
+
+    /* ---- Elegir una carpeta entera (Importar → «Una carpeta») ----
+       Android no deja leer carpetas desde la web: se elige con el selector de Android, se copian a la caché de la app
+       los ficheros que interesan (planos, fotos, .zip y BC3, también en subcarpetas) y la web los lee de ahí. */
+    private static final int MAX_FILES = 1500;
+    private static final int MAX_DEPTH = 6;
+
+    @PluginMethod
+    public void pickFolder(PluginCall call) {
+        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+        startActivityForResult(call, i, "folderResult");
+    }
+
+    @ActivityCallback
+    private void folderResult(PluginCall call, ActivityResult result) {
+        if (call == null) return;
+        if (result.getResultCode() != Activity.RESULT_OK || result.getData() == null || result.getData().getData() == null) {
+            JSObject r = new JSObject();
+            r.put("files", new JSArray());
+            r.put("cancelled", true);
+            call.resolve(r);
+            return;
+        }
+        final Uri tree = result.getData().getData();
+        new Thread(() -> {
+            try {
+                File dir = folderCache();
+                deleteRec(dir);
+                dir.mkdirs();
+                JSArray arr = new JSArray();
+                String rootId = DocumentsContract.getTreeDocumentId(tree);
+                walk(tree, rootId, "", dir, arr, 0);
+                JSObject r = new JSObject();
+                r.put("files", arr);
+                call.resolve(r);
+            } catch (Exception e) {
+                call.reject("No se pudo leer la carpeta: " + e.getMessage());
+            }
+        }).start();
+    }
+
+    @PluginMethod
+    public void clearFolder(PluginCall call) {
+        deleteRec(folderCache());
+        call.resolve();
+    }
+
+    private File folderCache() {
+        return new File(getContext().getCacheDir(), "importar_carpeta");
+    }
+
+    private void deleteRec(File f) {
+        if (f == null || !f.exists()) return;
+        File[] list = f.listFiles();
+        if (list != null) for (File c : list) deleteRec(c);
+        f.delete();
+    }
+
+    private static boolean wanted(String name) {
+        String n = name.toLowerCase(Locale.ROOT);
+        return n.endsWith(".kml") || n.endsWith(".kmz") || n.endsWith(".zip") || n.endsWith(".bc3")
+            || n.endsWith(".jpg") || n.endsWith(".jpeg") || n.endsWith(".png") || n.endsWith(".webp");
+    }
+
+    private void walk(Uri tree, String docId, String rel, File outDir, JSArray arr, int depth) throws Exception {
+        if (depth > MAX_DEPTH || arr.length() >= MAX_FILES) return;
+        Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, docId);
+        String[] cols = { DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_MIME_TYPE };
+        try (Cursor c = getContext().getContentResolver().query(children, cols, null, null, null)) {
+            if (c == null) return;
+            while (c.moveToNext() && arr.length() < MAX_FILES) {
+                String id = c.getString(0), name = c.getString(1), mime = c.getString(2);
+                if (name == null || name.startsWith(".")) continue;
+                if (DocumentsContract.Document.MIME_TYPE_DIR.equals(mime)) {
+                    walk(tree, id, rel + name + "/", outDir, arr, depth + 1);
+                } else if (wanted(name)) {
+                    Uri doc = DocumentsContract.buildDocumentUriUsingTree(tree, id);
+                    File dest = new File(outDir, (arr.length() + 1) + "_" + name.replaceAll("[\\/:*?\"<>|]", "_"));
+                    try (InputStream in = getContext().getContentResolver().openInputStream(doc); FileOutputStream out = new FileOutputStream(dest)) {
+                        if (in == null) continue;
+                        byte[] buf = new byte[65536];
+                        int r;
+                        while ((r = in.read(buf)) != -1) out.write(buf, 0, r);
+                    } catch (Exception e) {
+                        continue; // fichero ilegible: se salta
+                    }
+                    JSObject o = new JSObject();
+                    o.put("name", name);
+                    o.put("rel", rel + name);
+                    o.put("mime", mime != null ? mime : "");
+                    o.put("path", dest.getAbsolutePath());
+                    arr.put(o);
+                }
+            }
+        }
     }
 
     @SuppressWarnings("deprecation")
