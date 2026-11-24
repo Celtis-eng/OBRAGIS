@@ -217,6 +217,15 @@ function drawActs() {
 let actDraft = null;
 // margen más probable según el tipo: firmes y badenes ocupan la calzada; limpiezas de cunetas, los dos márgenes
 const defaultSideFor = (t, cur) => { const it = actItem(t); return it.road || ['Bacheo', 'Badén'].includes(t) ? 'eje' : ['Limpieza de cunetas', 'Desbroce de márgenes'].includes(t) ? 'ambos' : cur; };
+// Otra actuación en el mismo tramo (mismos traza y PK; p. ej. refino + zahorra, o apertura de cuneta → cuneta revestida).
+// «extra»: tipos que quedan por apuntar en ese tramo (se abren uno detrás de otro al guardar).
+function otraEnTramo(a, extra = [], opts = {}) {
+  const t = extra[0] || '', lp = t ? lastParamsOf(t) : { params: {} };
+  actDraft = { id: uid(), obraId: a.obraId, layerId: a.layerId, featIdx: a.featIdx, traceName: a.traceName, layerName: a.layerName, d0: Math.min(a.d0, a.d1), d1: Math.max(a.d0, a.d1),
+    type: t, side: t ? defaultSideFor(t, a.side) : a.side, text: '', media: [], created: Date.now(), coords: [], params: { ...(lp.params || {}) }, prio: a.prio || '',
+    _extra: extra.slice(1), _grupo: opts.grupo, _contAfter: opts.contAfter, _walk: !!opts.walk, _sameOf: a.type };
+  renderActEditor();
+}
 function openActEditor(o) {
   if (o.act) actDraft = { ...o.act, params: { ...(o.act.params || {}) }, media: [...(o.act.media || [])] };
   else actDraft = { id: uid(), obraId: settings.activeObra, layerId: o.rec.id, featIdx: layers.get(o.rec.id).feats.indexOf(o.f), traceName: o.f.name, layerName: o.rec.name,
@@ -291,8 +300,13 @@ function renderActEditor() {
       <div class="field row"><label for="aLen" class="grow">Longitud desde el inicio (m)</label><input type="text" id="aLen" inputmode="decimal" placeholder="m" value="${len ? Math.round(len) : ''}"><button class="mini" data-a="len">Aplicar</button></div>
       ${isNew ? '' : '<div class="acts"><button class="btn" data-a="dup">Duplicar en otro tramo</button><button class="btn del" data-a="delete">Eliminar actuación</button></div>'}
     </details>
-    <div class="savebar">${a._walk && isNew ? '<div class="row2"><button class="btn pri" data-a="save">Guardar</button><button class="btn go" data-a="savecont">Guardar y seguir andando</button></div>' : '<button class="btn pri full" data-a="save">Guardar actuación</button>'}</div>`);
+    <div class="savebar">${a._extra && a._extra.length ? `<button class="btn pri full" data-a="save">Guardar y pasar a «${esc(shortType(a._extra[0]))}»</button><p class="hint sbnext">En este mismo tramo quedan: ${a._extra.map(esc).join(', ')}</p>`
+      : a._walk && isNew ? '<div class="row2"><button class="btn pri" data-a="save">Guardar</button><button class="btn go" data-a="savecont">Guardar y seguir andando</button></div>' : '<button class="btn pri full" data-a="save">Guardar actuación</button>'}
+      ${a._extra && a._extra.length ? '' : `<button type="button" class="linkb samebtn" data-a="savesame">${isNew ? 'Guardar y añadir otra en este tramo' : '+ Otra actuación en este mismo tramo'}</button>`}</div>`);
   { const sc = $('#sheetBody [data-a=savecont]'); if (sc) sc.onclick = () => { if (!actDraft) return; actDraft._cont = actDraft._dir || 1; saveAct().then(ok => { if (!ok && actDraft && !$('#measWarn') && !$('#zeroWarn') && !$('#invWarn')) delete actDraft._cont; }); }; } // con un aviso pendiente se recuerda que hay que seguir
+  { const ss = $('#sheetBody [data-a=savesame]'); if (ss) ss.onclick = async () => { if (!actDraft) return;
+      if (!isNew && acts.has(actDraft.id) && actKey(acts.get(actDraft.id)) === actKey((syncAct(), actDraft))) { const cur = acts.get(actDraft.id); otraEnTramo(cur); return; } // sin cambios: no hace falta guardar
+      actDraft._sameAfter = true; const ok = await saveAct(); if (!ok && actDraft) delete actDraft._sameAfter; }; }
   { const mo = $('#aMore'); if (mo) mo.ontoggle = () => { if (actDraft) actDraft._moreOpen = mo.open; }; }
   editorRerender = false;
   actDraft = keep;
@@ -459,6 +473,7 @@ async function saveAct() {
       w.innerHTML = `<b>Sin medidas</b>: no saldrá superficie ni volumen. Escribe ${mf.map(k => ACT_FIELDS[k].l.toLowerCase()).join(' / ')} o:<div class="row"><button type="button" class="mini" data-a="savenm">Guardar sin medidas</button></div>`;
       const t0 = Date.now(); w.querySelector('[data-a=savenm]').onclick = () => { if (Date.now() - t0 < 600 || !actDraft) return; actDraft._noMeasOk = true; saveAct(); };
       return; } }
+  const extra = a._extra || [], grupo = a._grupo, contAfter = a._contAfter, sameAfter = a._sameAfter, wasWalk = !!a._walk; delete a._extra; delete a._grupo; delete a._contAfter; delete a._sameAfter; delete a._sameOf;
   const cont = a._cont, fromSplit = a._split, noMeasUsed = a._noMeasOk === true || !!a._noMeasChain; delete a._cont; delete a._split; delete a._noMeasChain; delete a._dir; delete a._noMeasOk; delete a._zeroWarn; delete a._zeroOk; delete a._swapOk; delete a._ext; delete a._moreOpen; delete a._init; delete a._walk; if (a.params) { delete a.params._wAuto; Object.keys(a.params).forEach(k => { if (a.params[k] === null || a.params[k] === '') delete a.params[k]; }); }
   a.updated = Date.now();
   hideUndo(); // solo cuando de verdad se guarda (un toque fallido no borra el «Deshacer»)
@@ -468,8 +483,13 @@ async function saveAct() {
   acts.set(a.id, a); actDraft = null; slopeHL.clearLayers(); clearDraft(a.id);
   closeSheet(); drawActs(); toast(`Guardada: ${actTitle(a)}`);
   if (!$('#drawer').hidden) renderDrawer();
-  if (cont) { // «Guardar y seguir andando»: el siguiente tramo empieza en el PK guardado (corregido o no)
-    buzz(40); const go = await continueWalk(a, cont === -1 ? a.d0 : a.d1, { noMeas: noMeasUsed });
+  if (extra.length) { // varios tipos en el mismo tramo: se abre el siguiente con los mismos PK
+    toast(`Guardada: ${a.type}. Ahora «${extra[0]}» en el mismo tramo (${fmtPK(a.d0)}–${fmtPK(a.d1)}).`, 5000);
+    otraEnTramo(a, extra, { grupo, contAfter: cont || contAfter, walk: wasWalk }); return true; }
+  if (sameAfter) { toast(`Guardada: ${a.type}. Elige la otra actuación de este tramo (${fmtPK(a.d0)}–${fmtPK(a.d1)}).`, 5000); otraEnTramo(a, [], { walk: wasWalk }); return true; }
+  const contF = cont || contAfter;
+  if (contF) { // «Guardar y seguir andando»: el siguiente tramo empieza en el PK guardado (corregido o no)
+    const cont = contF; buzz(40); const go = await continueWalk(a, cont === -1 ? a.d0 : a.d1, { noMeas: noMeasUsed, grupo });
     if (!fromSplit) showUndo(`Guardado: ${a.type} ${fmtPK(a.d0)}–${fmtPK(a.d1)}${go ? '. Sigue el siguiente tramo.' : '. Fin del camino: no hay más tramo que seguir.'}`, async () => { // mismo «Deshacer» que desde la barra
       if (a.obraId !== settings.activeObra) { toast('Ese tramo es de otra obra.'); return; }
       await DB.del('acts', a.id); acts.delete(a.id); drawActs(); const st = cont === -1 ? a.d1 : a.d0;
@@ -506,12 +526,14 @@ function viewAct(id, at) {
       ${goBtn(p0[0], p0[1], 'Ir al inicio', a.d1 > a.d0 ? '' : 'full')}${a.d1 > a.d0 ? goBtn(p1[0], p1[1], 'Ir al final') : ''}
       <button class="btn pri" data-a="edit">Editar / añadir fotos</button>
       <button class="btn" data-a="copy">${ICON.copy}Copiar</button>
-      ${featOf(a) && featOf(a).f ? `<button class="btn go full" data-a="newhere">${ICON.road}Otra actuación en el PK ${fmtPK(dHere)}</button><button class="btn" data-a="trace">Ficha de la traza (anchos, pendiente…)</button>` : '<p class="hint">La traza de esta actuación no está cargada. Al volver a cargar su KML se enlaza sola.</p>'}
+      ${featOf(a) && featOf(a).f && a.d1 > a.d0 ? `<button class="btn go full" data-a="sametramo">${ICON.road}Otra actuación en este mismo tramo (${fmtPK(a.d0)}–${fmtPK(a.d1)})</button>` : ''}
+      ${featOf(a) && featOf(a).f ? `<button class="btn ${a.d1 > a.d0 ? '' : 'go '}full" data-a="newhere">${ICON.road}Otra actuación en el PK ${fmtPK(dHere)}</button><button class="btn" data-a="trace">Ficha de la traza (anchos, pendiente…)</button>` : '<p class="hint">La traza de esta actuación no está cargada. Al volver a cargar su KML se enlaza sola.</p>'}
     </div>`, 'view');
   const ctx = featOf(a); if (ctx && ctx.f) showSlopeSegment(ctx.f, a.d0, Math.max(a.d1, a.d0 + 0.1));
   onSheetClose(() => setTimeout(() => { if (!$('#aText')) slopeHL.clearLayers(); }, 0));
   b.querySelectorAll('img[data-full]').forEach(img => img.onclick = () => showPhoto(img.src));
   b.querySelector('[data-a=edit]').onclick = () => openActEditor({ act: a });
+  const st = b.querySelector('[data-a=sametramo]'); if (st) st.onclick = () => otraEnTramo(a);
   const nh = b.querySelector('[data-a=newhere]'); if (nh) nh.onclick = () => { const c = featOf(a); openActEditor({ rec: c.rec, f: c.f, d0: dHere, d1: dHere }); };
   const tr = b.querySelector('[data-a=trace]'); if (tr) tr.onclick = () => { const c = featOf(a), q = pointAtPK(c.f, dHere); featureSheet(c.f, L.latLng(q.lat, q.lng), c.rec); };
   b.querySelector('[data-a=copy]').onclick = () => copyText(`${a.type} (${SIDES[a.side]}) · ${a.traceName} · PK ${fmtPK(a.d0)} a ${fmtPK(a.d1)} · ${fmtLen(a.d1 - a.d0)}${pr.length ? ' · ' + pr.map(([k, v]) => `${k}: ${v}`).join(', ') : ''}${mr.length ? ' · ' + mr.map(([k, v]) => `${k}: ${v}`).join(', ') : ''}${a.text ? ' · ' + a.text : ''}`);

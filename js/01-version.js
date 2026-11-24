@@ -6,9 +6,10 @@
 /* ---------------- Versión de la app ----------------
    Cambia APP_VERSION en cada entrega (también se usa como versión de la app Android).
    Formato MAYOR.MENOR.CORRECCIÓN: menor = función nueva, corrección = arreglo. */
-const APP_VERSION = '1.19.5';
+const APP_VERSION = '1.19.6';
 const APP_DATE = '2026-11-23';
 const CHANGELOG = [
+  ['1.19.6', '24/11/2026', 'Varias actuaciones en el mismo tramo: al empezar un tramo andando puedes marcar varios tipos (p. ej. refino y zahorra) y al terminar se apuntan uno detrás de otro con los mismos PK. En cualquier actuación, «Guardar y añadir otra en este tramo», y desde una ya guardada, «Otra actuación en este mismo tramo» (p. ej. de la apertura de cuneta a la cuneta revestida). Doble toque en el mapa: acerca en el punto tocado.'],
   ['1.19.5', '24/11/2026', 'Importar varios ficheros a la vez (planos, fotos, .zip y BC3 mezclados: cada cosa va a su sitio) o una carpeta entera con sus subcarpetas: Importar → «Varios ficheros» o «Una carpeta». Arreglado: un .zip que no era una obra (planos y fotos, un previo, una carpeta descargada de Drive) salía como «dañado»; ahora se importa, y si dentro hay varias obras se recuperan todas.'],
   ['1.19.4', '23/11/2026', 'Datos a salvo: una obra eliminada ya no vuelve al recuperar la carpeta de copias (su copia se guarda como «_borrada» por si fue un error; elegida sola sí se recupera). Tras recuperar, ya no queda la «Mi primera obra» vacía. Un puntual al que escribes «Desde» más adelante se mueve, sin convertirse en un tramo de 50 m. La medición en vivo se recorta al final de la traza y no se calcula con un dato mal escrito.'],
   ['1.19.3', '23/11/2026', 'Al importar una obra que ya existe se compara con su último cambio real (también borrados y anotaciones, esté abierta o no) y se avisa si el paquete es más antiguo. Resumen fijo visible y al día tras «Terminar»; el aviso de PK al revés va bajo los PK y ofrece alargar; «Tu nombre» arriba al enviar; mediciones del BC3 más correctas (cuneta revestida en ambos márgenes, «Otro» con nombre propio, propuestas de la base).'],

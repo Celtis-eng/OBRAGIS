@@ -3,7 +3,7 @@
    Parte de la app (los ficheros js/ se cargan en orden desde index.html y comparten el ámbito global). */
 /* ---------------- Mapa y capas base ---------------- */
 const map = L.map('map', { zoomControl: false, renderer: L.canvas({ tolerance: 12 }), maxZoom: 21 }).setView([37.18, -3.6], 9);
-if (matchMedia('(pointer:coarse)').matches) map.doubleClickZoom.disable(); // con el dedo se amplía pellizcando; un doble toque sin querer no mueve el mapa
+// doble toque: acerca el mapa en el punto tocado (Leaflet lo hace también con el dedo). Al medir o dibujar se desactiva: ahí cada toque es un punto.
 L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(map);
 map.createPane('rasters').style.zIndex = 350;   // servicios WMS/WMTS, por encima del mapa base
 map.createPane('hl').style.zIndex = 590;        // resaltes y mediciones, por debajo de los marcadores

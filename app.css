@@ -938,3 +938,6 @@ body:has(#walkBar:not([hidden])) .savebar.plusfoot{padding-bottom:calc(var(--wbh
 .acts .row2{display:flex;gap:8px}
 .acts .row2>.btn{flex:1;min-width:0}
 .acts .row2>[hidden]{display:none}
+.savebar .samebtn{display:block;margin:8px auto 0;font-size:.92rem}
+.savebar .sbnext{margin:6px 0 0;text-align:center}
+#wExtra{margin-top:6px}#wExtra .chip::before{display:none}

@@ -672,6 +672,52 @@ async function importarVarios() { // 1.19.5: varios ficheros, carpetas y .zip qu
   await n.browser.close();
 }
 
+async function variasEnTramo() { // 1.19.6: varias actuaciones en el mismo tramo, copiar el tramo y doble toque
+  const { browser, ctx, page: p, errores } = await abrir({ tactil: true, geo: { latitude: 37.61, longitude: -2.93 } });
+  await p.setInputFiles('#inKml', [DATOS + 'pendientes_rangos.kml']); await esperar(600);
+  const enPK = d => p.evaluate(d => { const f = [...layers.values()][0].feats[0], q = pointAtPK(f, d); return { latitude: q.lat + 0.00002, longitude: q.lng }; }, d);
+  await ctx.setGeolocation(await enPK(100)); await esperar(200);
+  await p.evaluate(() => walkStartSheet()); await esperar(450);
+  await p.selectOption('#wType', 'Refino y planeo sin aporte'); await esperar(150); await p.selectOption('#wType', 'Zahorra artificial'); await esperar(150);
+  ok('Empezar tramo: se pueden marcar varios tipos', await p.evaluate(() => /Refino.*\+.*Zahorra/.test($('[data-a=wgo]').textContent)), await p.evaluate(() => $('[data-a=wgo]').textContent));
+  await p.click('[data-a=wgo]'); await esperar(1500);
+  ok('La barra dice los dos tipos', await p.evaluate(() => /\+/.test($('#walkBar').innerText)));
+  await ctx.setGeolocation(await enPK(400)); await esperar(300);
+  await p.click('#walkBar [data-w=end]'); await esperar(1600);
+  const e1 = await p.evaluate(() => ({ t: actDraft.type, b: $('#sheetBody [data-a=save]').textContent }));
+  ok('Al terminar se abre el primero y el botón pasa al siguiente', e1.t === 'Refino y planeo sin aporte' && /pasar a/.test(e1.b), JSON.stringify(e1));
+  await p.evaluate(() => { document.querySelectorAll('[data-pf]').forEach(i => { i.value = i.dataset.pf === 'w' ? '4' : i.dataset.pf === 'e' ? '20' : '1'; }); });
+  await esperar(700); await p.click('#sheetBody [data-a=save]'); await esperar(900);
+  const e2 = await p.evaluate(() => actDraft && { t: actDraft.type, d0: Math.round(actDraft.d0), d1: Math.round(actDraft.d1) });
+  ok('Después se abre el segundo tipo con los mismos PK', e2 && e2.t === 'Zahorra artificial' && Math.abs(e2.d0 - 100) <= 2 && Math.abs(e2.d1 - 400) <= 2, JSON.stringify(e2));
+  await p.evaluate(() => { document.querySelectorAll('[data-pf]').forEach(i => { i.value = i.dataset.pf === 'w' ? '4' : i.dataset.pf === 'e' ? '20' : '1'; }); });
+  await esperar(300); await p.click('#sheetBody [data-a=save]'); await esperar(900);
+  const L = await p.evaluate(() => [...acts.values()].map(a => [a.type, Math.round(a.d0), Math.round(a.d1), Object.keys(a).filter(k => k[0] === '_').length]));
+  ok('Quedan las dos actuaciones en el mismo tramo, sin datos internos', L.length === 2 && L.every(x => Math.abs(x[1] - 100) <= 2 && Math.abs(x[2] - 400) <= 2 && x[3] === 0), JSON.stringify(L));
+  // copiar el tramo de una actuación guardada (apertura de cuneta → cuneta revestida)
+  await p.evaluate(() => { const a = [...acts.values()].find(x => x.type === 'Refino y planeo sin aporte'); viewAct(a.id); }); await esperar(500);
+  await p.click('#sheetBody [data-a=sametramo]'); await esperar(600);
+  const e3 = await p.evaluate(() => actDraft && { t: actDraft.type, d0: Math.round(actDraft.d0), d1: Math.round(actDraft.d1), nuevo: !acts.has(actDraft.id) });
+  ok('«Otra actuación en este mismo tramo» copia traza y PK', e3 && e3.nuevo && !e3.t && Math.abs(e3.d0 - 100) <= 2 && Math.abs(e3.d1 - 400) <= 2, JSON.stringify(e3));
+  await p.selectOption('#aType', 'Cuneta revestida'); await esperar(400);
+  await p.evaluate(() => { document.querySelectorAll('[data-pf]').forEach(i => { i.value = '1'; }); });
+  await p.click('#sheetBody [data-a=savesame]'); await esperar(900);
+  const e4 = await p.evaluate(() => ({ n: acts.size, nuevo: actDraft && !acts.has(actDraft.id), d0: actDraft && Math.round(actDraft.d0) }));
+  ok('«Guardar y añadir otra en este tramo» guarda y abre otra con los mismos PK', e4.n === 3 && e4.nuevo && Math.abs(e4.d0 - 100) <= 2, JSON.stringify(e4));
+  await p.evaluate(() => closeSheet()); await esperar(400);
+  // doble toque: acerca en el punto tocado
+  const z0 = await p.evaluate(() => map.getZoom()); const r = await p.evaluate(() => { const b = $('#map').getBoundingClientRect(); return { x: b.left + b.width * 0.3, y: b.top + b.height * 0.4 }; });
+  const ll0 = await p.evaluate(r => { const q = map.containerPointToLatLng([r.x - $('#map').getBoundingClientRect().left, r.y - $('#map').getBoundingClientRect().top]); return [q.lat, q.lng]; }, r);
+  await p.mouse.dblclick(r.x, r.y); await esperar(900);
+  const z1 = await p.evaluate(ll0 => { const c = map.getCenter(), b = map.getBounds(); return { z: map.getZoom(), dentro: b.contains(L.latLng(ll0)) }; }, ll0);
+  ok('Doble toque en el mapa: acerca en el punto tocado', z1.z === z0 + 1 && z1.dentro, JSON.stringify({ z0, ...z1 }));
+  await p.evaluate(() => startMeasure && startMeasure()); await esperar(300); const z2 = await p.evaluate(() => map.getZoom());
+  await p.mouse.dblclick(r.x, r.y); await esperar(800);
+  ok('Midiendo, el doble toque no acerca (cada toque es un punto)', await p.evaluate(z2 => map.getZoom() === z2, z2));
+  ok('Sin errores JS', !errores.length, errores.join(' | '));
+  await browser.close();
+}
+
 async function pendientesViejos() {
   const { browser, page: p, errores } = await abrir({ ancho: 400, alto: 820 });
   await p.setInputFiles('#inKml', [DATOS + 'pendientes_rangos.kml']); await esperar(600);
@@ -706,7 +752,7 @@ async function modoSencillo() {
 }
 
 (async () => {
-  for (const t of [pkYNumeros, geometriaYPendientes, actuacionesYBorradores, tramoAndandoYRepetir, bc3, paqueteYEnvio, toquesYBarras, borradoresYDictado, ronda4, ronda5, ronda6, ronda7, ronda8, ronda9, ronda10, copiaAutomatica, datosASalvo, importarVarios, pendientesViejos, modoSencillo]) {
+  for (const t of [pkYNumeros, geometriaYPendientes, actuacionesYBorradores, tramoAndandoYRepetir, bc3, paqueteYEnvio, toquesYBarras, borradoresYDictado, ronda4, ronda5, ronda6, ronda7, ronda8, ronda9, ronda10, copiaAutomatica, datosASalvo, importarVarios, variasEnTramo, pendientesViejos, modoSencillo]) {
     console.log(`\n— ${t.name}`);
     try { await t(); } catch (e) { ok(t.name + ' terminó sin excepciones', false, e.message.split('\n')[0]); }
   }

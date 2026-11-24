@@ -18,30 +18,35 @@ function walkStartSheet(pre) {
     <div class="field"><span class="flabel" id="wsLbl">Margen</span><div class="seg walkseg" role="radiogroup" aria-labelledby="wsLbl"><button type="button" role="radio" aria-checked="${pre && pre.side ? 'false' : 'true'}" class="${pre && pre.side ? '' : 'on'}" data-ws="auto">Automático</button>${Object.entries(SIDES).map(([k, v]) => `<button type="button" role="radio" aria-checked="${pre && k === pre.side ? 'true' : 'false'}" class="${pre && k === pre.side ? 'on' : ''}" data-ws="${k}">${esc(v.replace('Margen ', '').replace(' / calzada', '').replace(' márgenes', ''))}</button>`).join('')}</div>
       <p class="hint">Automático: cunetas y desbroces en los dos márgenes; firmes en el eje.</p></div>
     <div class="field"><span class="flabel" id="wtLbl">Qué vas a medir</span>
-    ${types.length ? `<div class="bigtypes" role="radiogroup" aria-labelledby="wtLbl">${types.map(t => `<button type="button" class="btn" role="radio" aria-checked="false" data-wt="${esc(t)}"><span class="dot" style="background:${actColor(t)}"></span>${esc(t)}</button>`).join('')}</div>` : ''}
-    <label for="wType" class="small">u otro tipo</label>${actTypeSelect('', true).replace('id="aType"', 'id="wType"')}</div>
+    ${types.length ? `<div class="bigtypes" role="group" aria-labelledby="wtLbl">${types.map(t => `<button type="button" class="btn" role="checkbox" aria-checked="false" data-wt="${esc(t)}"><span class="dot" style="background:${actColor(t)}"></span>${esc(t)}</button>`).join('')}</div>` : ''}
+    <label for="wType" class="small">u otro tipo</label>${actTypeSelect('', true).replace('id="aType"', 'id="wType"')}<div class="chips" id="wExtra"></div>
+    <p class="hint">Puedes marcar <b>varios</b> (p. ej. refino y zahorra): al terminar se apuntan uno detrás de otro en el mismo tramo.</p></div>
     <div class="savebar"><button class="btn go full" data-a="wgo" disabled>Elige primero qué vas a medir</button></div>`);
-  let side = pre && pre.side || 'izq', sideSet = !!(pre && pre.side), type = '';
+  let side = pre && pre.side || 'izq', sideSet = !!(pre && pre.side), sel = [];
   const GO = b.querySelector('[data-a=wgo]');
-  const pick = t => { type = t; b.querySelectorAll('[data-wt]').forEach(x => { const on = x.dataset.wt === t; x.classList.toggle('on', on); x.setAttribute('aria-checked', on); });
-    if ($('#wType').value !== t) $('#wType').value = ACT_ITEMS.some(i => i.name === t) && !types.includes(t) ? t : '';
-    GO.disabled = !t; GO.textContent = t ? `▶ Empezar aquí: ${t}` : 'Elige primero qué vas a medir'; };
+  // se pueden marcar varios tipos (p. ej. refino + zahorra): al terminar se apuntan uno detrás de otro en el mismo tramo
+  const paint = () => { b.querySelectorAll('[data-wt]').forEach(x => { const on = sel.includes(x.dataset.wt); x.classList.toggle('on', on); x.setAttribute('aria-checked', on); });
+    const xt = $('#wExtra'); if (xt) xt.innerHTML = sel.filter(t => !types.includes(t)).map(t => `<span class="chip on">${esc(t)} <button type="button" class="linkb" data-wx="${esc(t)}" aria-label="Quitar ${esc(t)}">✕</button></span>`).join('');
+    b.querySelectorAll('[data-wx]').forEach(x => x.onclick = () => { sel = sel.filter(t => t !== x.dataset.wx); paint(); });
+    GO.disabled = !sel.length; GO.textContent = sel.length ? `▶ Empezar aquí: ${sel.length > 1 ? sel.map(shortType).join(' + ') : sel[0]}` : 'Elige primero qué vas a medir'; };
+  const tOn = {}; // un toque de más justo después de marcar (doble toque sin querer) no desmarca
+  const pick = (t, toggle = true) => { if (!t) return; if (sel.includes(t)) { if (toggle && Date.now() - (tOn[t] || 0) > 900) sel = sel.filter(x => x !== t); } else { sel = [...sel, t]; tOn[t] = Date.now(); } paint(); };
   b.querySelectorAll('[data-ws]').forEach(bt => bt.onclick = () => { sideSet = bt.dataset.ws !== 'auto'; if (sideSet) side = bt.dataset.ws; b.querySelectorAll('[data-ws]').forEach(x => { x.classList.toggle('on', x === bt); x.setAttribute('aria-checked', x === bt); }); });
   b.querySelectorAll('[data-wt]').forEach(bt => bt.onclick = () => pick(bt.dataset.wt));
-  $('#wType').onchange = () => pick($('#wType').value);
-  GO.onclick = () => { if (type) startWalk(type, sideSet ? side : defaultSideFor(type, side), lastParamsOf(type).params); };
+  $('#wType').onchange = () => { pick($('#wType').value, false); $('#wType').value = ''; };
+  GO.onclick = () => { if (sel.length) startWalk(sel[0], sideSet ? side : defaultSideFor(sel[0], side), lastParamsOf(sel[0]).params, sel.slice(1)); };
   if (pre && pre.type) pick(pre.type);
 }
-async function startWalk(type, side, params) {
+async function startWalk(type, side, params, extra = []) {
   if (walkAct) { const o = obras.get(walkAct.draft.obraId);
     if (!confirm(`Ya hay un tramo de «${walkAct.draft.type}» empezado${walkAct.draft.obraId !== settings.activeObra ? ` en la obra «${o ? o.name : '¿?'}»` : ''} en el PK ${fmtPK(walkAct.draft.d0)}. ¿Descartarlo y empezar este?`)) return; }
   toast('Obteniendo posición GPS…', 2500);
   let n; try { n = await currentTracePos(); } catch (e) { toast((e.code ? geoErr(e) : e.message), 6000); return; }
   if (n.off > 50) { toast(`Estás a ${Math.round(n.off)} m de «${n.f.name}»: acércate al camino (menos de 50 m) para empezar el tramo.`, 7000); return; }
   hideUndo(); const e = layers.get(n.rec.id);
-  walkAct = { draft: { id: uid(), obraId: settings.activeObra, layerId: n.rec.id, featIdx: e.feats.indexOf(n.f), traceName: n.f.name, layerName: n.rec.name, d0: n.d, d1: n.d, type, side, text: '', media: [], created: Date.now(), coords: [], params: { ...(params || {}) }, prio: '' }, t: Date.now() };
+  walkAct = { draft: { id: uid(), obraId: settings.activeObra, layerId: n.rec.id, featIdx: e.feats.indexOf(n.f), traceName: n.f.name, layerName: n.rec.name, d0: n.d, d1: n.d, type, side, text: '', media: [], created: Date.now(), coords: [], params: { ...(params || {}) }, prio: '', ...(extra.length ? { _extra: extra, _grupo: [type, ...extra] } : {}) }, t: Date.now() };
   try { await DB.put('kv', walkAct, 'walk'); } catch (er) { /* nada */ }
-  startWatch(); keepAwake(true); buzz(60); closeSheet(); showWalkBar(); toast(`Tramo de «${type}» empezado en el PK ${fmtPK(n.d)}. Pulsa «Terminar aquí» al llegar al final.`, 6000);
+  startWatch(); keepAwake(true); buzz(60); closeSheet(); showWalkBar(); toast(`Tramo de «${extra.length ? [type, ...extra].join(' + ') : type}» empezado en el PK ${fmtPK(n.d)}. Pulsa «Terminar aquí» al llegar al final.`, 6000);
 }
 // Deshacer en lugar de preguntar: una barra con «Deshacer» durante unos segundos
 let undoT = null, undoKind = '';
@@ -67,9 +72,10 @@ function lastParamsOf(type) { const a = [...acts.values()].filter(x => x.type ==
 async function continueWalk(a, at, opts = {}) {
   const ctx = featOf(a), from = isFinite(at) ? at : a.d1; // «at» = PK donde empieza el siguiente (hacia atrás, el menor)
   if (!ctx || !ctx.f || (from >= ctx.f.length - 0.5 && !(isFinite(at) && at < a.d1)) || (isFinite(at) && at <= 0.5 && at < a.d1)) { toast('Fin del camino: no hay más tramo que seguir.', 5000); return false; }
-  walkAct = { draft: { id: uid(), obraId: a.obraId, layerId: a.layerId, featIdx: a.featIdx, traceName: a.traceName, layerName: a.layerName, d0: from, d1: from, type: a.type, side: a.side, text: '', media: [], created: Date.now(), coords: [], params: { ...(a.params || {}) }, prio: '', _noMeasChain: !!opts.noMeas }, t: Date.now() };
+  const g = opts.grupo && opts.grupo.length > 1 ? opts.grupo : null, t0 = g ? g[0] : a.type, a0 = g ? ([...acts.values()].find(x => x.type === t0 && x.layerId === a.layerId && x.featIdx === a.featIdx && x.d0 === a.d0 && x.d1 === a.d1) || a) : a;
+  walkAct = { draft: { id: uid(), obraId: a.obraId, layerId: a.layerId, featIdx: a.featIdx, traceName: a.traceName, layerName: a.layerName, d0: from, d1: from, type: t0, side: a0.side, text: '', media: [], created: Date.now(), coords: [], params: { ...(a0.params || {}) }, prio: '', _noMeasChain: !!opts.noMeas, ...(g ? { _extra: g.slice(1), _grupo: g } : {}) }, t: Date.now() };
   try { await DB.put('kv', walkAct, 'walk'); } catch (e) { /* nada */ }
-  startWatch(); keepAwake(true); showWalkBar(); toast(`Siguiente tramo de «${a.type}» desde el PK ${fmtPK(from)}.`, 4000);
+  startWatch(); keepAwake(true); showWalkBar(); toast(`Siguiente tramo de «${g ? g.join(' + ') : a.type}» desde el PK ${fmtPK(from)}.`, 4000);
   return true;
 }
 // «Repetir la última» andando: mismo tipo, margen y datos; empieza aquí y se termina al llegar
@@ -95,7 +101,7 @@ function showWalkBar() {
     el.querySelector('[data-w=x]').onclick = async () => { if (!walkAct || Date.now() - walkAct.shown < 1500) return; const prev = walkAct; walkAct = null; await DB.del('kv', 'walk').catch(() => {}); showWalkBar(); keepAwake(false);
       showUndo(`Tramo de «${prev.draft.type}» cancelado`, async () => { if (prev.draft.obraId !== settings.activeObra) { toast('Ese tramo es de otra obra.'); return; } walkAct = { ...prev, shown: Date.now() }; await DB.put('kv', walkAct, 'walk'); showWalkBar(); keepAwake(true); }); }; }
   const d = walkAct.draft, here = livePkCur && livePkCur.rec.id === d.layerId && livePkCur.fi === d.featIdx && livePkT >= walkAct.t ? livePkCur.d : null;
-  el.querySelector('[data-w=txt]').innerHTML = `<b>${esc(d.type)}</b><br>PK ${fmtPK(d.d0)}${here != null ? ` → ${fmtPK(here)} · ${fmtLen(Math.abs(here - d.d0))}` : ''}`;
+  el.querySelector('[data-w=txt]').innerHTML = `<b>${esc(d._extra && d._extra.length ? [d.type, ...d._extra].map(shortType).join(' + ') : d.type)}</b><br>PK ${fmtPK(d.d0)}${here != null ? ` → ${fmtPK(here)} · ${fmtLen(Math.abs(here - d.d0))}` : ''}`;
   if (el.hidden !== false || !walkAct.shown) walkAct.shown = Date.now();
   el.hidden = false;
   if (el.offsetHeight > 0) document.documentElement.style.setProperty('--wbh', el.offsetHeight + 'px');
@@ -119,6 +125,7 @@ async function walkEnd(split) {
   const prev = { ...walkAct, draft: { ...walkAct.draft, d0: startAt, d1: startAt } }; // copia para «Deshacer» (sin los PK ya reordenados)
   walkAct = null; await DB.del('kv', 'walk').catch(() => {}); showWalkBar(); keepAwake(false); buzz([60, 80, 60]);
   if (!Object.keys(d.params || {}).some(k => d.params[k] != null && d.params[k] !== '' && k[0] !== '_')) d.params = lastParamsOf(d.type).params; // mismos datos que la última de su tipo
+  if (split === true && d._extra && d._extra.length) { split = false; d._contAfter = endAt < startAt ? -1 : 1; toast(`Revisa las ${d._extra.length + 1} actuaciones de este tramo; al guardar la última se sigue andando.`, 5000); }
   if (split === true && !d._noMeasChain && (() => { const mf = actItem(d.type).fields.filter(k => ['w', 'e', 'h', 'b', 'S'].includes(k)); return mf.length && !mf.some(k => d.params && d.params[k] > 0); })()) {
     split = false; toast(`Primero indica las medidas de «${d.type}»; las siguientes se copiarán solas.`, 6000); }
   if (split === true) { // «Terminar y seguir»: se guarda tal cual y empieza el siguiente tramo, con «Deshacer»

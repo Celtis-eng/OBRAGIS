@@ -7,6 +7,9 @@ $('#fabLocate').innerHTML = ICON.locate;
 $('#fabPhoto').innerHTML = ICON.photo;
 $('#fabNote').innerHTML = ICON.plus;
 $('#sheetX').innerHTML = ICON.close;
+// doble toque = acercar en el punto tocado, salvo cuando cada toque es un punto (medir, dibujar, elegir un PK en el mapa)
+{ const h = map.doubleClickZoom, dz = L.Map.DoubleClickZoom.prototype._onDoubleClick; h.disable(); // primero se quita el de serie
+  h._onDoubleClick = function (e) { if (measure || drawing || actPick || slopePick) return; return dz.call(this, e); }; h.enable(); }
 $('#btnMenu').onclick = openDrawer;
 $('#scrim').onclick = closeDrawer;
 $('#sheetX').onclick = closeSheet;
