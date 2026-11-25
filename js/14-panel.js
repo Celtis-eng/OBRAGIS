@@ -11,9 +11,8 @@ function layerRow(id, name, sub, swatch, opts) {
   return `<div class="lyr ${open ? 'open' : ''} ${sel && selIds.has(id) ? 'picked' : ''}">
     <div class="lrow" style="--dep:${opts.depth || 0}"><input type="checkbox" class="${sel ? 'selbox' : ''}" data-vis="${id}" ${vis ? 'checked' : ''} aria-label="${sel ? 'Seleccionar' : 'Mostrar'} ${esc(name)}">
       ${swatch}<button class="nm" data-open="${id}" type="button">${esc(name)}<small>${esc(sub)}</small></button>
-      ${opts.move ? `<button class="mini ic" data-up="${id}" aria-label="Subir">${ICON.up}</button><button class="mini ic" data-down="${id}" aria-label="Bajar">${ICON.down}</button>` : ''}
     </div>
-    ${open ? `<div class="lopts">${opts.body}</div>` : ''}
+    ${open ? `<div class="lopts">${opts.move ? `<div class="row ord"><span class="hint grow">Orden en el mapa</span><button class="mini" data-up="${id}">${ICON.up}Subir</button><button class="mini" data-down="${id}">${ICON.down}Bajar</button></div>` : ''}${opts.body}</div>` : ''}
   </div>`;
 }
 function layerOptions(e) {

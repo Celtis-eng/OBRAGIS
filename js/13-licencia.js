@@ -94,7 +94,7 @@ function updateMeasure() {
   } else $('#mText').textContent = p.length < 2 ? 'Toca el mapa para añadir puntos' : `Distancia: ${fmtLen(d)} · ${p.length} puntos`;
 }
 function endMeasure() { if (!measure) return; map.removeLayer(measure.line); map.removeLayer(measure.marks); measure = null; $('#measureBar').hidden = true; }
-map.on('click', e => { if (drawing && !drawing.gps) return addDrawPt(L.latLng(e && e.latlng ? e.latlng : e)); if (slopePick || actPick || widthPick || offPick || calcPick) return slopePickPoint(e.latlng); if (measure) addMeasurePt(e.latlng); });
+map.on('click', e => { if (geomEdit) return geomEditTap(e.latlng); if (drawing && !drawing.gps) return addDrawPt(L.latLng(e && e.latlng ? e.latlng : e)); if (slopePick || actPick || widthPick || offPick || calcPick) return slopePickPoint(e.latlng); if (measure) return addMeasurePt(e.latlng); if (!drawing) wmsTap(e.latlng); });
 $('#mUndo').onclick = () => {
   if (!measure || !measure.pts.length) return;
   measure.pts.pop(); measure.marks.clearLayers();
@@ -173,6 +173,7 @@ async function cacheArea() { offlineSheet(); }
    la vista actual, un municipio buscado por nombre o el municipio del punto que se toque en el mapa.
    Los límites municipales se obtienen de OpenStreetMap (Nominatim). */
 const NOMINATIM = 'https://nominatim.openstreetmap.org';
+const NOMI_H = { 'User-Agent': `OBRA-GIS/${APP_VERSION} (app de campo; Android)`, 'Accept-Language': 'es' };
 let offZone = null, offCancel = false, offPick = false;
 function pointInRing(lat, lng, ring) { let ins = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const yi = ring[i][1], xi = ring[i][0], yj = ring[j][1], xj = ring[j][0]; if (((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) ins = !ins; } return ins; }
 function inGeom(lat, lng, g) {
@@ -202,9 +203,10 @@ function zoneUrls(zone, opts) {
   const wmsLayers = opts.wms ? [...layers.values()].filter(e => e.rec.visible && e.tile) : [];
   tl.forEach(t => {
     const sub = u => u.replace('{z}', t.z).replace('{x}', t.x).replace('{y}', t.y);
-    urls.push(sub(URL_PNOA));
-    if (opts.labels && t.z <= 18) urls.push(sub(URL_LABELS));
-    if (t.z <= Math.min(opts.zMax, 17)) wmsLayers.forEach(e => { try { urls.push(e.tile.getTileUrl(L.point(t.x, t.y).set ? t : Object.assign(L.point(t.x, t.y), { z: t.z }))); } catch (_) {} });
+    if (opts.orto !== false) urls.push(sub(URL_PNOA));
+    if (opts.orto !== false && opts.labels && t.z <= 18) urls.push(sub(URL_LABELS));
+    if (opts.mtn) urls.push(sub(URL_MTN));
+    if (t.z <= Math.min(opts.zMax, 17)) wmsLayers.forEach(e => { try { urls.push(tileUrlAt(e.tile, t.x, t.y, t.z)); } catch (_) {} });
   });
   return urls;
 }
@@ -223,7 +225,9 @@ async function offlineSheet() {
     <div id="zRes"></div>
     <div class="field row"><label for="zMax" class="grow">Detalle máximo</label><select id="zMax" style="max-width:180px">
       <option value="15">Bajo (5 m/píxel)</option><option value="16">Medio (2,4 m/píxel)</option><option value="17" selected>Alto (1,2 m/píxel)</option><option value="18">Muy alto (0,6 m/píxel)</option><option value="19">Máximo (0,3 m/píxel)</option></select></div>
-    <label class="opt"><input type="checkbox" id="zLab" checked>Incluir carreteras y nombres</label>
+    <label class="opt"><input type="checkbox" id="zOrto" ${settings.base === 'mtn' ? '' : 'checked'}>Ortofoto PNOA</label>
+    <label class="opt"><input type="checkbox" id="zLab" checked>Incluir carreteras y nombres sobre la ortofoto</label>
+    <label class="opt"><input type="checkbox" id="zMtn" ${settings.base === 'mtn' ? 'checked' : ''}>Mapa topográfico MTN25 ráster (IGN)</label>
     <label class="opt"><input type="checkbox" id="zWms">Incluir las capas de servicios visibles ahora (hasta detalle alto)</label>
     <p class="hint" id="zEst"></p>
     <div class="progress" id="zProg" hidden><div></div><span></span></div>
@@ -233,13 +237,13 @@ async function offlineSheet() {
     <p class="hint">Las capas KML, anotaciones, fotos y actuaciones ya están siempre en el móvil y funcionan sin conexión.</p>`);
   const est = () => {
     const zone = offZone || { kind: 'view', name: 'Vista actual', bounds: map.getBounds() };
-    const opts = { zMax: +$('#zMax').value, labels: $('#zLab').checked, wms: $('#zWms').checked };
+    const opts = { zMax: +$('#zMax').value, labels: $('#zLab').checked, wms: $('#zWms').checked, orto: $('#zOrto').checked, mtn: $('#zMtn').checked };
     const n = zoneUrls(zone, opts).length, mb = Math.round(n * 0.022);
     $('#zEst').textContent = n > 40000 ? `Son ${thousands(n)} imágenes (unos ${thousands(mb)} MB): demasiadas. Baja el detalle máximo o elige una zona más pequeña.` : `${thousands(n)} imágenes · unos ${thousands(mb)} MB`;
     return { zone, opts, n };
   };
   est();
-  ['zMax', 'zLab', 'zWms'].forEach(id => $('#' + id).onchange = est);
+  ['zMax', 'zLab', 'zWms', 'zOrto', 'zMtn'].forEach(id => $('#' + id).onchange = est);
   b.querySelectorAll('[data-zmode]').forEach(bt => bt.onclick = () => {
     const m = bt.dataset.zmode;
     if (m === 'view') { offZone = null; offlineSheet(); }
@@ -251,7 +255,7 @@ async function offlineSheet() {
     const q = $('#zQ').value.trim(); if (!q) return;
     $('#zRes').innerHTML = '<p class="hint">Buscando…</p>';
     try {
-      const res = JSON.parse(await httpGetText(`${NOMINATIM}/search?q=${encodeURIComponent(q)}&countrycodes=es&format=jsonv2&polygon_geojson=1&limit=6`));
+      const res = JSON.parse(await httpGetText(`${NOMINATIM}/search?q=${encodeURIComponent(q)}&countrycodes=es&format=jsonv2&polygon_geojson=1&limit=6`, NOMI_H));
       const ok = res.filter(r => r.geojson && /Polygon/.test(r.geojson.type));
       $('#zRes').innerHTML = ok.length ? ok.map((r, i) => `<button class="crow" data-zr="${i}" type="button"><span>${esc(r.display_name)}</span><small>${esc(r.addresstype || r.type || '')}</small></button>`).join('') : '<p class="hint">No se ha encontrado ningún municipio con ese nombre.</p>';
       $('#zRes').querySelectorAll('[data-zr]').forEach(bt => bt.onclick = () => { const r = ok[+bt.dataset.zr]; setOffZone('search', r.display_name.split(',').slice(0, 2).join(','), r.geojson); offlineSheet(); });
@@ -272,14 +276,15 @@ async function offlineSheet() {
     const { zone, opts, n } = est();
     if (zone.kind === 'search' && !zone.geom) { toast('Busca y elige primero el municipio.'); return; }
     if (n > 40000) { toast('Demasiadas imágenes: baja el detalle máximo.'); return; }
+    if (!n) { toast('Elige qué mapa quieres guardar (ortofoto o topográfico).'); return; }
     const urls = zoneUrls(zone, opts), cache = await caches.open('tiles-v1'), prog = $('#zProg');
     prog.hidden = false; b.querySelector('[data-a=dl]').hidden = true; b.querySelector('[data-a=stop]').hidden = false;
-    let done = 0, ok = 0, bytes = 0, fail = 0; offCancel = false; const queue = urls.slice();
+    let done = 0, ok = 0, bytes = 0, fail = 0, lastErr = ''; offCancel = false; const queue = urls.slice();
     const upd = () => { const p = prog.querySelector('div'), t = prog.querySelector('span'); if (p) p.style.width = (done / urls.length * 100).toFixed(1) + '%'; if (t) t.textContent = `${thousands(done)} / ${thousands(urls.length)} · ${(bytes / 1048576).toFixed(0)} MB`; };
     async function worker() {
       while (queue.length && !offCancel) {
         const u = queue.shift();
-        try { const hit = await cache.match(u); if (hit) { ok++; } else { const bl = await fetchTileBlob(u); await cache.put(u, new Response(bl, { headers: { 'Content-Type': bl.type || 'image/jpeg' } })); bytes += bl.size; ok++; } } catch (e) { fail++; }
+        try { const hit = await cache.match(u); if (hit) { ok++; } else { const bl = await fetchTileBlob(u); if (!bl.size || !/^image\//.test(bl.type || 'image/')) throw new Error('respuesta no válida'); await cache.put(u, new Response(bl, { headers: { 'Content-Type': bl.type || 'image/jpeg' } })); bytes += bl.size; ok++; } } catch (e) { fail++; lastErr = e.message || String(e); }
         done++; if (done % 20 === 0) upd();
       }
     }
@@ -288,7 +293,8 @@ async function offlineSheet() {
     list.push({ id, name: zone.name, created: Date.now(), count: ok, bytes, zMax: opts.zMax });
     await DB.put('kv', urls.slice(0, done), 'zone:' + id); await DB.put('kv', list, 'zones');
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
-    toast(offCancel ? `Descarga detenida: ${ok} imágenes guardadas.` : `Zona «${zone.name}» lista sin conexión: ${ok} imágenes${fail ? ` (${fail} no se pudieron bajar)` : ''}.`, 7000);
+    if (!ok && fail) { toast(`No se ha podido descargar ninguna imagen (${fail} fallos). Comprueba la conexión (mejor con wifi) y vuelve a intentarlo.${lastErr ? ' Error: ' + lastErr : ''}`, 10000); offlineSheet(); return; }
+    toast(offCancel ? `Descarga detenida: ${ok} imágenes guardadas.` : `Zona «${zone.name}» lista sin conexión: ${ok} imágenes${fail ? ` (${fail} no se pudieron bajar: vuelve a pulsar «Descargar» y se bajarán solo las que faltan)` : ''}. Para comprobarla, activa el modo avión y mira la zona.`, 9000);
     offZone = null; offlineSheet();
   };
 }
@@ -301,7 +307,7 @@ async function offlinePickAt(ll) {
   offPick = false; $('#pickBar').hidden = true;
   toast('Buscando el municipio…', 4000);
   try {
-    const r = JSON.parse(await httpGetText(`${NOMINATIM}/reverse?lat=${ll.lat.toFixed(6)}&lon=${ll.lng.toFixed(6)}&zoom=10&format=jsonv2&polygon_geojson=1`));
+    const r = JSON.parse(await httpGetText(`${NOMINATIM}/reverse?lat=${ll.lat.toFixed(6)}&lon=${ll.lng.toFixed(6)}&zoom=10&format=jsonv2&polygon_geojson=1`, NOMI_H));
     if (!r.geojson || !/Polygon/.test(r.geojson.type)) throw new Error('sin límite');
     setOffZone('tap', r.name || (r.display_name || '').split(',')[0], r.geojson);
   } catch (e) { toast('No se ha encontrado el municipio de ese punto. Prueba con «Municipio» o «Vista actual».', 6000); }

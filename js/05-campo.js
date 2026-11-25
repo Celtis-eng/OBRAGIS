@@ -43,7 +43,40 @@ function getPos() {
 
 /* ---------------- Captura de fotos, vídeo y audio ---------------- */
 let captureCb = null;
-function capture(inputId, cb) { captureCb = cb; const i = $('#' + inputId); i.value = ''; i.click(); }
+// En la app de Android, las fotos se hacen con la cámara nativa (plugin Camera): si Android cierra OBRA-GIS mientras la cámara
+// está abierta (pasa con poca memoria), al volver la foto se recupera y se añade a la anotación o actuación que se estaba editando.
+async function capture(inputId, cb, ctx) {
+  captureCb = cb;
+  const CAM = NATIVE && inputId === 'inPhoto' && Plug('Camera');
+  if (!CAM) { const i = $('#' + inputId); i.value = ''; i.click(); return; }
+  const c = ctx || (typeof draft !== 'undefined' && draft && $('#nTitle') ? { kind: 'note', id: draft.id } : typeof actDraft !== 'undefined' && actDraft && $('#aText') ? { kind: 'act', id: actDraft.id } : { kind: 'quick' });
+  try { // lo que se está escribiendo queda guardado antes de abrir la cámara
+    if (c.kind === 'note') { syncDraft(); await storeDraft('note', { ...draft, media: [...draft.media] }, true); }
+    if (c.kind === 'act') { syncAct(); await storeDraft('act', { ...actDraft, params: { ...actDraft.params } }, true); }
+    await DB.put('kv', { ...c, t: Date.now() }, 'camPending');
+  } catch (e) { /* sigue igual */ }
+  let r = null;
+  try { r = await CAM.getPhoto({ source: 'CAMERA', resultType: 'uri', quality: 88, width: 2560, height: 2560, correctOrientation: true, saveToGallery: false, allowEditing: false }); }
+  catch (e) { captureCb = null; DB.del('kv', 'camPending').catch(() => {}); if (!/cancel|no image|User cancelled/i.test(e.message || '')) toast('No se pudo hacer la foto: ' + (e.message || e), 6000); return; }
+  DB.del('kv', 'camPending').catch(() => {});
+  const f = await camFile(r).catch(() => null); const cb2 = captureCb; captureCb = null;
+  if (f && cb2) cb2([f]); else if (!f) toast('No se pudo leer la foto.', 5000);
+}
+async function camFile(r) { const b = await (await fetch(r.webPath)).blob(); return new File([b], `foto_${Date.now()}.${(r.format || 'jpg').replace('jpeg', 'jpg')}`, { type: b.type || 'image/jpeg' }); }
+// Al volver después de que Android cerrara la app con la cámara abierta: se recupera la foto
+function camRestoreListen() {
+  const APP = Plug('App'); if (!NATIVE || !APP) return;
+  APP.addListener('appRestoredResult', async res => {
+    if (!res || res.pluginId !== 'Camera' || !res.success || !res.data) return;
+    let c = null; try { c = await DB.get('kv', 'camPending'); await DB.del('kv', 'camPending'); } catch (e) { /* nada */ }
+    let f = null; try { f = await camFile(res.data); } catch (e) { toast('No se pudo recuperar la foto.', 6000); return; }
+    const d = c && c.id && drafts[c.id];
+    if (d && d.kind === 'note') { draft = { ...d.data, media: [...(d.data.media || [])] }; renderEditor(); await addMedia([f]); }
+    else if (d && d.kind === 'act') { actDraft = { ...d.data, params: { ...(d.data.params || {}) }, media: [...(d.data.media || [])] }; renderActEditor(); if (addMediaActNow) await addMediaActNow([f]); }
+    else { let at = c && c.at; if (!at) { const p = await getPos().catch(() => null); at = p ? { lat: p.lat, lng: p.lng, acc: p.acc, src: 'gps' } : { ...map.getCenter(), src: 'mapa' }; } openEditor(at); await addMedia([f]); }
+    toast('Android cerró la app mientras usabas la cámara: tu foto se ha recuperado. Revisa y guarda.', 9000);
+  });
+}
 ['inPhoto', 'inVideo', 'inGallery'].forEach(id => $('#' + id).addEventListener('change', e => {
   const files = Array.from(e.target.files || []); const cb = captureCb; captureCb = null;
   if (files.length && cb) cb(files);

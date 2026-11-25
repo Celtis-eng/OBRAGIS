@@ -13,12 +13,14 @@ const hlRenderer = L.canvas({ pane: 'hl' });
 const ign = (svc, layer, fmt) => `https://www.ign.es/wmts/${svc}?service=WMTS&request=GetTile&version=1.0.0&layer=${layer}&style=default&tilematrixset=GoogleMapsCompatible&tilematrix={z}&tilerow={y}&tilecol={x}&format=${fmt}`;
 const URL_PNOA = ign('pnoa-ma', 'OI.OrthoimageCoverage', 'image/jpeg');
 const URL_LABELS = ign('ign-base', 'IGNBaseOrto', 'image/png');
+const URL_MTN = ign('mapa-raster', 'MTN', 'image/jpeg'); // MTN25 ráster (y el MTN de alta resolución al acercar), hasta el nivel 20
 const ATTR_IGN = 'PNOA y Base IGN CC-BY 4.0 <a href="https://www.scne.es" target="_blank" rel="noopener">scne.es</a>';
 // En la app nativa no hay service worker: las teselas guardadas para uso sin conexión se leen aquí.
 const CachedTileLayer = L.TileLayer.extend({
   createTile(coords, done) {
     const img = document.createElement('img');
     img.alt = ''; img.setAttribute('role', 'presentation');
+    if ('caches' in window) img.addEventListener('error', ev => { if (img.dataset.fb) return; img.dataset.fb = '1'; ev.stopImmediatePropagation(); tileFallback(this, coords, img).catch(() => this._tileOnError(done, img, ev)); }, { once: true });
     L.DomEvent.on(img, 'load', L.Util.bind(this._tileOnLoad, this, done, img));
     L.DomEvent.on(img, 'error', L.Util.bind(this._tileOnError, this, done, img));
     const url = this.getTileUrl(coords);
@@ -30,6 +32,25 @@ const CachedTileLayer = L.TileLayer.extend({
     return img;
   },
 });
+// Dirección de una tesela de cualquier nivel (getTileUrl de Leaflet usa el nivel del mapa, no el de la tesela)
+function tileUrlAt(layer, x, y, z) {
+  const c = Object.assign(L.point(x, y), { z });
+  if (layer.wmsParams) return layer.getTileUrl(c);
+  return L.Util.template(layer._url, L.extend({ r: '', s: layer._getSubdomain ? layer._getSubdomain(c) : '', x, y, z }, layer.options));
+}
+// Tesela que falta (sin cobertura y más cerca de lo que se descargó): se recorta y amplía la de un nivel guardado más alejado
+async function tileFallback(layer, coords, img) {
+  const cache = await caches.open('tiles-v1');
+  for (let k = 1; k <= 6 && coords.z - k >= 0; k++) {
+    const z = coords.z - k, x = coords.x >> k, y = coords.y >> k;
+    const u = tileUrlAt(layer, x, y, z);
+    const r = await cache.match(u); if (!r) continue;
+    const bmp = await createImageBitmap(await r.blob()), n = 1 << k, sz = 256 / n, c = document.createElement('canvas');
+    c.width = c.height = 256; c.getContext('2d').drawImage(bmp, (coords.x - (x << k)) * sz, (coords.y - (y << k)) * sz, sz, sz, 0, 0, 256, 256);
+    img.src = c.toDataURL('image/jpeg', 0.85); return;
+  }
+  throw new Error('sin tesela guardada');
+}
 const tiles = (url, o) => new CachedTileLayer(url, o);
 const CachedWMS = L.TileLayer.WMS.extend({ createTile: CachedTileLayer.prototype.createTile });
 const pnoaTiles = () => tiles(URL_PNOA, { maxNativeZoom: 19, maxZoom: 21, attribution: ATTR_IGN });
@@ -38,6 +59,7 @@ const BASES = {
   pnoa: { name: 'Ortofoto PNOA híbrida (IGN)', make: () => L.layerGroup([pnoaTiles(), tiles(URL_LABELS, { maxNativeZoom: 18, maxZoom: 21 })]) },
   // google: { name: 'Google híbrido', make: makeGoogle },  ← reservado para una futura versión premium con usuarios
   pnoaSolo: { name: 'Ortofoto PNOA sin rótulos', make: pnoaTiles },
+  mtn: { name: 'Mapa topográfico MTN25 ráster (IGN)', make: () => tiles(URL_MTN, { maxNativeZoom: 20, maxZoom: 21, attribution: ATTR_IGN }) },
   osm: { name: 'Callejero OpenStreetMap', make: () => L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 21, maxNativeZoom: 19, attribution: '© OpenStreetMap' }) },
 };
 
@@ -154,7 +176,7 @@ const CATALOG_GROUPS = [
     DERA('DERA_g8_tejido_economico', 'g08_07_ActividadExtractiva', 'Actividades extractivas (canteras)'),
   ] },
   { id: 'referencia', name: 'Cartografía de referencia', items: [
-    { name: 'Mapa topográfico MTN (IGN)', kind: 'wmts', url: ign('mapa-raster', 'MTN', 'image/jpeg'), maxNative: 18, opacity: 0.7, cover: 'España', attribution: ATTR_IGN },
+    { name: 'Mapa topográfico MTN25 ráster (IGN)', kind: 'wmts', url: URL_MTN, maxNative: 20, opacity: 0.8, cover: 'España', attribution: ATTR_IGN },
     DERA('DERA_g1_relieve', 'g01_03_CurvaNivel', 'Curvas de nivel'),
     { name: 'Límites administrativos (IGN)', kind: 'wms', url: 'https://www.ign.es/wms-inspire/unidades-administrativas', layers: 'AU.AdministrativeBoundary', cover: 'España', attribution: ATTR_IGN },
   ] },
@@ -441,6 +463,7 @@ function buildKml(entry) {
       else lyr = L.circleMarker(p.c[0], { radius: 7, color: '#fff', weight: 2, opacity: op, fillColor: st.icon || rec.color, fillOpacity: op });
       lyr.on('click', e => {
         L.DomEvent.stop(e);
+        if (geomEdit) return geomEditTap(e.latlng);
         if (drawing && !drawing.gps) return addDrawPt(L.latLng(e && e.latlng ? e.latlng : e)); if (slopePick || actPick || widthPick || offPick || calcPick) return slopePickPoint(e.latlng);
         if (measure) return addMeasurePt(e.latlng);
         featureSheet(f, e.latlng, rec);
@@ -573,6 +596,7 @@ function featureSheet(f, ll, rec) {
   if (f.type === 'ln') acts += `<button class="btn pri" data-a="slope">${ICON.slope}Pendiente</button><button class="btn" data-a="slclass">${ICON.slope}Tramificar pendientes</button><button class="btn pri" data-a="width">${ICON.width}Anchos</button><button class="btn go full" data-a="ficha">${ICON.note}Ficha de inspección de campo</button>`;
   acts += `<button class="btn" data-a="copy">${ICON.copy}Copiar coordenadas</button><button class="btn" data-a="measure">${ICON.ruler}Medir desde aquí</button>`;
   if (f.type === 'ln') acts += `<button class="btn" data-a="reverse">${ICON.swap}Invertir sentido</button>`;
+  if (geomEditable(f)) acts += `<button class="btn full" data-a="geoedit">${ICON.pen}${f.type === 'pt' ? 'Mover el punto' : f.type === 'ln' ? 'Editar la traza: mover puntos y alargar' : 'Editar el contorno'}</button>`;
   acts += `<button class="btn" data-a="props">${ICON.info}Propiedades de la capa</button><button class="btn" data-a="hidef">${ICON.eyeOff || ''}Ocultar este elemento</button><button class="btn" data-a="hidel">Ocultar la capa</button>`;
 
   let coords = '';
@@ -616,6 +640,7 @@ function featureSheet(f, ll, rec) {
   if (na) na.onclick = () => { const d = pkAt(f, ll).d; openActEditor({ rec, f, d0: d, d1: d }); };
   const rv = b.querySelector('[data-a=reverse]');
   if (rv) rv.onclick = () => reverseTrace(rec, f);
+  const ge = b.querySelector('[data-a=geoedit]'); if (ge) ge.onclick = () => startGeomEdit(rec, f, ll);
   const fb = b.querySelector('[data-a=ficha]');
   if (fb) fb.onclick = () => fichaForTrace(rec, f);
   b.querySelector('[data-a=props]').onclick = () => layerProps(rec.id);

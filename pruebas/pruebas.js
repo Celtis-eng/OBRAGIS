@@ -718,6 +718,39 @@ async function variasEnTramo() { // 1.19.6: varias actuaciones en el mismo tramo
   await browser.close();
 }
 
+async function ronda120() { // 1.20.0: editar trazas, asas de actuación, servicios al tocar, leyenda, MTN y sin conexión
+  const { browser, page: p, errores } = await abrir({ ancho: 400, alto: 820 });
+  await p.setInputFiles('#inKml', [DATOS + 'ejemplo-red-riego.kml']); await esperar(700);
+  const r = await p.evaluate(async () => { const e = [...layers.values()][0]; const f = e.feats.filter(x => x.length > 100)[0]; const fi = e.feats.indexOf(f);
+    const a = { id: uid(), obraId: settings.activeObra, layerId: e.rec.id, featIdx: fi, traceName: f.name, layerName: e.rec.name, d0: 300, d1: 500, type: 'Limpieza de cunetas', side: 'ambos', text: '', media: [], created: Date.now(), coords: segmentCoords(f, 300, 500), params: {}, prio: '' };
+    await DB.put('acts', a); acts.set(a.id, a); drawActs(); const q = pointAtPK(f, 300);
+    startGeomEdit(e.rec, f, L.latLng(f.start)); const s0 = f.start;
+    geomEdit.extend = 'start'; geomEditTap(L.latLng(s0[0] - 0.0012, s0[1] - 0.0015)); const n1 = geomEdit.pts.length;
+    await saveGeomEdit(); const nf = layers.get(e.rec.id).feats[fi], a2 = acts.get(a.id), q2 = pointAtPK(nf, a2.d0);
+    const kmlOk = /coordinates/.test((await DB.get('layers', e.rec.id)).text) && parseKML((await DB.get('layers', e.rec.id)).text).feats[fi].length > f.length + 100;
+    return { L0: f.length, L1: nf.length, n1, d0: a2.d0, mov: L.latLng(q2.lat, q2.lng).distanceTo([q.lat, q.lng]), kmlOk, bar: !!$('#geBar') && $('#geBar').hidden }; });
+  ok('Editar traza: alargar por el inicio la guarda en el KML', r.L1 > r.L0 + 100 && r.kmlOk && r.bar, JSON.stringify(r));
+  ok('Al alargar, la actuación se queda en su sitio y su PK se recalcula', r.mov < 1 && r.d0 > 400, JSON.stringify(r));
+  ok('«Deshacer» la edición de la traza vuelve a la original', await p.evaluate(async L0 => { await new Promise(r => setTimeout(r, 700)); $('#undoBar button').click(); await new Promise(r => setTimeout(r, 900)); const f = [...layers.values()][0].feats.filter(x => x.length > 100)[0]; return Math.abs(f.length - L0) < 1; }, r.L0));
+  ok('Editar actuación: asas A y B en el mapa', await p.evaluate(async () => { openActEditor({ act: [...acts.values()][0] }); await new Promise(r => setTimeout(r, 300)); const n = actHandles.getLayers().length; closeSheet(); await new Promise(r => setTimeout(r, 100)); return n === 2 && actHandles.getLayers().length === 0; }));
+  ok('Arrastrar el asa B mueve el PK final', await p.evaluate(async () => { const a = [...acts.values()][0]; openActEditor({ act: a }); await new Promise(r => setTimeout(r, 300)); const ctx = featOf(a), q = pointAtPK(ctx.f, 900); const hB = actHandles.getLayers()[1]; hB.setLatLng([q.lat, q.lng]); hB.fire('drag'); hB.fire('dragend'); const v = $('#aPk1').value; closeSheet(); return v === fmtPK(900); }));
+  // servicios: un toque en el mapa consulta las capas visibles; el doble toque no
+  await p.evaluate(async () => { await addService(CATALOG.find(c => c.name === 'Líneas eléctricas')); closeSheet(); });
+  await esperar(600);
+  const pt = await p.evaluate(() => { const b = $('#map').getBoundingClientRect(); return { x: b.left + b.width * 0.5, y: b.top + 120 }; });
+  await p.mouse.dblclick(pt.x, pt.y); await esperar(700);
+  ok('Doble toque con servicios visibles: acerca y no abre la consulta', await p.evaluate(() => $('#sheet').hidden));
+  await esperar(600); await p.mouse.click(pt.x, pt.y); await esperar(900);
+  ok('Un toque en el mapa con servicios visibles muestra qué hay en ese punto', await p.evaluate(() => !$('#sheet').hidden && /Servicios en este punto/.test($('#sheetBody').textContent)), await p.evaluate(() => JSON.stringify({ hidden: $('#sheet').hidden, h: ($('#sheetBody h2') || {}).textContent, q: wmsQueryable().length, el: document.elementFromPoint(200, 180) && document.elementFromPoint(200, 180).className })));
+  ok('Botón «Leyenda» con servicios visibles y su hoja', await p.evaluate(async () => { closeSheet(); await new Promise(r => setTimeout(r, 400)); const bt = $('#legendBtn'); if (!bt || bt.hidden) return false; bt.click(); return /Leyenda/.test($('#sheetBody h2').textContent) && !!$('#sheetBody .legend img'); }));
+  ok('Mapa base topográfico MTN25 (IGN) a máxima resolución', await p.evaluate(() => !!BASES.mtn && /mapa-raster.*layer=MTN/.test(URL_MTN) && CATALOG.find(c => /MTN25/.test(c.name)).maxNative === 20));
+  ok('Sin conexión: se puede guardar también el topográfico', await p.evaluate(() => zoneUrls({ kind: 'view', bounds: map.getBounds() }, { zMax: 12, orto: false, mtn: true }).every(u => /mapa-raster/.test(u))));
+  ok('Dirección de una tesela de otro nivel (para ampliar la guardada)', await p.evaluate(() => { const t = L.tileLayer(URL_PNOA); t._map = map; return /tilematrix=11&tilerow=7&tilecol=5/.test(tileUrlAt(t, 5, 7, 11)); }));
+  ok('Gestor de capas: subir/bajar dentro de las opciones (el nombre usa todo el ancho)', await p.evaluate(() => { openDrawer(); const has = !!document.querySelector('#drawer .lrow [data-up]'); closeDrawer(); return !has; }));
+  ok('Sin errores JS', !errores.length, errores.join(' | '));
+  await browser.close();
+}
+
 async function pendientesViejos() {
   const { browser, page: p, errores } = await abrir({ ancho: 400, alto: 820 });
   await p.setInputFiles('#inKml', [DATOS + 'pendientes_rangos.kml']); await esperar(600);
@@ -752,7 +785,7 @@ async function modoSencillo() {
 }
 
 (async () => {
-  for (const t of [pkYNumeros, geometriaYPendientes, actuacionesYBorradores, tramoAndandoYRepetir, bc3, paqueteYEnvio, toquesYBarras, borradoresYDictado, ronda4, ronda5, ronda6, ronda7, ronda8, ronda9, ronda10, copiaAutomatica, datosASalvo, importarVarios, variasEnTramo, pendientesViejos, modoSencillo]) {
+  for (const t of [pkYNumeros, geometriaYPendientes, actuacionesYBorradores, tramoAndandoYRepetir, bc3, paqueteYEnvio, toquesYBarras, borradoresYDictado, ronda4, ronda5, ronda6, ronda7, ronda8, ronda9, ronda10, copiaAutomatica, datosASalvo, importarVarios, variasEnTramo, ronda120, pendientesViejos, modoSencillo]) {
     console.log(`\n— ${t.name}`);
     try { await t(); } catch (e) { ok(t.name + ' terminó sin excepciones', false, e.message.split('\n')[0]); }
   }

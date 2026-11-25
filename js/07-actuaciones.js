@@ -214,7 +214,8 @@ function drawActs() {
   }
 }
 
-let actDraft = null;
+let actDraft = null, addMediaActNow = null;
+const actHandles = L.layerGroup().addTo(map); // asas para mover en el mapa el inicio y el final de la actuación que se edita
 // margen más probable según el tipo: firmes y badenes ocupan la calzada; limpiezas de cunetas, los dos márgenes
 const defaultSideFor = (t, cur) => { const it = actItem(t); return it.road || ['Bacheo', 'Badén'].includes(t) ? 'eje' : ['Limpieza de cunetas', 'Desbroce de márgenes'].includes(t) ? 'ambos' : cur; };
 // Otra actuación en el mismo tramo (mismos traza y PK; p. ej. refino + zahorra, o apertura de cuneta → cuneta revestida).
@@ -285,6 +286,7 @@ function renderActEditor() {
       <div class="field"><label for="aPk1">Hasta PK</label><input type="text" id="aPk1" inputmode="decimal" value="${fmtPK(a.d1)}" data-v="${fmtPK(a.d1)}"><small class="rb" id="aPk1rb"></small>
         <div class="pkbtns"><button class="mini" data-a="gps1" aria-label="Fin en mi posición">${ICON.locate}Aquí</button><button class="mini" data-a="map1" aria-label="Fin tocando el mapa">${ICON.pin}Mapa</button></div></div>
     </div>
+    ${f && f.type === 'ln' ? '<p class="hint tiny">También puedes arrastrar en el mapa los puntos A y B de la actuación a lo largo de la traza.</p>' : ''}
     <p class="hint" id="aLenHint">${len > 0 ? `Tramo de ${fmtLen(len)}.` : 'Ahora es una actuación puntual. Para un tramo, camina hasta el final y pulsa «Aquí» junto a «Hasta PK», o escribe el PK final.'}</p>
     ${fieldHtml ? `<h3 class="sh">3 · Medidas</h3><div class="pgrid">${fieldHtml}</div>` : ''}
     ${it ? '<div class="meas" id="aMeas"></div>' : ''}
@@ -327,7 +329,7 @@ function renderActEditor() {
   addDictation($('#aText'));
   b.querySelectorAll('[data-pf]').forEach(inp => inp.oninput = () => { if (inp.dataset.pf === 'w') delete actDraft.params._wAuto; inp.classList.remove('need'); { const nd = $('#need_' + inp.id); if (nd) nd.remove(); } fieldErr(inp, actFieldError(inp.dataset.pf, inp.value)); meas(); });
   if (f) showSlopeSegment(f, Math.min(a.d0, a.d1), Math.max(a.d0, a.d1));
-  onSheetClose(() => setTimeout(() => { if (!actPick && ($('#sheet').hidden || !$('#aText'))) { slopeHL.clearLayers(); if (!$('#aText')) actDraft = actPick ? actDraft : null; } }, 0));
+  onSheetClose(() => setTimeout(() => { if (!actPick && ($('#sheet').hidden || !$('#aText'))) { slopeHL.clearLayers(); actHandles.clearLayers(); if (!$('#aText')) actDraft = actPick ? actDraft : null; } }, 0));
   const setPK = (which, d) => { syncAct(); pkRule(which, Math.max(0, Math.min(f ? f.length : d, d))); if (actDraft.params._wAuto) delete actDraft.params.w; renderActEditor(); };
   $('#aType').onchange = () => { syncAct(); const nt = $('#aType').value, old = actItem(actDraft.type); actDraft.type = nt;
     if (!actDraft._sideSet && !acts.has(actDraft.id)) actDraft.side = defaultSideFor(nt, actDraft.side);
@@ -364,6 +366,19 @@ function renderActEditor() {
     if (d.params._wAuto && ctx) { const nw = roadWidthAt(ctx.rec, d.featIdx, lo, hi); if (nw) { d.params.w = Math.round(nw * 100) / 100; const wi = $('#pf_w'); if (wi) wi.value = String(d.params.w).replace('.', ','); } }
     meas();
   };
+  // asas A y B en el mapa: se arrastran a lo largo de la traza para mover el inicio y el final de la actuación
+  actHandles.clearLayers();
+  if (f && f.type === 'ln' && isFinite(actDraft.d0) && isFinite(actDraft.d1)) {
+    const point = Math.abs(actDraft.d1 - actDraft.d0) < 0.01;
+    const mkH = which => { const q = pointAtPK(f, actDraft[which]);
+      const m = L.marker([q.lat, q.lng], { icon: geIcon('end', point ? '•' : which === 'd0' ? 'A' : 'B'), draggable: true, keyboard: false, zIndexOffset: 1200, autoPan: true }).addTo(actHandles);
+      m.on('drag', ev => { if (!actDraft) return; const d2 = Math.max(0, Math.min(f.length, pkAt(f, ev.target.getLatLng()).d));
+        (point ? ['d0', 'd1'] : [which]).forEach(k => { actDraft[k] = d2; const el = $(k === 'd0' ? '#aPk0' : '#aPk1'); if (el) { el.value = fmtPK(d2); el.dataset.v = el.value; fieldErr(el, ''); const rb = $('#' + el.id + 'rb'); if (rb) rb.textContent = ''; el.classList.remove('bad'); } });
+        refreshActInline(); });
+      m.on('dragend', ev => { if (!actDraft) return; const q2 = pointAtPK(f, actDraft[which]); ev.target.setLatLng([q2.lat, q2.lng]); });
+    };
+    mkH('d0'); if (!point) mkH('d1');
+  }
   const gps = which => async () => {
     if (!f) { toast('La traza de esta actuación ya no está cargada.'); return; }
     toast('Obteniendo posición GPS…', 2000);
@@ -394,6 +409,7 @@ function renderActEditor() {
     }
     renderActEditor();
   };
+  addMediaActNow = addMediaAct; // para la foto recuperada tras cerrarse la app con la cámara abierta
   b.querySelector('[data-a=photo]').onclick = () => { syncAct(); capture('inPhoto', addMediaAct); };
   b.querySelector('[data-a=video]').onclick = () => { syncAct(); capture('inVideo', addMediaAct); };
   b.querySelectorAll('[data-rm]').forEach(el => el.onclick = () => { syncAct(); actDraft.media.splice(+el.dataset.rm, 1); renderActEditor(); });

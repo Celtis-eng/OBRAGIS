@@ -9,7 +9,7 @@ $('#fabNote').innerHTML = ICON.plus;
 $('#sheetX').innerHTML = ICON.close;
 // doble toque = acercar en el punto tocado, salvo cuando cada toque es un punto (medir, dibujar, elegir un PK en el mapa)
 { const h = map.doubleClickZoom, dz = L.Map.DoubleClickZoom.prototype._onDoubleClick; h.disable(); // primero se quita el de serie
-  h._onDoubleClick = function (e) { if (measure || drawing || actPick || slopePick) return; return dz.call(this, e); }; h.enable(); }
+  h._onDoubleClick = function (e) { if (measure || drawing || actPick || slopePick || (geomEdit && (geomEdit.extend || geomEdit.kind === 'pt'))) return; return dz.call(this, e); }; h.enable(); }
 $('#btnMenu').onclick = openDrawer;
 $('#scrim').onclick = closeDrawer;
 $('#sheetX').onclick = closeSheet;
@@ -30,7 +30,7 @@ $('#fabPhoto').onclick = () => {
     const at = p ? { lat: p.lat, lng: p.lng, acc: p.acc, src: 'gps' } : { ...map.getCenter(), src: 'mapa' };
     if (!p) toast('Sin señal GPS: la foto se ha situado en el centro del mapa. Arrastra el marcador para corregirla.', 7000);
     openEditor(at); addMedia(files);
-  });
+  }, { kind: 'quick' });
 };
 // Nueva anotación en mi posición
 $('#fabNote').onclick = () => {
@@ -167,6 +167,7 @@ function nativeInbox() { // app nativa: «Abrir con» y «Compartir»
     await DB.put('kv', drafts, 'drafts'); if (old) await DB.del('kv', 'draft'); // primero se guarda lo migrado y después se borra lo antiguo
     if (refreshPending()) showDraftBar();
   } catch (e) { console.warn('borradores', e); if (!drafts || typeof drafts !== 'object') drafts = {}; }
+  if (NATIVE) camRestoreListen(); // después de leer los borradores: la foto recuperada va al suyo
   checkLicense(); setInterval(checkLicense, 6 * 3600e3);
   if (NATIVE) setTimeout(() => checkAppUpdate(false), 5000);
   if (new URLSearchParams(location.search).has('shared')) { history.replaceState(null, '', './'); receiveShared(); }

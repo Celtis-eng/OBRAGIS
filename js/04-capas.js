@@ -418,6 +418,7 @@ let longFired = 0;
 })();
 
 function pointMenu(ll) {
+  if (geomEdit) return geomEditTap(ll);
   if (drawing && !drawing.gps) return addDrawPt(L.latLng(ll)); if (slopePick || actPick || widthPick || offPick || calcPick) return slopePickPoint(ll);
   if (measure) return addMeasurePt(ll);
   const queryable = orderedLayers().filter(e => e.rec.visible && e.tile && e.rec.kind === 'wms' && e.rec.info);
@@ -438,7 +439,7 @@ function pointMenu(ll) {
   const cross = L.marker(ll, { icon: L.divIcon({ className: '', html: '<div class="cross"></div>', iconSize: [28, 28], iconAnchor: [14, 14] }), interactive: false }).addTo(map);
   onSheetClose(() => map.removeLayer(cross));
   b.querySelector('[data-a=note]').onclick = () => openEditor({ lat: ll.lat, lng: ll.lng, src: 'mapa' });
-  b.querySelector('[data-a=photo]').onclick = () => { const at = { lat: ll.lat, lng: ll.lng, src: 'mapa' }; capture('inPhoto', files => { openEditor(at); addMedia(files); }); };
+  b.querySelector('[data-a=photo]').onclick = () => { const at = { lat: ll.lat, lng: ll.lng, src: 'mapa' }; capture('inPhoto', files => { openEditor(at); addMedia(files); }, { kind: 'at', at }); };
   b.querySelector('[data-a=copy]').onclick = () => copyText(`${fmtLL(ll.lat, ll.lng)}\n${fmtUTM(ll.lat, ll.lng)}`);
   b.querySelector('[data-a=measure]').onclick = () => { closeSheet(); startMeasure(ll); };
   b.querySelector('[data-a=resadd]').onclick = () => resourceEditor({ lat: ll.lat, lng: ll.lng });
@@ -460,9 +461,9 @@ function featureInfoUrl(rec, ll, fmt) {
   return `${rec.url}?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetFeatureInfo&LAYERS=${lay}&QUERY_LAYERS=${lay}&STYLES=&SRS=EPSG:3857&BBOX=${bbox}`
     + `&WIDTH=${size}&HEIGHT=${size}&X=${Math.floor(size / 2)}&Y=${Math.floor(size / 2)}&FEATURE_COUNT=5&FORMAT=image/png&INFO_FORMAT=${encodeURIComponent(fmt)}`;
 }
-async function httpGetText(url) {
+async function httpGetText(url, headers) {
   const H = Plug('CapacitorHttp');
-  if (NATIVE && H) { const r = await H.get({ url, responseType: 'text', connectTimeout: 12000, readTimeout: 12000 }); if (r.status >= 400) throw new Error('HTTP ' + r.status); return typeof r.data === 'string' ? r.data : JSON.stringify(r.data); }
+  if (NATIVE && H) { const r = await H.get({ url, headers: headers || {}, responseType: 'text', connectTimeout: 12000, readTimeout: 12000 }); if (r.status >= 400) throw new Error('HTTP ' + r.status); return typeof r.data === 'string' ? r.data : JSON.stringify(r.data); }
   const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 12000);
   try { const r = await fetch(url, { signal: ctl.signal }); if (!r.ok) throw new Error('HTTP ' + r.status); return await r.text(); }
   finally { clearTimeout(t); }
@@ -487,8 +488,8 @@ function parseInfo(text, fmt) {
   if (!txt || /no (features|results|se ha encontrado)|search returned no results/i.test(txt)) return [];
   return [[['', txt.slice(0, 600)]]];
 }
-async function queryAfecciones(ll, list) {
-  const out = list.map(e => ({ e, html: '' }));
+async function queryAfecciones(ll, list, opts = {}) {
+  const out = list.map(e => ({ e, html: '', withLegend: !!opts.legend }));
   const render = () => {
     const box = $('#afecList'); if (!box) return;
     const hits = out.filter(o => o.html && o.html !== 'none' && !o.fail);
@@ -505,7 +506,7 @@ async function queryAfecciones(ll, list) {
     const link = featureInfoUrl(r, ll, 'text/html');
     try {
       const feats = parseInfo(await httpGetText(featureInfoUrl(r, ll, fmt)), r.info);
-      o.html = feats.length ? `<div class="afec-item"><b>${esc(r.name)}</b>${feats.slice(0, 3).map(f => `<table class="attrs">${f.slice(0, 12).map(([k, v]) => `<tr>${k ? `<td>${esc(k)}</td>` : ''}<td${k ? '' : ' colspan="2"'}>${esc(String(v))}</td></tr>`).join('')}</table>`).join('')}</div>` : 'none';
+      o.html = feats.length ? `<div class="afec-item"><b>${esc(r.name)}</b>${r.kind !== 'wmts' && o.withLegend ? `<div class="legend sm"><img src="${esc(legendUrl(r))}" alt="Leyenda de ${esc(r.name)}" onerror="this.parentNode.remove()"></div>` : ''}${feats.slice(0, 3).map(f => `<table class="attrs">${f.slice(0, 12).map(([k, v]) => `<tr>${k ? `<td>${esc(k)}</td>` : ''}<td${k ? '' : ' colspan="2"'}>${esc(String(v))}</td></tr>`).join('')}</table>`).join('')}</div>` : 'none';
     } catch (err) {
       o.html = 'fail'; o.fail = true; o.link = link;
     }
@@ -513,3 +514,39 @@ async function queryAfecciones(ll, list) {
   }));
   render();
 }
+
+/* ---- Tocar el mapa con servicios (WMS) visibles: qué hay en ese punto y su leyenda ----
+   Un toque corto en el mapa (no en una traza ni en un punto) consulta las capas de servicios visibles.
+   Se espera un instante: si es un doble toque, solo se acerca el mapa. */
+let wmsTapT = null;
+const wmsQueryable = () => orderedLayers().filter(e => e.rec.visible && e.tile && e.rec.kind === 'wms' && e.rec.info);
+function wmsTap(ll) {
+  if (!$('#sheet').hidden || !wmsQueryable().length) return;
+  clearTimeout(wmsTapT); wmsTapT = setTimeout(() => wmsInfoSheet(ll), 330);
+}
+map.on('dblclick zoomstart dragstart', () => clearTimeout(wmsTapT));
+function wmsInfoSheet(ll) {
+  const q = wmsQueryable(); if (!q.length) return;
+  const b = openSheet(`<h2>Servicios en este punto</h2><p class="sub">${q.length === 1 ? esc(q[0].rec.name) : plural(q.length, 'capa consultada', 'capas consultadas')}${distFromMe(ll.lat, ll.lng)}</p>
+    <div class="afec"><div id="afecList"><p class="hint">Consultando ${plural(q.length, 'capa', 'capas')}…</p></div></div>
+    <div class="acts"><button class="btn" data-a="legend">${ICON.layers}Leyenda de las capas</button><button class="btn" data-a="more">Más opciones en este punto</button></div>`);
+  const cross = L.marker(ll, { icon: L.divIcon({ className: '', html: '<div class="cross"></div>', iconSize: [28, 28], iconAnchor: [14, 14] }), interactive: false }).addTo(map);
+  onSheetClose(() => map.removeLayer(cross));
+  b.querySelector('[data-a=legend]').onclick = legendSheet;
+  b.querySelector('[data-a=more]').onclick = () => pointMenu(ll);
+  queryAfecciones(ll, q, { legend: true });
+}
+// Leyenda de todas las capas de servicios visibles (botón «Leyenda» sobre el mapa)
+function legendSheet() {
+  const v = orderedLayers().filter(e => e.rec.visible && e.tile && typeOf(e.rec) === 'wms');
+  openSheet(`<h2>Leyenda</h2><p class="sub">Capas de servicios visibles en el mapa. Toca el mapa sobre un elemento para ver qué es.</p>
+    ${v.length ? v.map(e => `<div class="legrow"><b>${esc(e.rec.name)}</b>${e.rec.kind !== 'wmts' ? `<div class="legend"><img src="${esc(legendUrl(e.rec))}" alt="Leyenda de ${esc(e.rec.name)}" onerror="this.parentNode.outerHTML='<p class=hint>Este servicio no publica leyenda.</p>'"></div>` : '<p class="hint">Mapa de fondo, sin leyenda.</p>'}<small class="hint">${esc(e.rec.attribution || '')}</small></div>`).join('') : '<p class="empty">No hay capas de servicios visibles.</p>'}`);
+}
+let legBtnT = null;
+function updateLegendBtn() {
+  clearTimeout(legBtnT); legBtnT = setTimeout(() => {
+    let bt = $('#legendBtn'); const n = orderedLayers().filter(e => e.rec.visible && e.tile && typeOf(e.rec) === 'wms' && e.rec.kind !== 'wmts').length;
+    if (!bt) { if (!n) return; bt = document.createElement('button'); bt.id = 'legendBtn'; bt.type = 'button'; bt.className = 'legbtn'; bt.onclick = legendSheet; document.body.appendChild(bt); }
+    bt.hidden = !n; bt.innerHTML = `${ICON.layers}Leyenda${n > 1 ? ` (${n})` : ''}`; }, 200);
+}
+map.on('layeradd layerremove', updateLegendBtn);
