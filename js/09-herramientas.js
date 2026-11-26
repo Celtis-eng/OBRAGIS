@@ -627,7 +627,7 @@ async function runAfecReport(c) {
       if (job.dead.has(r.id)) { job.done++; continue; }
       const fmt = r.info === 'json' ? 'application/json' : 'text/html', url = featureInfoUrlR(r, s.ll, fmt, c.radius);
       try {
-        let feats = cache.get(url); if (!feats) { feats = parseInfo(await httpGetText(url), r.info); cache.set(url, feats); }
+        let feats = cache.get(url); if (!feats) { feats = parseInfo(await httpGetText(url), r.info, r); cache.set(url, feats); }
         job.fails.set(r.id, 0);
         feats.forEach(attrs => { if (attrs.length) hits.push({ s, svc, attrs, key: r.id + '|' + JSON.stringify(attrs.slice(0, 6)) }); });
       } catch (err) {

@@ -746,6 +746,11 @@ async function ronda120() { // 1.20.0: editar trazas, asas de actuación, servic
   ok('Mapa base topográfico MTN25 (IGN) a máxima resolución', await p.evaluate(() => !!BASES.mtn && /mapa-raster.*layer=MTN/.test(URL_MTN) && CATALOG.find(c => /MTN25/.test(c.name)).maxNative === 20));
   ok('Sin conexión: se puede guardar también el topográfico', await p.evaluate(() => zoneUrls({ kind: 'view', bounds: map.getBounds() }, { zMax: 12, orto: false, mtn: true }).every(u => /mapa-raster/.test(u))));
   ok('Dirección de una tesela de otro nivel (para ampliar la guardada)', await p.evaluate(() => { const t = L.tileLayer(URL_PNOA); t._map = map; return /tilematrix=11&tilerow=7&tilecol=5/.test(tileUrlAt(t, 5, 7, 11)); }));
+  ok('Demarcaciones hidrográficas en el catálogo y en el kit de afecciones', await p.evaluate(() => { const c = CATALOG.find(x => /Demarcaciones hidrográficas/.test(x.name)); return !!c && c.layers === 'demarcac_hidrograf_phc' && AFECCIONES_KIT.includes(c.name); }));
+  ok('La consulta de la demarcación dice la vertiente (atlántica o mediterránea)', await p.evaluate(() => { const rec = { layers: 'demarcac_hidrograf_phc' };
+    const m = parseInfo('<table><tr><th>Código</th><th>Nombre</th></tr><tr><td>ES060</td><td>Cuencas Mediterráneas Andaluzas</td></tr></table>', 'html', rec);
+    const a = parseInfo('<table><tr><td>Nombre</td><td>Guadalquivir</td></tr></table>', 'html', rec);
+    return m[0][0][1] === 'Mediterránea' && a[0][0][1] === 'Atlántica'; }));
   ok('Gestor de capas: subir/bajar dentro de las opciones (el nombre usa todo el ancho)', await p.evaluate(() => { openDrawer(); const has = !!document.querySelector('#drawer .lrow [data-up]'); closeDrawer(); return !has; }));
   ok('Sin errores JS', !errores.length, errores.join(' | '));
   await browser.close();

@@ -469,7 +469,14 @@ async function httpGetText(url, headers) {
   finally { clearTimeout(t); }
 }
 const HIDE_KEYS = /^(fid|gid|objectid|shape|geom|the_geom|bbox|id_?$)/i;
-function parseInfo(text, fmt) {
+// Vertiente de cada demarcación hidrográfica (lo que se pregunta al ver una afección: ¿cuenca atlántica o mediterránea?)
+const VERTIENTE = [[/mediterr[aá]neas? andaluzas|segura|j[uú]car|ebro|cataluñ|balear/i, 'Mediterránea'], [/guadalquivir|guadalete|barbate|tinto|odiel|piedras|guadiana|tajo|duero|miño|cant[aá]brico/i, 'Atlántica']];
+function vertienteDe(feats) {
+  return feats.map(f => { const txt = f.map(([, v]) => String(v)).join(' '); const hit = VERTIENTE.find(([re]) => re.test(txt));
+    return hit && !f.some(([k]) => /vertiente/i.test(k)) ? [['Vertiente', hit[1]], ...f] : f; });
+}
+function parseInfo(text, fmt, rec) { const out = parseInfo0(text, fmt); return rec && /demarcac/i.test(rec.layers || '') ? vertienteDe(out) : out; }
+function parseInfo0(text, fmt) {
   if (fmt === 'json') {
     const j = JSON.parse(text);
     return (j.features || []).map(f => Object.entries(f.properties || {}).filter(([k, v]) => v !== null && v !== '' && !HIDE_KEYS.test(k) && typeof v !== 'object'));
@@ -505,7 +512,7 @@ async function queryAfecciones(ll, list, opts = {}) {
     const r = o.e.rec, fmt = r.info === 'json' ? 'application/json' : 'text/html';
     const link = featureInfoUrl(r, ll, 'text/html');
     try {
-      const feats = parseInfo(await httpGetText(featureInfoUrl(r, ll, fmt)), r.info);
+      const feats = parseInfo(await httpGetText(featureInfoUrl(r, ll, fmt)), r.info, r);
       o.html = feats.length ? `<div class="afec-item"><b>${esc(r.name)}</b>${r.kind !== 'wmts' && o.withLegend ? `<div class="legend sm"><img src="${esc(legendUrl(r))}" alt="Leyenda de ${esc(r.name)}" onerror="this.parentNode.remove()"></div>` : ''}${feats.slice(0, 3).map(f => `<table class="attrs">${f.slice(0, 12).map(([k, v]) => `<tr>${k ? `<td>${esc(k)}</td>` : ''}<td${k ? '' : ' colspan="2"'}>${esc(String(v))}</td></tr>`).join('')}</table>`).join('')}</div>` : 'none';
     } catch (err) {
       o.html = 'fail'; o.fail = true; o.link = link;
