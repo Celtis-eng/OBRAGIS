@@ -60,6 +60,8 @@ const BASES = {
   // google: { name: 'Google híbrido', make: makeGoogle },  ← reservado para una futura versión premium con usuarios
   pnoaSolo: { name: 'Ortofoto PNOA sin rótulos', make: pnoaTiles },
   mtn: { name: 'Mapa topográfico MTN25 ráster (IGN)', make: () => tiles(URL_MTN, { maxNativeZoom: 20, maxZoom: 21, attribution: ATTR_IGN }) },
+  blanco: { name: 'Sin mapa: fondo blanco', make: () => L.layerGroup(), bg: '#ffffff' },
+  negro: { name: 'Sin mapa: fondo negro', make: () => L.layerGroup(), bg: '#000000' },
   osm: { name: 'Callejero OpenStreetMap', make: () => L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 21, maxNativeZoom: 19, attribution: '© OpenStreetMap' }) },
 };
 
@@ -98,6 +100,7 @@ async function setBase(id) {
   if (baseLayer) map.removeLayer(baseLayer);
   baseLayer = layer.addTo(map);
   settings.base = id; saveSettings(); odKey = ''; updateOrthoDate();
+  $('#map').style.background = BASES[id].bg || ''; document.body.classList.toggle('nobase', !!BASES[id].bg); document.body.classList.toggle('nobase-dark', BASES[id].bg === '#000000'); // sin mapa: las capas KML se ven mejor
   if (!$('#drawer').hidden) renderDrawer();
 }
 

@@ -187,6 +187,10 @@ function drawActs() {
     if (!a.coords || !a.coords.length || !bounds.intersects(L.latLngBounds(a.coords))) continue;
     if (hiddenCats.has(actItem(a.type).cat)) continue;
     const col = actColor(a.type), sides = a.side === 'ambos' ? [off, -off] : a.side === 'izq' ? [off] : a.side === 'der' ? [-off] : [0];
+    // con el mapa muy alejado un tramo ocupa pocos píxeles: se dibuja además una marca en su centro para que se vea
+    if (z < 16) { const p0 = map.latLngToLayerPoint(a.coords[0]), p1 = map.latLngToLayerPoint(a.coords[a.coords.length - 1]);
+      if (p0.distanceTo(p1) < 18) { const mid = a.coords[Math.floor(a.coords.length / 2)];
+        const mk = L.circleMarker(mid, { radius: z < 12 ? 5 : 6, color: '#fff', weight: 2, fillColor: col, fillOpacity: 1 }); mk.on('click', actClick(a)); mk.addTo(actsLayer); } }
     sides.forEach(px => {
       let lyr;
       if (a.coords.length > 1 && a.d1 > a.d0) {

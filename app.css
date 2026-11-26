@@ -975,3 +975,7 @@ body:has(#walkBar:not([hidden])) .savebar.plusfoot{padding-bottom:calc(var(--wbh
 .gebar .row2{display:grid;grid-template-columns:1fr 1.4fr;gap:8px}
 .gebar .mini.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 .gebar .mini svg{width:15px;height:15px}
+/* 1.20.2 · Sin mapa base (fondo blanco o negro) */
+body.nobase:not(.nobase-dark) .pk-label span{color:#1b1b1b;text-shadow:0 0 3px #fff,0 0 3px #fff}
+body.nobase:not(.nobase-dark) .odate{display:none}
+ul.plain{margin:6px 0;padding-left:20px}

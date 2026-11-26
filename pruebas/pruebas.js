@@ -756,6 +756,29 @@ async function ronda120() { // 1.20.0: editar trazas, asas de actuación, servic
   await browser.close();
 }
 
+async function ronda1202() { // 1.20.2: servicios → KML, sin mapa base, actuaciones visibles de lejos
+  const { browser, page: p, errores } = await abrir({ ancho: 400, alto: 820 });
+  const json = JSON.stringify({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: { id_dera: 1, nombre: 'ATARFE_CAMINORO', tension_kV: 66 }, geometry: { type: 'MultiLineString', coordinates: [[[-3.69676197, 37.22443047], [-3.6900, 37.2200], [-3.6800, 37.2150]]] } }] });
+  const gml = `<?xml version="1.0"?><wfs:FeatureCollection xmlns:wfs="http://www.opengis.net/wfs" xmlns:gml="http://www.opengis.net/gml" xmlns:ms="http://mapserver.gis.umn.edu/mapserver"><gml:featureMember><ms:Inventario_VVPP><gml:boundedBy><gml:Envelope><gml:lowerCorner>37.1 -3.6</gml:lowerCorner></gml:Envelope></gml:boundedBy><ms:msGeometry><gml:LineString srsName="EPSG:4326"><gml:posList>37.172173 -3.535598 37.172148 -3.535797 37.172048 -3.536074</gml:posList></gml:LineString></ms:msGeometry><ms:OBJECTID>18723</ms:OBJECTID><ms:NOMBRE>VEREDA DE LA CUESTA DE CANTALOBOS</ms:NOMBRE><ms:MUNICIPIO>Granada</ms:MUNICIPIO></ms:Inventario_VVPP></gml:featureMember></wfs:FeatureCollection>`;
+  const pedidas = [];
+  await p.route(/SERVICE=WFS/i, route => { const u = route.request().url(); pedidas.push(u); return route.fulfill({ body: /ideandalucia/.test(u) ? json : gml, contentType: /ideandalucia/.test(u) ? 'application/json' : 'text/xml', headers: { 'access-control-allow-origin': '*' } }); });
+  await p.evaluate(async () => { for (const n of ['Líneas eléctricas', 'Vías pecuarias (inventario REDIAM)']) await addService(CATALOG.find(c => c.name === n)); closeSheet(); map.setView([37.2, -3.6], 12); });
+  await esperar(500);
+  await p.evaluate(() => { const ids = [...layers.values()].filter(e => typeOf(e.rec) === 'wms').map(e => e.rec.id); wfsSheet(ids); }); await esperar(300);
+  await p.click('#sheetBody [data-a=go]'); await esperar(2500);
+  const r = await p.evaluate(() => ({ kml: [...layers.values()].filter(e => typeOf(e.rec) === 'kml').map(e => [e.rec.name, e.feats.length, e.feats[0].name, e.feats[0].start, (e.feats[0].attrs || []).length]), res: $('#wfsRes').textContent }));
+  ok('Servicios → KML: crea una capa KML por servicio con sus elementos y atributos', r.kml.length === 2 && r.kml.some(k => /Líneas/.test(k[0]) && k[2] === 'ATARFE_CAMINORO' && k[4] >= 2) && r.kml.some(k => /VEREDA/.test(k[2])), JSON.stringify(r));
+  ok('Las coordenadas quedan en su sitio (también si el servidor da latitud primero)', r.kml.every(k => k[3][0] > 37 && k[3][0] < 38 && k[3][1] < -3 && k[3][1] > -4), JSON.stringify(r.kml.map(k => k[3])));
+  ok('La zona se pide en grados con su sistema (WFS 1.1.0)', pedidas.length === 2 && pedidas.every(u => /VERSION=1\.1\.0/.test(u) && /urn%3Aogc%3Adef%3Acrs%3AEPSG%3A%3A4326/.test(u)), pedidas.join(' | '));
+  ok('Selección de capas: botón «Servicios → KML»', await p.evaluate(async () => { closeSheet(); selMode = true; [...layers.values()].filter(e => typeOf(e.rec) === 'wms').forEach(e => selIds.add(e.rec.id)); openDrawer(); await renderDrawer(); const b = document.querySelector('#drawer [data-s=wfs]'); const ok = b && !b.disabled; selMode = false; selIds.clear(); closeDrawer(); return ok; }));
+  ok('Sin mapa base: fondo blanco y fondo negro', await p.evaluate(async () => { await setBase('blanco'); const w = getComputedStyle($('#map')).backgroundColor; await setBase('negro'); const k = getComputedStyle($('#map')).backgroundColor; await setBase('pnoa'); return w === 'rgb(255, 255, 255)' && k === 'rgb(0, 0, 0)' && !document.body.classList.contains('nobase'); }));
+  ok('Actuaciones visibles con el mapa muy alejado (marca en el centro)', await p.evaluate(async () => { const e = [...layers.values()].find(x => typeOf(x.rec) === 'kml'), f = e.feats[0], c = f.parts[0].c;
+    const a = { id: uid(), obraId: settings.activeObra, layerId: e.rec.id, featIdx: 0, traceName: f.name, layerName: e.rec.name, d0: 0, d1: 50, type: 'Limpieza de cunetas', side: 'ambos', text: '', media: [], created: Date.now(), coords: [c[0], c[1]], params: {}, prio: '' };
+    acts.set(a.id, a); map.setView(c[0], 9); await new Promise(r => setTimeout(r, 400)); drawActs(); const n = actsLayer.getLayers().filter(l => l instanceof L.CircleMarker).length; acts.delete(a.id); drawActs(); return n >= 1; }));
+  ok('Sin errores JS', !errores.length, errores.join(' | '));
+  await browser.close();
+}
+
 async function pendientesViejos() {
   const { browser, page: p, errores } = await abrir({ ancho: 400, alto: 820 });
   await p.setInputFiles('#inKml', [DATOS + 'pendientes_rangos.kml']); await esperar(600);
@@ -790,7 +813,7 @@ async function modoSencillo() {
 }
 
 (async () => {
-  for (const t of [pkYNumeros, geometriaYPendientes, actuacionesYBorradores, tramoAndandoYRepetir, bc3, paqueteYEnvio, toquesYBarras, borradoresYDictado, ronda4, ronda5, ronda6, ronda7, ronda8, ronda9, ronda10, copiaAutomatica, datosASalvo, importarVarios, variasEnTramo, ronda120, pendientesViejos, modoSencillo]) {
+  for (const t of [pkYNumeros, geometriaYPendientes, actuacionesYBorradores, tramoAndandoYRepetir, bc3, paqueteYEnvio, toquesYBarras, borradoresYDictado, ronda4, ronda5, ronda6, ronda7, ronda8, ronda9, ronda10, copiaAutomatica, datosASalvo, importarVarios, variasEnTramo, ronda120, ronda1202, pendientesViejos, modoSencillo]) {
     console.log(`\n— ${t.name}`);
     try { await t(); } catch (e) { ok(t.name + ' terminó sin excepciones', false, e.message.split('\n')[0]); }
   }

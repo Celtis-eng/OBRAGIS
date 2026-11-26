@@ -25,6 +25,7 @@ function layerOptions(e) {
   h += `<div class="field row"><input type="text" value="${esc(r.name)}" data-name="${id}" aria-label="Nombre de la capa"><button class="mini" data-rename="${id}">Renombrar</button></div>`;
   h += `<div class="row"><button class="mini" data-props="${id}">${ICON.info}Propiedades</button>${t === 'kml' ? `<button class="mini" data-attr="${id}">${ICON.table}Tabla</button><button class="mini" data-afec="${id}">Afecciones</button>` : ''}${t !== 'wms' ? `<button class="mini" data-zoom="${id}">Encuadrar</button>` : ''}${t === 'photos' ? `<button class="mini" data-sharephotos="${id}">Compartir fotos con GPS</button>` : ''}<button class="mini del" data-dell="${id}">Eliminar capa</button></div>`;
   h += `<div class="field row"><input type="text" list="folderList" value="${esc(folderOf(r))}" data-folder="${id}" aria-label="Carpeta de la capa"><button class="mini" data-movefolder="${id}">Mover a carpeta</button></div>`;
+  if (t === 'wms' && wfsOk(r)) h += `<div class="row"><button class="mini" data-wfs="${id}">Pasar a KML (elementos de la zona)</button></div>`;
   if (t === 'wms' && r.kind !== 'wmts') h += `<div class="legend"><img src="${esc(legendUrl(r))}" alt="Leyenda de ${esc(r.name)}" onerror="this.parentNode.remove()"></div>`;
   if (t === 'wms') h += `<p class="hint">${esc(r.url)}${r.layers ? ' · ' + esc(r.layers) : ''}${r.cover ? ' · cobertura: ' + esc(r.cover) : ''}</p>`;
   return h;
@@ -108,6 +109,7 @@ async function renderDrawer() {
         <button class="mini" data-s="folder" ${nSel ? '' : 'disabled'}>${ICON.folder}Agrupar en carpeta</button>
         <button class="mini" data-s="union" ${selKml >= 2 ? '' : 'disabled'}>Unir KML</button>
         <button class="mini" data-s="afec" ${selKml >= 1 ? '' : 'disabled'}>Informe de afecciones</button>
+        <button class="mini" data-s="wfs" ${[...selIds].some(id => layers.has(id) && typeOf(layers.get(id).rec) === 'wms') ? '' : 'disabled'}>Servicios → KML</button>
         <button class="mini" data-s="export" ${nSel ? '' : 'disabled'}>Exportar / compartir</button>
         <button class="mini del" data-s="del" ${nSel ? '' : 'disabled'}>Eliminar</button>
       </div></div>` : ''}
@@ -183,6 +185,7 @@ async function renderDrawer() {
     closeDrawer(); zoomToLayer(id);
   });
   d.querySelectorAll('[data-dell]').forEach(bt => bt.onclick = () => deleteLayer(bt.dataset.dell));
+  d.querySelectorAll('[data-wfs]').forEach(bt => bt.onclick = () => { closeDrawer(); wfsSheet([bt.dataset.wfs]); });
   d.querySelectorAll('[data-props]').forEach(bt => bt.onclick = () => { closeDrawer(); layerProps(bt.dataset.props); });
   d.querySelectorAll('[data-attr]').forEach(bt => bt.onclick = () => { closeDrawer(); attrTable(bt.dataset.attr); });
   d.querySelectorAll('[data-op]').forEach(r => {
@@ -307,6 +310,7 @@ async function selectionAction(act) {
   if (act === 'cancel') { selMode = false; selIds.clear(); return renderDrawer(); }
   if (act === 'all') { layers.forEach((e, id) => selIds.add(id)); return renderDrawer(); }
   if (!ids.length) return;
+  if (act === 'wfs') { closeDrawer(); return wfsSheet(ids); }
   if (act === 'show' || act === 'hide') { for (const id of ids) await setLayerVisible(id, act === 'show'); return renderDrawer(); }
   if (act === 'up' || act === 'down') return groupMove(ids.filter(id => !isPointLayer(layers.get(id).rec)), act === 'up' ? -1 : 1);
   if (act === 'del') {
