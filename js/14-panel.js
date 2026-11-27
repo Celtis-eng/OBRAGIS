@@ -137,6 +137,7 @@ async function renderDrawer() {
       <button class="btn full" data-t="measure">${ICON.ruler}Medir distancia o superficie</button>
       <button class="btn full" data-t="calc">${ICON.calc}Calculadora</button>
       <button class="btn full" data-t="afec">${ICON.layers}Informe de afecciones</button>
+      <button class="btn full" data-t="cauces">${ICON.layers}Cauces y zona de policía</button>
     </div>
     <details class="more dmore tech"><summary>Más herramientas</summary><div class="acts mlist">
       <button class="btn full" data-t="fichas">${ICON.note}Fichas de inspección de campo</button>
@@ -238,6 +239,7 @@ async function renderDrawer() {
   d.querySelector('[data-t=calc]').onclick = () => { closeDrawer(); calcSheet(); };
   d.querySelector('[data-t=fichas]').onclick = () => { closeDrawer(); fichaList(); };
   d.querySelector('[data-t=afec]').onclick = () => { closeDrawer(); afecSheet(); };
+  d.querySelector('[data-t=cauces]').onclick = () => { closeDrawer(); cauceSheet(); };
   d.querySelector('[data-t=send]').onclick = () => { closeDrawer(); sendToOffice(); };
   d.querySelector('[data-t=bc3]').onclick = () => { closeDrawer(); bc3Sheet(); };
   $('#chkSimple').onchange = e => { settings.simple = e.target.checked; saveSettings(); applySimple(); renderDrawer(); };

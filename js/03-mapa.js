@@ -128,6 +128,8 @@ const CATALOG_GROUPS = [
     MITECO('Zi_laminas_q10', 'Zona inundable T=10 años'),
     MITECO('Zi_laminas_q100', 'Zona inundable T=100 años'),
     MITECO('Zi_laminas_q500', 'Zona inundable T=500 años'),
+    { name: 'Red hidrográfica 1:10.000 (Junta, BCA10)', kind: 'wms', url: 'https://www.juntadeandalucia.es/institutodeestadisticaycartografia/geoserver-ieca/bca/wms', layers: '03_Red_Hidrografica', cover: 'Andalucía', attribution: 'BCA10 © IECA, Junta de Andalucía', wfsUrl: 'https://www.juntadeandalucia.es/institutodeestadisticaycartografia/geoserver-ieca/bca/wfs', wfsType: '/(curso|cauce|hidro|rio|río)/' },
+    { name: 'Cauces 1:25.000 (IGN, hidrografía del MTN25)', kind: 'wms', url: 'https://servicios.idee.es/wms-inspire/hidrografia', layers: 'HY.PhysicalWaters.Waterbodies', resolve: 'Watercourse|Waterbod', info: 'html', cover: 'España', attribution: 'Hidrografía IGR-HI © IGN, CC-BY 4.0', wfsUrl: 'https://servicios.idee.es/wfs-inspire/hidrografia', wfsType: '/watercourse/' },
     { name: 'Demarcaciones hidrográficas (vertiente atlántica o mediterránea)', kind: 'wms', url: 'https://www.juntadeandalucia.es/medioambiente/mapwms/REDIAM_demarcaciones_hidrograficas_phc', layers: 'demarcac_hidrograf_phc', info: 'html', cover: 'Andalucía', opacity: 0.45, attribution: 'REDIAM, Junta de Andalucía (PHC 2022-2027)' },
     DERA('DERA_g3_hidrografia', 'g03_01_Rio', 'Ríos y arroyos'),
     DERA('DERA_g3_hidrografia', 'g03_06_Embalse', 'Embalses'),
@@ -187,7 +189,7 @@ const CATALOG_GROUPS = [
 ];
 const CATALOG = CATALOG_GROUPS.flatMap(g => g.items.map(i => ({ ...i, group: g.id })));
 // Selección básica para revisar las afecciones de una obra
-const AFECCIONES_KIT = ['Demarcaciones hidrográficas (vertiente atlántica o mediterránea)', 'Líneas eléctricas', 'Subestaciones eléctricas', 'Gasoductos', 'Oleoductos', 'Red de carreteras', 'Ferrocarril',
+const AFECCIONES_KIT = ['Demarcaciones hidrográficas (vertiente atlántica o mediterránea)', 'Red hidrográfica 1:10.000 (Junta, BCA10)', 'Cauces 1:25.000 (IGN, hidrografía del MTN25)', 'Líneas eléctricas', 'Subestaciones eléctricas', 'Gasoductos', 'Oleoductos', 'Red de carreteras', 'Ferrocarril',
   'Vías pecuarias (inventario REDIAM)', 'DPH cartográfico (cauces)', 'Zona de flujo preferente', 'Zona inundable T=100 años',
   'Conducciones de agua', 'Canales', 'Espacios naturales protegidos', 'Red Natura 2000 · ZEC', 'Red Natura 2000 · ZEPA',
   'Montes públicos', 'Bienes protegidos (áreas)', 'Bienes protegidos (puntos)', 'Parcelas de Catastro'];

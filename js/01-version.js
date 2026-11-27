@@ -6,9 +6,10 @@
 /* ---------------- Versión de la app ----------------
    Cambia APP_VERSION en cada entrega (también se usa como versión de la app Android).
    Formato MAYOR.MENOR.CORRECCIÓN: menor = función nueva, corrección = arreglo. */
-const APP_VERSION = '1.20.3';
+const APP_VERSION = '1.20.4';
 const APP_DATE = '2026-11-23';
 const CHANGELOG = [
+  ['1.20.4', '27/11/2026', 'Afecciones de agua: nuevas capas «Red hidrográfica 1:10.000 (Junta)» y «Cauces 1:25.000 (IGN)», también en el kit de afecciones. Nueva herramienta «Cauces y zona de policía» (menú → Herramientas): trae los cauces del IGN del entorno de las trazas, calcula dónde las cruza cada cauce (PK) y qué tramos van en zona de servidumbre (5 m) y de policía (100 m), y busca en el perfil del terreno las vaguadas por donde cruzan barrancos aunque no estén en ningún mapa (con la superficie de cuenca si el MITECO responde). Se guarda como capa KML o tabla.'],
   ['1.20.3', '27/11/2026', 'Tu posición se ve siempre (desde que se abre la app). La diana centra el mapa en ti y lo mantiene centrado mientras te mueves (botón azul); si mueves el mapa deja de seguirte, y al volver a pulsarla se centra otra vez. Anchos: longitud de cada ancho (y tramo a tramo) y aviso de los tramos de la traza sin ancho asignado, también marcados en rojo en el mapa. Capas de servicios: aviso de «cargando» y de «sin respuesta».'],
   ['1.20.2', '26/11/2026', 'Las actuaciones se ven también con el mapa muy alejado (un punto de su color en el centro de cada tramo). Mapa base «Sin mapa» con fondo blanco o negro, para ver mejor las capas KML. Pasar a KML los elementos de las capas de servicios (líneas eléctricas, vías pecuarias, cauces…): en el gestor de capas, en las opciones de la capa o seleccionando varias → «Servicios → KML», con la zona en pantalla o el entorno de las trazas.'],
   ['1.20.1', '26/11/2026', 'Nueva capa «Demarcaciones hidrográficas (vertiente atlántica o mediterránea)» (REDIAM, planes hidrológicos 2022-2027), también en el kit de afecciones: al tocar el mapa dice la demarcación y si es vertiente atlántica o mediterránea.'],

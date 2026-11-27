@@ -380,8 +380,13 @@ const serviceExists = def => [...layers.values()].find(e => e.rec.url === def.ur
 async function addService(def, quiet = false) {
   const dup = serviceExists(def);
   if (dup) { if (!quiet) toast(`«${dup.rec.name}» ya está en tus capas.`); return false; }
-  const rec = { id: uid(), obraId: settings.activeObra, type: 'wms', kind: def.kind, name: def.name, url: def.url, layers: def.layers || '', maxNative: def.maxNative, info: def.info || '', cover: def.cover || '',
-    attribution: def.attribution || '', visible: true, opacity: def.opacity ?? 1, order: nextOrder(), created: Date.now() };
+  let layersName = def.layers || '';
+  if (def.resolve) { // nombre de capa sin confirmar: se busca en la descripción del servicio la que encaja
+    try { const caps = new DOMParser().parseFromString(await httpGetText(`${def.url}?SERVICE=WMS&REQUEST=GetCapabilities`), 'application/xml');
+      const names = byTag(caps, 'Layer').map(l => { const n = [...l.children].find(c => c.localName === 'Name'); return n ? n.textContent.trim() : ''; }).filter(Boolean);
+      if (names.length && !names.includes(layersName)) { const re = new RegExp(def.resolve, 'i'), hit = names.find(n => re.test(n)); if (hit) layersName = hit; } } catch (e) { /* se usa el nombre previsto */ } }
+  const rec = { id: uid(), obraId: settings.activeObra, type: 'wms', kind: def.kind, name: def.name, url: def.url, layers: layersName, maxNative: def.maxNative, info: def.info || '', cover: def.cover || '',
+    attribution: def.attribution || '', visible: true, opacity: def.opacity ?? 1, order: nextOrder(), created: Date.now(), ...(def.wfsUrl ? { wfsUrl: def.wfsUrl } : {}), ...(def.wfsType ? { wfsType: def.wfsType } : {}) };
   await DB.put('layers', rec);
   registerLayer(rec);
   if (!quiet) toast(`Capa «${rec.name}» añadida. Mantén pulsado un punto del mapa para ver sus datos.`, 5000);

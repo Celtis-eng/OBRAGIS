@@ -743,7 +743,7 @@ async function ronda120() { // 1.20.0: editar trazas, asas de actuación, servic
   await esperar(600); await p.mouse.click(pt.x, pt.y); await esperar(900);
   ok('Un toque en el mapa con servicios visibles muestra qué hay en ese punto', await p.evaluate(() => !$('#sheet').hidden && /Servicios en este punto/.test($('#sheetBody').textContent)), await p.evaluate(() => JSON.stringify({ hidden: $('#sheet').hidden, h: ($('#sheetBody h2') || {}).textContent, q: wmsQueryable().length, el: document.elementFromPoint(200, 180) && document.elementFromPoint(200, 180).className })));
   ok('Botón «Leyenda» con servicios visibles y su hoja', await p.evaluate(async () => { closeSheet(); await new Promise(r => setTimeout(r, 400)); const bt = $('#legendBtn'); if (!bt || bt.hidden) return false; bt.click(); return /Leyenda/.test($('#sheetBody h2').textContent) && !!$('#sheetBody .legend img'); }));
-  ok('Mapa base topográfico MTN25 (IGN) a máxima resolución', await p.evaluate(() => !!BASES.mtn && /mapa-raster.*layer=MTN/.test(URL_MTN) && CATALOG.find(c => /MTN25/.test(c.name)).maxNative === 20));
+  ok('Mapa base topográfico MTN25 (IGN) a máxima resolución', await p.evaluate(() => !!BASES.mtn && /mapa-raster.*layer=MTN/.test(URL_MTN) && CATALOG.find(c => /Mapa topográfico MTN25/.test(c.name)).maxNative === 20));
   ok('Sin conexión: se puede guardar también el topográfico', await p.evaluate(() => zoneUrls({ kind: 'view', bounds: map.getBounds() }, { zMax: 12, orto: false, mtn: true }).every(u => /mapa-raster/.test(u))));
   ok('Dirección de una tesela de otro nivel (para ampliar la guardada)', await p.evaluate(() => { const t = L.tileLayer(URL_PNOA); t._map = map; return /tilematrix=11&tilerow=7&tilecol=5/.test(tileUrlAt(t, 5, 7, 11)); }));
   ok('Demarcaciones hidrográficas en el catálogo y en el kit de afecciones', await p.evaluate(() => { const c = CATALOG.find(x => /Demarcaciones hidrográficas/.test(x.name)); return !!c && c.layers === 'demarcac_hidrograf_phc' && AFECCIONES_KIT.includes(c.name); }));
@@ -807,6 +807,36 @@ async function ronda1203() { // 1.20.3: seguir mi posición, longitudes y huecos
   await browser.close();
 }
 
+async function cauces() { // 1.20.4: cruces con cauces, zona de servidumbre y policía, y vaguadas del terreno
+  const { browser, page: p, errores } = await abrir({ ancho: 400, alto: 820 });
+  await p.setInputFiles('#inKml', [DATOS + 'pendientes_rangos.kml']); await esperar(700);
+  const r = await p.evaluate(async () => {
+    const e = [...layers.values()][0], f = e.feats[0], q = pointAtPK(f, 500), q2 = pointAtPK(f, 501);
+    // cauce perpendicular a la traza en el PK 500
+    const dx = q2.lng - q.lng, dy = q2.lat - q.lat, k = 0.004 / Math.hypot(dx, dy);
+    const a = [q.lat - dx * k, q.lng + dy * k], b = [q.lat + dx * k, q.lng - dy * k];
+    const text = `<?xml version="1.0"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><Placemark><name>Barranco del Lobo</name><LineString><coordinates>${a[1]},${a[0]} ${q.lng},${q.lat} ${b[1]},${b[0]}</coordinates></LineString></Placemark></Document></kml>`;
+    const rec = { id: uid(), obraId: settings.activeObra, type: 'kml', name: 'Cauces de prueba', text, color: '#1c7ed6', visible: true, opacity: 1, order: nextOrder(), created: Date.now() };
+    await DB.put('layers', rec); registerLayer(rec);
+    cauceSheet(); await new Promise(r => setTimeout(r, 200));
+    const marcada = $(`[data-cau="${rec.id}"]`).checked && !$(`[data-cau="${e.rec.id}"]`).checked;
+    $('#sheetBody [data-a=run]').click(); await new Promise(r => setTimeout(r, 300));
+    const res = cauceRes.out.find(x => x.e === e);
+    // vaguada: perfil con un hondo de 3 m en el PK 800
+    profileElevations = async (ff, pts) => ({ z: pts.map(pt => { const d = pkAt(ff, L.latLng(pt.lat, pt.lng)).d; return 600 + d * 0.01 - Math.max(0, 3 - Math.abs(d - 800) / 10); }), label: 'prueba' });
+    $('#sheetBody [data-a=vag]').click(); await new Promise(r => setTimeout(r, 1500));
+    return { marcada, cruces: res.cruces.map(c => [Math.round(c.d), c.name]), pol: res.pol.map(x => [Math.round(x.a), Math.round(x.b)]), serv: res.serv.map(x => [Math.round(x.a), Math.round(x.b)]), vag: (cauceRes.vag || []).map(v => [Math.round(v.d), v.mapped, +v.depth.toFixed(1)]), html: /cruce/.test($('#cauRes').textContent) };
+  });
+  ok('Cauces: las capas con nombre de cauce se marcan solas', r.marcada, JSON.stringify(r));
+  ok('Cruce de un cauce con la traza en su PK', r.cruces.length === 1 && Math.abs(r.cruces[0][0] - 500) <= 2 && r.cruces[0][1] === 'Barranco del Lobo', JSON.stringify(r.cruces));
+  ok('Zona de policía (100 m) y de servidumbre (5 m) alrededor del cruce', r.pol.length === 1 && Math.abs(r.pol[0][0] - 400) <= 4 && Math.abs(r.pol[0][1] - 600) <= 4 && r.serv.length === 1 && r.serv[0][1] - r.serv[0][0] <= 14, JSON.stringify([r.pol, r.serv]));
+  ok('Vaguada del terreno sin cartografiar detectada en su PK', r.vag.some(v => Math.abs(v[0] - 800) <= 10 && v[1] === false && v[2] >= 2), JSON.stringify(r.vag));
+  ok('Resultado como capa KML', await p.evaluate(async () => { $('#cauRes [data-a=kml]').click(); await new Promise(r => setTimeout(r, 500)); const l = [...layers.values()].find(e => /zona de policía \(resultado\)/i.test(e.rec.name)); return !!l && l.feats.some(f => /Cruce/.test(f.name)) && l.feats.some(f => /Vaguada/.test(f.name)); }));
+  ok('Catálogo: red hidrográfica 1:10.000 de la Junta y cauces 1:25.000 del IGN en el kit de afecciones', await p.evaluate(() => ['Red hidrográfica 1:10.000 (Junta, BCA10)', 'Cauces 1:25.000 (IGN, hidrografía del MTN25)'].every(n => CATALOG.some(c => c.name === n) && AFECCIONES_KIT.includes(n)) && wfsOk({ type: 'wms', url: 'https://servicios.idee.es/wms-inspire/hidrografia', layers: 'x', wfsUrl: 'https://servicios.idee.es/wfs-inspire/hidrografia', wfsType: '/watercourse/' })));
+  ok('Sin errores JS', !errores.length, errores.join(' | '));
+  await browser.close();
+}
+
 async function pendientesViejos() {
   const { browser, page: p, errores } = await abrir({ ancho: 400, alto: 820 });
   await p.setInputFiles('#inKml', [DATOS + 'pendientes_rangos.kml']); await esperar(600);
@@ -841,7 +871,7 @@ async function modoSencillo() {
 }
 
 (async () => {
-  for (const t of [pkYNumeros, geometriaYPendientes, actuacionesYBorradores, tramoAndandoYRepetir, bc3, paqueteYEnvio, toquesYBarras, borradoresYDictado, ronda4, ronda5, ronda6, ronda7, ronda8, ronda9, ronda10, copiaAutomatica, datosASalvo, importarVarios, variasEnTramo, ronda120, ronda1202, ronda1203, pendientesViejos, modoSencillo]) {
+  for (const t of [pkYNumeros, geometriaYPendientes, actuacionesYBorradores, tramoAndandoYRepetir, bc3, paqueteYEnvio, toquesYBarras, borradoresYDictado, ronda4, ronda5, ronda6, ronda7, ronda8, ronda9, ronda10, copiaAutomatica, datosASalvo, importarVarios, variasEnTramo, ronda120, ronda1202, ronda1203, cauces, pendientesViejos, modoSencillo]) {
     console.log(`\n— ${t.name}`);
     try { await t(); } catch (e) { ok(t.name + ' terminó sin excepciones', false, e.message.split('\n')[0]); }
   }

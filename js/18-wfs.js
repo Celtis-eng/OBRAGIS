@@ -9,6 +9,7 @@ const WFS_MAX = 5000;
 function wfsFor(rec) {
   const u = String(rec.url || '').split('?')[0], lay = String(rec.layers || '').split(',')[0];
   if (!u || !lay || rec.kind === 'wmts') return null;
+  if (rec.wfsUrl) return { url: rec.wfsUrl, type: /^\/.*\/$/.test(rec.wfsType || '') ? '' : (rec.wfsType || lay), find: /^\/.*\/$/.test(rec.wfsType || '') ? rec.wfsType.slice(1, -1) : '', json: true, rec }; // servicio de datos propio (IGN, BCA10)
   let m = u.match(/^(https:\/\/www\.ideandalucia\.es\/services\/([^/]+))\/wms$/i); // DERA (GeoServer)
   if (m) return { url: m[1] + '/wfs', type: lay, json: true };
   m = u.match(/^(https:\/\/[^/]+\/geoserver\/.+)\/wms$/i); // GeoServer (MITECO y otros)
@@ -17,10 +18,21 @@ function wfsFor(rec) {
   return { url: u, type: lay, json: false }; // MapServer (REDIAM) y otros: la misma dirección con SERVICE=WFS
 }
 const wfsOk = rec => typeOf(rec) === 'wms' && !!wfsFor(rec);
-function wfsUrl(w, b, json) {
-  // WFS 1.1.0 con la zona en grados y su sistema dicho expresamente (en 1.0.0 los servidores de la Junta la leen en UTM)
+function wfsUrl(w, b, json, v2) {
+  // WFS 1.1.0 con la zona en grados y su sistema dicho expresamente (en 1.0.0 los servidores de la Junta la leen en UTM); 2.0.0 de reserva
   const bb = [b.getSouth(), b.getWest(), b.getNorth(), b.getEast()].map(v => v.toFixed(6)).join(',') + ',urn:ogc:def:crs:EPSG::4326';
-  return `${w.url}?SERVICE=WFS&VERSION=1.1.0&REQUEST=GetFeature&TYPENAME=${encodeURIComponent(w.type)}&SRSNAME=EPSG:4326&BBOX=${encodeURIComponent(bb)}&MAXFEATURES=${WFS_MAX}${json ? '&OUTPUTFORMAT=application%2Fjson' : ''}`;
+  return v2 ? `${w.url}?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAMES=${encodeURIComponent(w.type)}&SRSNAME=urn:ogc:def:crs:EPSG::4326&BBOX=${encodeURIComponent(bb)}&COUNT=${WFS_MAX}${json ? '&OUTPUTFORMAT=application%2Fjson' : ''}`
+    : `${w.url}?SERVICE=WFS&VERSION=1.1.0&REQUEST=GetFeature&TYPENAME=${encodeURIComponent(w.type)}&SRSNAME=EPSG:4326&BBOX=${encodeURIComponent(bb)}&MAXFEATURES=${WFS_MAX}${json ? '&OUTPUTFORMAT=application%2Fjson' : ''}`;
+}
+// Tipo de elemento sin nombre fijo: se busca en la descripción del servicio de datos (y se recuerda en la capa)
+async function wfsResolve(w) {
+  if (w.type) return;
+  if (w.rec && w.rec._wfsType) { w.type = w.rec._wfsType; return; }
+  const caps = new DOMParser().parseFromString(await httpGetText(`${w.url}?SERVICE=WFS&REQUEST=GetCapabilities`), 'application/xml');
+  const names = byTag(caps, 'FeatureType').map(ft => { const n = [...ft.children].find(c => c.localName === 'Name'); return n ? n.textContent.trim() : ''; }).filter(Boolean);
+  const re = new RegExp(w.find || '.', 'i'), hits = names.filter(n => re.test(n));
+  if (!hits.length) throw new Error('el servicio no ofrece ese tipo de datos');
+  w.type = hits.join(','); if (w.rec) w.rec._wfsType = w.type;
 }
 // [lng, lat] con el orden corregido si el servidor lo da al revés (en España la latitud está entre 27 y 45)
 const lonLat = (a, b) => (a > 26 && a < 45 && b > -20 && b < 6) ? [b, a] : [a, b];
@@ -84,9 +96,14 @@ ${pms}
 }
 async function wfsFeatures(rec, b) {
   const w = wfsFor(rec); if (!w) throw new Error('este servicio no publica sus datos');
-  let txt = null, feats = null;
-  if (w.json) { try { txt = await httpGetText(wfsUrl(w, b, true)); const j = JSON.parse(txt); feats = (j.features || []).map(f => ({ props: Object.fromEntries(Object.entries(f.properties || {}).filter(([, v]) => v !== null && v !== '' && typeof v !== 'object')), geoms: geomFromGeoJSON(f.geometry) })).filter(x => x.geoms.length); } catch (e) { feats = null; } }
-  if (!feats) feats = featsFromGML(await httpGetText(wfsUrl(w, b, false)));
+  await wfsResolve(w);
+  const fromJSON = txt => { const j = JSON.parse(txt); return (j.features || []).map(f => ({ props: Object.fromEntries(Object.entries(f.properties || {}).filter(([, v]) => v !== null && v !== '' && typeof v !== 'object')), geoms: geomFromGeoJSON(f.geometry) })).filter(x => x.geoms.length); };
+  let feats = null, err = null;
+  for (const [json, v2] of [[true, false], [false, false], [false, true]]) { // JSON, GML y WFS 2.0 (INSPIRE), por este orden
+    if (json && !w.json) continue;
+    try { const txt = await httpGetText(wfsUrl(w, b, json, v2)); feats = json ? fromJSON(txt) : featsFromGML(txt); break; } catch (e) { err = e; }
+  }
+  if (!feats) throw err || new Error('sin respuesta');
   return feats;
 }
 // Zona: lo que se ve en pantalla o el entorno de las trazas de la obra
