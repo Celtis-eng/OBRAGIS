@@ -1,7 +1,7 @@
-/* OBRA-GIS v1.20.2 (2026-11-26) — service worker: app disponible sin conexión, teselas PNOA en caché
+/* OBRA-GIS v1.20.3 (2026-11-27) — service worker: app disponible sin conexión, teselas PNOA en caché
    y recepción de KML/KMZ compartidos desde otras apps.
    VERSION debe coincidir con APP_VERSION de js/01-version.js: al cambiarla, los móviles descargan la versión nueva. */
-const VERSION = '1.20.2';
+const VERSION = '1.20.3';
 const SHELL = 'shell-' + VERSION;
 const TILES = 'tiles-v1';
 const ASSETS = ['./', 'index.html', 'app.css', 'js/01-version.js', 'js/02-base.js', 'js/03-mapa.js', 'js/04-capas.js', 'js/05-campo.js', 'js/06-pendiente.js', 'js/07-actuaciones.js', 'js/08-obras.js', 'js/09-herramientas.js', 'js/10-informes.js', 'js/11-tramo.js', 'js/12-bc3.js', 'js/13-licencia.js', 'js/14-panel.js', 'js/15-arranque.js', 'js/16-copia.js', 'js/17-editar.js', 'js/18-wfs.js', 'ficha.js', 'manifest.webmanifest',

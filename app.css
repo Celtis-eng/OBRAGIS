@@ -979,3 +979,17 @@ body:has(#walkBar:not([hidden])) .savebar.plusfoot{padding-bottom:calc(var(--wbh
 body.nobase:not(.nobase-dark) .pk-label span{color:#1b1b1b;text-shadow:0 0 3px #fff,0 0 3px #fff}
 body.nobase:not(.nobase-dark) .odate{display:none}
 ul.plain{margin:6px 0;padding-left:20px}
+/* 1.20.3 · Seguir mi posición */
+.fab.follow{background:#1c7ed6;color:#fff}
+.me.stale{background:#868e96;box-shadow:0 0 0 2px rgba(134,142,150,.4)}
+.okline{color:#2b8a3e}
+.wtramos th{text-align:left;font-weight:600;color:var(--muted);font-size:.8rem}
+.wrow span small{display:block;font:400 .78rem system-ui,sans-serif;color:var(--muted)}
+/* 1.20.3 · Capas de servicios cargando */
+.svcload{position:absolute;z-index:950;bottom:calc(var(--safe-b) + 104px);left:calc(var(--safe-l) + 8px);display:flex;flex-wrap:wrap;align-items:center;gap:8px;max-width:calc(100vw - 110px);background:rgba(255,255,255,.95);color:#16211c;border-radius:999px;padding:6px 14px;font:600 13px/1.3 system-ui,sans-serif;box-shadow:0 2px 10px rgba(0,0,0,.25);pointer-events:none}
+.svcload .spin{width:14px;height:14px;border:2px solid #1c7ed6;border-right-color:transparent;border-radius:50%;animation:svcspin .8s linear infinite;flex:none}
+.svcload .svcerr{color:#c92a2a}
+@keyframes svcspin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.svcload .spin{animation:none}}
+#drawer small[data-st="cargando"]::after{content:" · cargando…";color:#1c7ed6}
+#drawer small[data-st="error"]::after{content:" · ⚠ sin respuesta";color:#c92a2a}

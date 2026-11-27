@@ -779,6 +779,32 @@ async function ronda1202() { // 1.20.2: servicios → KML, sin mapa base, actuac
   await browser.close();
 }
 
+async function ronda1203() { // 1.20.3: seguir mi posición, longitudes y huecos de anchos, «cargando» de los servicios
+  const { browser, ctx, page: p, errores } = await abrir({ ancho: 400, alto: 820, geo: { latitude: 37.6131, longitude: -2.916 } });
+  await p.setInputFiles('#inKml', [DATOS + 'ejemplo-red-riego.kml']); await esperar(700);
+  await p.evaluate(() => locate()); await esperar(1200);
+  ok('La diana sigue mi posición', await p.evaluate(() => followMe && $('#fabLocate').classList.contains('follow')));
+  await ctx.setGeolocation({ latitude: 37.6140, longitude: -2.9140 }); await esperar(1500);
+  ok('Al moverme, el mapa me sigue', await p.evaluate(() => map.getCenter().distanceTo([37.6140, -2.9140]) < 15), await p.evaluate(() => JSON.stringify(map.getCenter())));
+  const b = await p.evaluate(() => { const r = $('#map').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+  await p.mouse.move(b.x, b.y); await p.mouse.down(); await p.mouse.move(b.x + 120, b.y + 60, { steps: 8 }); await p.mouse.up(); await esperar(300);
+  ok('Al arrastrar el mapa deja de seguirme (y mi punto sigue visible)', await p.evaluate(() => !followMe && !!meMarker && map.hasLayer(meMarker)));
+  await ctx.setGeolocation({ latitude: 37.6150, longitude: -2.9120 }); await esperar(1200);
+  ok('Sin seguir, el mapa no se mueve solo', await p.evaluate(() => map.getCenter().distanceTo([37.6150, -2.9120]) > 50));
+  await p.evaluate(() => locate()); await esperar(900);
+  ok('Al volver a pulsar la diana se centra en mí', await p.evaluate(() => followMe && map.getCenter().distanceTo([37.6150, -2.9120]) < 15));
+  const w = await p.evaluate(() => { const e = [...layers.values()][0], f = e.feats.filter(x => x.length > 100)[0];
+    const d = { mode: 'changes', points: [{ d: 100, w: 4 }, { d: 400, w: 5 }, { d: 600, w: 4 }] }; const g = widthGaps(d, f), h = widthResultsHtml(widthStats(widthSegments(d, f)), d, f);
+    const di = { mode: 'interval', points: [{ d: 0, w: 4 }, { d: 20, w: NaN }, { d: 40, w: 4.5 }] };
+    return { g: g.gaps.map(x => [Math.round(x.a), Math.round(x.b)]), long: /Longitud de cada ancho/.test(h) && /Traza sin ancho asignado/.test(h), sin: widthGaps(di, f).sinDato.length, txt: h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 400) }; });
+  ok('Anchos: longitud de cada ancho y aviso de la traza sin ancho', w.long && w.g[0][0] === 0 && w.g[0][1] === 100 && w.sin === 1, JSON.stringify(w));
+  ok('Servicios: aviso de «cargando» y de «sin respuesta»', await p.evaluate(async () => { await addService(CATALOG.find(c => c.name === 'Líneas eléctricas'), true); const e = [...layers.values()].find(x => typeOf(x.rec) === 'wms');
+    e.tile.off('load'); e.tile.fire('loading'); svcState.get(e.rec.id).t -= 1000; svcPaint(); await new Promise(r => setTimeout(r, 400)); const a = !!$('#svcLoad') && !$('#svcLoad').hidden && /Cargando|Sin respuesta/.test($('#svcLoad').textContent);
+    svcState.delete(e.rec.id); svcPaint(); await new Promise(r => setTimeout(r, 400)); const b2 = $('#svcLoad').hidden; return a && b2; }));
+  ok('Sin errores JS', !errores.length, errores.join(' | '));
+  await browser.close();
+}
+
 async function pendientesViejos() {
   const { browser, page: p, errores } = await abrir({ ancho: 400, alto: 820 });
   await p.setInputFiles('#inKml', [DATOS + 'pendientes_rangos.kml']); await esperar(600);
@@ -813,7 +839,7 @@ async function modoSencillo() {
 }
 
 (async () => {
-  for (const t of [pkYNumeros, geometriaYPendientes, actuacionesYBorradores, tramoAndandoYRepetir, bc3, paqueteYEnvio, toquesYBarras, borradoresYDictado, ronda4, ronda5, ronda6, ronda7, ronda8, ronda9, ronda10, copiaAutomatica, datosASalvo, importarVarios, variasEnTramo, ronda120, ronda1202, pendientesViejos, modoSencillo]) {
+  for (const t of [pkYNumeros, geometriaYPendientes, actuacionesYBorradores, tramoAndandoYRepetir, bc3, paqueteYEnvio, toquesYBarras, borradoresYDictado, ronda4, ronda5, ronda6, ronda7, ronda8, ronda9, ronda10, copiaAutomatica, datosASalvo, importarVarios, variasEnTramo, ronda120, ronda1202, ronda1203, pendientesViejos, modoSencillo]) {
     console.log(`\n— ${t.name}`);
     try { await t(); } catch (e) { ok(t.name + ' terminó sin excepciones', false, e.message.split('\n')[0]); }
   }

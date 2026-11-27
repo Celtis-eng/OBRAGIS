@@ -3,6 +3,11 @@
    Parte de la app (los ficheros js/ se cargan en orden desde index.html y comparten el ámbito global). */
 /* ---------------- GPS ---------------- */
 let lastPos = null, watchId = null, wantCenter = false, meMarker = null, meCircle = null;
+// Seguir mi posición: el botón de la diana centra el mapa y lo mantiene centrado mientras te mueves.
+// Si arrastras el mapa se deja de seguir (tu punto se sigue viendo); al volver a pulsar la diana se centra y sigue otra vez.
+let followMe = false;
+function setFollow(on) { followMe = on; const f = $('#fabLocate'); if (f) { f.classList.toggle('follow', on); f.setAttribute('aria-pressed', on); f.title = on ? 'Siguiendo tu posición' : 'Centrar en mi posición'; } }
+map.on('dragstart', () => { if (followMe) setFollow(false); });
 function geoErr(e) {
   return e && e.code === 1 ? 'Sin permiso de ubicación. Actívalo en los ajustes para esta app.'
     : e && e.code === 3 ? 'El GPS tarda en responder. Prueba al aire libre.' : 'No se pudo obtener la posición.';
@@ -16,7 +21,10 @@ function onPos(p) {
     meMarker = L.marker(ll, { icon: L.divIcon({ className: '', html: '<div class="me"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }), interactive: false, zIndexOffset: 1000 }).addTo(map);
   } else { meMarker.setLatLng(ll); meCircle.setLatLng(ll).setRadius(lastPos.acc); }
   const f = $('#fabLocate'); f.classList.remove('wait'); f.classList.add('on');
+  meMarker.getElement() && meMarker.getElement().firstChild && meMarker.getElement().firstChild.classList.remove('stale');
+  if (!settings.geoOk) { settings.geoOk = true; saveSettings(); } // la próxima vez la posición se muestra al abrir la app
   if (wantCenter) { wantCenter = false; map.setView(ll, Math.max(map.getZoom(), 17)); }
+  else if (followMe && !geomEdit && map.getCenter().distanceTo(ll) > 3) map.panTo(ll, { animate: true, duration: 0.5 });
   else if (walkHere() && $("#sheet").hidden && !map.getBounds().pad(-0.25).contains(ll)) map.panTo(ll, { animate: true }); // con un tramo en marcha, el mapa acompaña
   updateLivePK();
 }
@@ -30,9 +38,12 @@ function startWatch() {
 }
 function locate() {
   if (!startWatch()) return;
-  if (lastPos && Date.now() - lastPos.t < 60000) map.setView([lastPos.lat, lastPos.lng], Math.max(map.getZoom(), 17));
+  setFollow(true);
+  if (lastPos && Date.now() - lastPos.t < 60000) map.setView([lastPos.lat, lastPos.lng], Math.max(map.getZoom(), followMe && map.getZoom() >= 15 ? map.getZoom() : 17));
   else { wantCenter = true; $('#fabLocate').classList.add('wait'); }
 }
+// si el GPS deja de dar posición, el punto se ve gris (es la última conocida)
+setInterval(() => { const el = meMarker && meMarker.getElement() && meMarker.getElement().firstChild; if (el) el.classList.toggle('stale', !lastPos || Date.now() - lastPos.t > 30000); }, 5000);
 function getPos() {
   if (lastPos && Date.now() - lastPos.t < 20000) return Promise.resolve(lastPos);
   if (!navigator.geolocation) return Promise.reject(new Error('Sin GPS'));

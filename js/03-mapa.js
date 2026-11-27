@@ -491,6 +491,24 @@ function buildRaster(entry) {
     if (++errors >= 6 && !warned && navigator.onLine !== false) { warned = true; toast(`El servicio «${r.name}» no responde ahora mismo. Prueba más tarde o quita la capa.`, 6000); }
   });
   entry.tile.on('tileload', () => { errors = 0; });
+  // aviso de «cargando» mientras el servicio manda sus imágenes (y de error si no responde)
+  entry.tile.on('loading', () => { svcState.set(r.id, { name: r.name, st: 'cargando', t: Date.now() }); svcPaint(); });
+  entry.tile.on('load', () => { svcState.delete(r.id); svcPaint(); });
+  entry.tile.on('tileerror', () => { if (errors >= 3) { svcState.set(r.id, { name: r.name, st: 'error', t: Date.now() }); svcPaint(); } });
+  entry.tile.on('remove', () => { svcState.delete(r.id); svcPaint(); });
+}
+const svcState = new Map(); let svcT = null;
+function svcPaint() {
+  clearTimeout(svcT); svcT = setTimeout(() => {
+    let el = $('#svcLoad'); const list = [...svcState.values()].filter(x => x.st === 'error' || Date.now() - x.t > 250); // lo que carga al momento no hace parpadear el aviso
+    if (svcState.size > list.length) svcT = setTimeout(svcPaint, 300);
+    if (!el) { if (!list.length) return; el = document.createElement('div'); el.id = 'svcLoad'; el.className = 'svcload'; el.setAttribute('role', 'status'); el.setAttribute('aria-live', 'polite'); document.body.appendChild(el); }
+    const carg = list.filter(x => x.st === 'cargando'), err = list.filter(x => x.st === 'error');
+    el.hidden = !list.length;
+    el.innerHTML = (carg.length ? `<span class="spin" aria-hidden="true"></span>Cargando ${carg.length === 1 ? esc(carg[0].name) : plural(carg.length, 'capa', 'capas')}…` : '') + (err.length ? `<span class="svcerr">⚠ Sin respuesta: ${err.map(x => esc(x.name)).join(', ')}</span>` : '');
+    svcState.forEach((x, id) => { const sm = document.querySelector(`#drawer [data-open="${id}"] small`); if (sm) sm.dataset.st = x.st; });
+    document.querySelectorAll('#drawer [data-open] small[data-st]').forEach(sm => { if (!svcState.has(sm.closest('[data-open]').dataset.open)) delete sm.dataset.st; });
+  }, 120);
 }
 function mapLayerOf(entry) { return entry.group || entry.tile || pointGroup(entry.rec.id); }
 

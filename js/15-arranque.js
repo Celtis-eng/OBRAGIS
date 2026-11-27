@@ -144,6 +144,7 @@ function nativeInbox() { // app nativa: «Abrir con» y «Compartir»
     if (settings.catastro && ![...layers.values()].some(e => e.rec.url === cat.url)) { settings.catastro = false; saveSettings(); addService(cat, true); } // versión anterior
   } catch (e) { toast('No se pudieron leer los datos guardados: ' + e.message, 7000); }
   if (NATIVE) nativeInbox();
+  if (settings.geoOk) startWatch(); // tu posición se ve desde que se abre la app (si ya diste permiso)
   else if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW', e));
   if ('launchQueue' in window) { // KML abiertos con doble clic (app instalada en el ordenador)
     window.launchQueue.setConsumer(async params => {

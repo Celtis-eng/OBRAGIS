@@ -6,9 +6,10 @@
 /* ---------------- Versión de la app ----------------
    Cambia APP_VERSION en cada entrega (también se usa como versión de la app Android).
    Formato MAYOR.MENOR.CORRECCIÓN: menor = función nueva, corrección = arreglo. */
-const APP_VERSION = '1.20.2';
+const APP_VERSION = '1.20.3';
 const APP_DATE = '2026-11-23';
 const CHANGELOG = [
+  ['1.20.3', '27/11/2026', 'Tu posición se ve siempre (desde que se abre la app). La diana centra el mapa en ti y lo mantiene centrado mientras te mueves (botón azul); si mueves el mapa deja de seguirte, y al volver a pulsarla se centra otra vez. Anchos: longitud de cada ancho (y tramo a tramo) y aviso de los tramos de la traza sin ancho asignado, también marcados en rojo en el mapa. Capas de servicios: aviso de «cargando» y de «sin respuesta».'],
   ['1.20.2', '26/11/2026', 'Las actuaciones se ven también con el mapa muy alejado (un punto de su color en el centro de cada tramo). Mapa base «Sin mapa» con fondo blanco o negro, para ver mejor las capas KML. Pasar a KML los elementos de las capas de servicios (líneas eléctricas, vías pecuarias, cauces…): en el gestor de capas, en las opciones de la capa o seleccionando varias → «Servicios → KML», con la zona en pantalla o el entorno de las trazas.'],
   ['1.20.1', '26/11/2026', 'Nueva capa «Demarcaciones hidrográficas (vertiente atlántica o mediterránea)» (REDIAM, planes hidrológicos 2022-2027), también en el kit de afecciones: al tocar el mapa dice la demarcación y si es vertiente atlántica o mediterránea.'],
   ['1.20.0', '25/11/2026', 'Editar trazas: en la ficha de una traza, «Editar la traza» para mover sus puntos, añadir o quitar puntos y alargarla por el inicio o el final (tocando el mapa o con tu posición); las actuaciones se quedan en su sitio. Las actuaciones se pueden ajustar arrastrando en el mapa sus extremos A y B. Servicios (afecciones): un toque en el mapa dice qué hay en ese punto, y el botón «Leyenda» explica los colores. Mapa topográfico MTN25 ráster del IGN como mapa base y a máxima resolución. Mapas sin conexión: también el topográfico, y al acercar más de lo descargado se ve la imagen ampliada en vez de en blanco. Gestor de capas con árbol más claro y nombres completos. En la app de Android, la cámara nativa: si Android cierra la app mientras haces la foto, al volver se recupera.'],

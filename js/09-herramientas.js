@@ -69,6 +69,7 @@ function drawWidths() {
     for (const [fi, data] of Object.entries(e.rec.widths)) {
       const f = e.feats[+fi]; if (!f || data.show === false) continue;
       const segs = widthSegments(data, f); if (!segs.length) continue;
+      widthGaps(data, f).gaps.forEach(g => { const c = segmentCoords(f, g.a, g.b); if (c.length > 1 && bounds.intersects(L.latLngBounds(c))) L.polyline(c, { renderer: hlRenderer, color: '#e03131', weight: 4, dashArray: '8 6', opacity: 0.9, interactive: false }).addTo(widthLayer); }); // sin ancho asignado
       const key = (data.updated || 0) + ':' + fi;
       if (!f._wpoly || f._wkey !== key) { f._wpoly = widthPolygon(f, segs); f._wkey = key; }
       f._wpoly.forEach(pg => {
@@ -107,7 +108,7 @@ function renderWidthSheet() {
   const rows = d.mode === 'interval'
     ? (d.points.length ? `<div class="wtable">${d.points.map((p, i) => `<div class="wrow" id="wr${i}"><span>PK ${fmtPK(p.d)}</span><input type="text" inputmode="decimal" data-wi="${i}" value="${isFinite(p.w) ? String(p.w).replace('.', ',') : ''}" placeholder="ancho (m)"></div>`).join('')}</div>`
       : '<p class="hint">Pulsa «Generar estaciones» para crear los puntos de toma de datos a lo largo de la traza.</p>')
-    : `<div class="wtable">${d.points.map((p, i) => `<div class="wrow"><span>Desde PK ${fmtPK(p.d)}</span><input type="text" inputmode="decimal" data-wi="${i}" value="${isFinite(p.w) ? String(p.w).replace('.', ',') : ''}"><button class="mini ic del" data-wdel="${i}" aria-label="Quitar">${ICON.close}</button></div>`).join('') || '<p class="hint">Añade el primer ancho, normalmente desde el PK 0+000.</p>'}</div>
+    : `<div class="wtable">${d.points.map((p, i) => `<div class="wrow"><span>Desde PK ${fmtPK(p.d)}<small>${fmtLen((i + 1 < d.points.length ? d.points[i + 1].d : f.length) - p.d)} hasta ${i + 1 < d.points.length ? 'el siguiente' : 'el final'}</small></span><input type="text" inputmode="decimal" data-wi="${i}" value="${isFinite(p.w) ? String(p.w).replace('.', ',') : ''}"><button class="mini ic del" data-wdel="${i}" aria-label="Quitar">${ICON.close}</button></div>`).join('') || '<p class="hint">Añade el primer ancho, normalmente desde el PK 0+000.</p>'}</div>
       <div class="wadd">
         <div class="pkrow"><div class="field"><label for="wcPk">Desde PK</label><input type="text" id="wcPk" inputmode="decimal" value="${esc(d._wcPk ?? (d.points.length ? '' : '0+000'))}"></div>
           <div class="field"><label for="wcW">Ancho (m)</label><input type="text" id="wcW" inputmode="decimal" value="${esc(d._wcW || '')}"></div></div>
@@ -190,7 +191,33 @@ function renderWidthSheet() {
   };
 }
 function rangeOf(f) { const a = parsePK($('#wR0') && $('#wR0').value), b = parsePK($('#wR1') && $('#wR1').value); return [isFinite(a) ? a : -Infinity, isFinite(b) ? b : Infinity]; }
+// Partes de la traza que no tienen ancho (antes del primer dato, después del último o entre estaciones sin ancho)
+function widthGaps(d, f) {
+  const segs = widthSegments(d, f).sort((a, b) => a.a - b.a), gaps = []; let x = 0;
+  segs.forEach(s => { if (s.a - x > 1) gaps.push({ a: x, b: s.a }); x = Math.max(x, s.b); });
+  if (f.length - x > 1) gaps.push({ a: x, b: f.length });
+  const sinDato = d.mode === 'interval' ? (d.points || []).filter(p => !(p.w > 0)) : [];
+  return { gaps, sinDato, len: gaps.reduce((t, g) => t + g.b - g.a, 0) };
+}
+function widthBreakdownHtml(d, f) {
+  const segs = widthSegments(d, f); if (!segs.length) return '';
+  const rows = segs.map(sg => ({ a: sg.a, b: sg.b, w: (sg.wa + sg.wb) / 2, var: Math.abs(sg.wa - sg.wb) > 0.005, wa: sg.wa, wb: sg.wb }));
+  const byW = new Map(); rows.forEach(r => { const k = (Math.round(r.w * 20) / 20).toFixed(2); byW.set(k, (byW.get(k) || 0) + r.b - r.a); });
+  const tot = rows.reduce((t, r) => t + r.b - r.a, 0);
+  return `<h3 class="sh">Longitud de cada ancho</h3><table class="attrs">${[...byW].sort((x, y) => +x[0] - +y[0]).map(([w, l]) => `<tr><td>${fmtW(+w)}</td><td><b>${fmtLen(l)}</b> · ${Math.round(l / tot * 100)} %</td></tr>`).join('')}</table>
+    <details class="more"><summary>Tramo a tramo (${rows.length})</summary><table class="attrs wtramos"><tr><th>Desde – hasta</th><th>Ancho</th><th>Longitud</th></tr>${rows.slice(0, 300).map(r => `<tr><td>${fmtPK(r.a)} – ${fmtPK(r.b)}</td><td>${r.var ? `${fmtW(r.wa)} → ${fmtW(r.wb)}` : fmtW(r.w)}</td><td>${fmtLen(r.b - r.a)}</td></tr>`).join('')}</table></details>`;
+}
+function widthGapsHtml(d, f) {
+  const g = widthGaps(d, f); if (!g.gaps.length && !g.sinDato.length) return (d.points || []).some(p => p.w > 0) ? '<p class="hint okline">✓ Toda la traza tiene ancho asignado.</p>' : '';
+  return `<div class="fwarn" role="status"><b>Traza sin ancho asignado${g.len ? `: ${fmtLen(g.len)} (${Math.round(g.len / f.length * 100)} %)` : ''}</b>
+    ${g.gaps.length ? `<ul class="plain">${g.gaps.slice(0, 12).map(x => `<li>PK ${fmtPK(x.a)} – ${fmtPK(x.b)} · ${fmtLen(x.b - x.a)}</li>`).join('')}${g.gaps.length > 12 ? `<li>… y ${g.gaps.length - 12} más</li>` : ''}</ul>` : ''}
+    ${g.sinDato.length ? `<p>${plural(g.sinDato.length, 'estación sin ancho', 'estaciones sin ancho')} (entre ellas se ha supuesto el ancho de las vecinas): ${g.sinDato.slice(0, 10).map(p => 'PK ' + fmtPK(p.d)).join(', ')}${g.sinDato.length > 10 ? '…' : ''}.</p>` : ''}
+    <p class="hint" style="margin:4px 0 0">En el mapa, los tramos sin ancho se marcan con una línea roja discontinua.</p></div>`;
+}
 function widthResultsHtml(st, d, f) {
+  return widthResultsHtml0(st, d, f) + widthGapsHtml(d, f) + widthBreakdownHtml(d, f);
+}
+function widthResultsHtml0(st, d, f) {
   if (!st) return '<p class="hint">Introduce al menos ' + (d.mode === 'interval' ? 'dos estaciones con ancho' : 'un cambio de ancho') + ' para calcular.</p>';
   const full = st.from <= 0.5 && st.to >= f.length - 0.5;
   return `<div class="slope-main"><span>${fmtW(st.mean)}</span><small>ancho medio ponderado por longitud</small></div>
