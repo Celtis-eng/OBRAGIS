@@ -762,10 +762,12 @@ async function ronda1202() { // 1.20.2: servicios → KML, sin mapa base, actuac
   const gml = `<?xml version="1.0"?><wfs:FeatureCollection xmlns:wfs="http://www.opengis.net/wfs" xmlns:gml="http://www.opengis.net/gml" xmlns:ms="http://mapserver.gis.umn.edu/mapserver"><gml:featureMember><ms:Inventario_VVPP><gml:boundedBy><gml:Envelope><gml:lowerCorner>37.1 -3.6</gml:lowerCorner></gml:Envelope></gml:boundedBy><ms:msGeometry><gml:LineString srsName="EPSG:4326"><gml:posList>37.172173 -3.535598 37.172148 -3.535797 37.172048 -3.536074</gml:posList></gml:LineString></ms:msGeometry><ms:OBJECTID>18723</ms:OBJECTID><ms:NOMBRE>VEREDA DE LA CUESTA DE CANTALOBOS</ms:NOMBRE><ms:MUNICIPIO>Granada</ms:MUNICIPIO></ms:Inventario_VVPP></gml:featureMember></wfs:FeatureCollection>`;
   const pedidas = [];
   await p.route(/SERVICE=WFS/i, route => { const u = route.request().url(); pedidas.push(u); return route.fulfill({ body: /ideandalucia/.test(u) ? json : gml, contentType: /ideandalucia/.test(u) ? 'application/json' : 'text/xml', headers: { 'access-control-allow-origin': '*' } }); });
-  await p.evaluate(async () => { for (const n of ['Líneas eléctricas', 'Vías pecuarias (inventario REDIAM)']) await addService(CATALOG.find(c => c.name === n)); closeSheet(); map.setView([37.2, -3.6], 12); });
+  await esperar(1500); await p.evaluate(() => { settings.eulaAccepted = EULA_VERSION; settings.welcomed = true; closeSheet(); }); // la bienvenida no debe tapar la hoja (en CI tarda más)
+  await p.evaluate(async () => { for (const n of ['Líneas eléctricas', 'Vías pecuarias (inventario REDIAM)']) await addService(CATALOG.find(c => c.name === n), true); closeSheet(); map.setView([37.2, -3.6], 12); });
   await esperar(500);
   await p.evaluate(() => { const ids = [...layers.values()].filter(e => typeOf(e.rec) === 'wms').map(e => e.rec.id); wfsSheet(ids); }); await esperar(300);
-  await p.click('#sheetBody [data-a=go]'); await esperar(2500);
+  await p.click('#sheetBody [data-a=go]');
+  await p.waitForFunction(() => /carpeta/.test(($('#wfsRes') || {}).textContent || ''), null, { timeout: 15000 }).catch(() => {});
   const r = await p.evaluate(() => ({ kml: [...layers.values()].filter(e => typeOf(e.rec) === 'kml').map(e => [e.rec.name, e.feats.length, e.feats[0].name, e.feats[0].start, (e.feats[0].attrs || []).length]), res: $('#wfsRes').textContent }));
   ok('Servicios → KML: crea una capa KML por servicio con sus elementos y atributos', r.kml.length === 2 && r.kml.some(k => /Líneas/.test(k[0]) && k[2] === 'ATARFE_CAMINORO' && k[4] >= 2) && r.kml.some(k => /VEREDA/.test(k[2])), JSON.stringify(r));
   ok('Las coordenadas quedan en su sitio (también si el servidor da latitud primero)', r.kml.every(k => k[3][0] > 37 && k[3][0] < 38 && k[3][1] < -3 && k[3][1] > -4), JSON.stringify(r.kml.map(k => k[3])));
